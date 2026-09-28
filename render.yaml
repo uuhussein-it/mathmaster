@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: sat-mathmaster
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --workers 2 --threads 4 --timeout 120 --chdir . wsgi:application
+    healthCheckPath: /api/courses
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+    # NOTE (persistent results, paid tier only):
+    # To keep student results across restarts, attach a disk and set the DB
+    # path to it, e.g. mount at /data and set:
+    #   - key: SAT_DB_PATH
+    #     value: /data/sat.db
+    # (then change backend/db.py to read SAT_DB_PATH, see README)

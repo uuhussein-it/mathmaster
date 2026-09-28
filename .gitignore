@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.db-shm
+*.db-wal
+data/sat.db.bak-*
+data/sat_25_backup.db
+data/sat_db_v20_backup.db
+data/sat_pre_merge_backup.db
+.DS_Store
