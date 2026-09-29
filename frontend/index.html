@@ -798,7 +798,9 @@ function matchCourse(){
   const sub=document.getElementById('course-subtitle');
   const lessons=document.getElementById('course-lessons');
   if(!curCourse){units.classList.add('hidden');selectedLessons=new Set();document.getElementById('formula-btn').disabled=true;return}
-  document.getElementById('formula-btn').disabled=false;
+  const fbtn=document.getElementById('formula-btn');
+  fbtn.disabled=!curCourse.has_formula;
+  fbtn.title=curCourse.has_formula?'Open the '+curCourse.code+' formula sheet':'No formula sheet uploaded for '+curCourse.code+' yet';
   units.classList.remove('hidden');
   title.textContent=`Grade ${g} — ${b} (${curCourse.code})`;
   const topics=curCourse.topics;
@@ -836,8 +838,8 @@ async function openFormula(){
   if(!curCourse)return;
   const code=curCourse.code;
   const r=await fetch(API+'/api/formula/'+code);
-  if(r.ok)window.open(API+'/api/formula/'+code,'_blank');
-  else alert('Formula sheet for '+code+' is not uploaded yet. It will be available soon.');
+  if(r.ok){window.open(API+'/api/formula/'+code,'_blank');return}
+  alert('No formula sheet has been uploaded for '+code+' yet. It will be available soon.');
 }
 async function startCourse(){
   if(!currentName()){askName();return}

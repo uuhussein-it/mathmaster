@@ -334,7 +334,10 @@ def course_q_to_dict(row):
 
 @app.route("/api/courses")
 def course_list():
-    return jsonify(db.course_catalog())
+    courses = db.course_catalog()
+    for c in courses:
+        c["has_formula"] = os.path.exists(os.path.join(FORMULA_DIR, f"{c['code']}.pdf"))
+    return jsonify(courses)
 
 
 @app.route("/api/course-q-img/<int:qid>")
