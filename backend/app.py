@@ -117,14 +117,22 @@ def q_to_dict(row, reveal=False):
     return d
 
 
-def get_domain(subtopic_id):
+def subtopic_domain_map():
+    """{subtopic_id: topic name} built once (avoids a DB round-trip per question)."""
+    cache = getattr(subtopic_domain_map, "_cache", None)
+    if cache is not None:
+        return cache
     conn = db.get_conn()
-    r = conn.execute(
-        "SELECT t.name FROM subtopics s JOIN topics t ON t.id=s.topic_id WHERE s.id=?",
-        (subtopic_id,),
-    ).fetchone()
+    rows = conn.execute(
+        "SELECT s.id AS sid, t.name AS tname FROM subtopics s JOIN topics t ON t.id=s.topic_id"
+    ).fetchall()
     conn.close()
-    return r["name"] if r else "Unknown"
+    subtopic_domain_map._cache = {r["sid"]: r["tname"] for r in rows}
+    return subtopic_domain_map._cache
+
+
+def get_domain(subtopic_id):
+    return subtopic_domain_map().get(subtopic_id, "Unknown")
 
 
 def image_bearer_qids():
