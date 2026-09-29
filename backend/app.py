@@ -366,7 +366,7 @@ def create_course_session_route():
     body = request.get_json(force=True) or {}
     course_id = body.get("course_id")
     subtopic_ids = body.get("subtopics", []) or []
-    qsize = int(body.get("size", 15))
+    qsize = int(body.get("size", 0) or 0)
     student_name = (body.get("student_name") or "").strip() or None
     if not course_id:
         abort(400, "course_id required")
@@ -376,7 +376,8 @@ def create_course_session_route():
     if not rows:
         abort(404, "no questions for the selected lessons")
     random.shuffle(rows)
-    rows = rows[:max(1, min(qsize, 44))]
+    if qsize > 0:
+        rows = rows[:qsize]
     sid = db.create_course_session(course_id, student_name, qsize=len(rows))
     return jsonify(
         {
@@ -387,11 +388,32 @@ def create_course_session_route():
     )
 
 
+def _solution_parts(correct):
+    """Split a stored free-response answer into its acceptable pieces.
+
+    Curriculum answers are often worked solutions stored as
+    'x = 6 | x = 1 | x = -2' (one step per line). A student who types any one
+    of those steps -- or just the final value -- should be credited, so return
+    the whole string plus each line and each trailing value of an assignment.
+    """
+    parts = {correct}
+    for line in re.split(r"[|\n]", correct):
+        line = line.strip()
+        if not line:
+            continue
+        parts.add(line)
+        m = re.search(r"[A-Za-z]\s*=\s*(-?\d+(?:\.\d+)?(?:/\d+)?)\s*$", line)
+        if m:
+            parts.add(m.group(1))
+    return {p for p in parts if p}
+
+
 def score_course_question(user, row):
     """Return (is_correct, correct_answer) for a course question.
 
     MCQ: user letters (e.g. "BD") compared against the stored correct
-    letter(s).  FR: exact normalized text match, else numeric compare."""
+    letter(s).  FR: matches the whole stored answer, any single line of a
+    stored worked solution, or the numeric value of either."""
     correct = (row["correct"] or "").strip()
     user = (user or "").strip()
     if not user or not correct:
@@ -400,16 +422,9 @@ def score_course_question(user, row):
         u = "".join(sorted(re.findall(r"[A-F]", user.upper())))
         c = "".join(sorted(re.findall(r"[A-F]", correct.upper())))
         return (u == c) if u and c else None, correct
-    un = user.upper().rstrip(".").replace(",", "").replace(" ", "").replace("−", "-").replace("–", "-")
-    cn = correct.upper().rstrip(".").replace(",", "").replace(" ", "").replace("−", "-").replace("–", "-")
-    if un == cn:
-        return True, correct
-    # numeric compare
-    def nums(s):
-        return [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", s)]
-    unums, cnums = nums(user), nums(correct)
-    if unums and cnums and len(cnums) == 1:
-        return (abs(unums[0] - cnums[0]) < 0.01), correct
+    for part in _solution_parts(correct):
+        if normalize_match(user, part):
+            return True, correct
     return None, correct
 
 
@@ -670,10 +685,48 @@ def session_combined(session_id):
     return combined_correct, combined_total, domain_stats
 
 
+def _to_number(s):
+    """Parse a numeric answer tolerantly: '1/2', '0.5', '.5', '1,234', '2e3',
+    unicode minus, and stray trailing periods. Returns float or None."""
+    t = (s or "").strip().replace(",", "").replace("−", "-").replace("–", "-")
+    t = t.replace("$", "").replace("%", "").strip().rstrip(".")
+    if not t:
+        return None
+    try:
+        return float(t)
+    except ValueError:
+        pass
+    m = re.fullmatch(r"(-?)\s*(\d+(?:\.\d+)?)\s*/\s*(\d+(?:\.\d+)?)", t)
+    if m:
+        try:
+            num, den = float(m.group(2)), float(m.group(3))
+        except ValueError:
+            return None
+        if den == 0:
+            return None
+        return -num / den if m.group(1) else num / den
+    return None
+
+
 def normalize_match(user, correct):
+    """True when the typed answer matches the stored one.
+
+    Tries exact text, then case/punctuation-insensitive text, then numeric
+    compare so 0.5, 1/2 and .5 are all accepted for a stored '1/2'."""
     if not user:
         return False
-    return user == correct
+    user_s, correct_s = str(user).strip(), str(correct).strip()
+    if user_s == correct_s:
+        return True
+    canon = lambda x: re.sub(r"[\s,]", "", x).upper().rstrip(".").replace("−", "-").replace("–", "-")
+    if canon(user_s) == canon(correct_s):
+        return True
+    un, cn = _to_number(user_s), _to_number(correct_s)
+    if un is not None and cn is not None:
+        # 1e-6 relative tolerance: accepts values a student rounded by hand
+        # (0.272727 for 3/11) without ever equalling a different answer.
+        return abs(un - cn) <= 1e-6 * max(1.0, abs(cn))
+    return False
 
 
 def scaled_score(correct, total, route):

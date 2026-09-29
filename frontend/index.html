@@ -375,7 +375,8 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
       <div id="course-lessons"></div>
       <div class="row-actions" style="margin-top:18px;align-items:center">
         <label style="margin:0">Questions per set</label>
-        <input id="course-size" type="number" value="10" min="1" max="44" style="width:90px">
+        <input id="course-size" type="number" value="0" min="0" max="100000" style="width:90px">
+        <span class="small" style="margin:0">0 = all questions in the selected lessons</span>
         <span class="spacer"></span>
         <button class="btn" id="course-start" onclick="startCourse()">Start Practice →</button>
       </div>
@@ -573,11 +574,6 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
     <div class="name-note">You can change your name anytime by clicking it in the top bar.</div>
   </div>
 </div>
-    <div class="row-actions" style="justify-content:flex-end">
-      <button class="btn" onclick="beginTest()">Begin Module →</button>
-    </div>
-  </div>
-</div>
 
 <!-- ======= Payload / Code ======= -->
 <script>
@@ -593,6 +589,46 @@ function isMC(q){return q.type!=='SPR'&&((q.options&&q.options.some(o=>o&&o.trim
 function bodyHTML(q,isMc){return q.question_image?`<img class="qshot" src="${q.question_image}" loading="lazy" alt="Question">`:`<div class="qprompt">${isMc?esc(q.prompt):esc(q.prompt)}</div>`}
 function optsHTML(q,isMc){return isMc?['A','B','C','D'].map((k,ki)=>`<button class="opt" data-k="${k}"><span class="key">${k}</span>${optBody(q,ki)}</button>`).join(''):`<input class="finput" placeholder="Type your answer…">`}
 function norm(s){return (s||'').toString().trim().replace(/,$/,'').toUpperCase()}
+
+/* Tolerant numeric parse: '1/2', '0.5', '.5', '1,234', unicode minus, '$.50'.
+   Returns Number or NaN. */
+function toNumber(s){
+  let t=(s==null?'':String(s)).trim().replace(/,/g,'').replace(/−/g,'-').replace(/–/g,'-')
+    .replace(/\$/g,'').replace(/%/g,'').trim().replace(/\.$/,'');
+  if(!t)return NaN;
+  if(/^-?(\d+\.?\d*|\.\d+)(e-?\d+)?$/i.test(t))return parseFloat(t);
+  let m=t.match(/^(-?)\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/);
+  if(m){const n=parseFloat(m[2]),d=parseFloat(m[3]);if(!d)return NaN;return m[1]?-n/d:n/d;}
+  return NaN;
+}
+
+/* Answer check for typed (free-response) answers: exact text, then numeric. */
+function frMatch(user,correct){
+  if(user==null||!String(user).trim())return false;
+  const u=String(user).trim(),c=String(correct==null?'':correct).trim();
+  if(u===c)return true;
+  const canon=x=>x.replace(/[\s,]/g,'').toUpperCase().replace(/\.$/,'').replace(/−/g,'-').replace(/–/g,'-');
+  if(canon(u)===canon(c))return true;
+  const un=toNumber(u),cn=toNumber(c);
+  // 1e-6 relative tolerance: accepts hand-rounded values (0.272727 for 3/11)
+  if(!Number.isNaN(un)&&!Number.isNaN(cn))return Math.abs(un-cn)<=1e-6*Math.max(1,Math.abs(cn));
+  return false;
+}
+
+/* Curriculum FR answers can be stored as a worked solution, one step per
+   line: 'x = 6 | x = 1 | x = -2'. Accept the typed answer if it matches the
+   whole string, any single step, or the numeric value of a step. */
+function frMatchAny(user,correct){
+  if(frMatch(user,correct))return true;
+  const parts=String(correct==null?'':correct).split(/[|\n]/);
+  for(let p of parts){
+    p=p.trim(); if(!p)continue;
+    if(frMatch(user,p))return true;
+    const m=p.match(/[A-Za-z]\s*=\s*(-?\d+(?:\.\d+)?(?:\/\d+)?)\s*$/);
+    if(m&&frMatch(user,m[1]))return true;
+  }
+  return false;
+}
 
 /* Render $...$ math segments with KaTeX inside a container. */
 function renderKatex(container){
@@ -671,7 +707,7 @@ function renderSubQ(i){subIdx=i;const q=subQuestionState[i];const a=document.get
   a.innerHTML=`<div class="card qcard"><div class="qhead"><span class="qnum">Question ${i+1} of ${subQuestionState.length}</span><span class="qmeta"><span class="badge ${q.difficulty}">${q.difficulty}</span><span class="small">${esc(q.source||'')}</span><span class="small">${q.type}</span></span></div>${bodyHTML(q,isMc)}${opts}<div class="feedback hidden" data-fb></div><div class="row-actions"><button class="btn secondary" ${i<=0?'disabled':''} onclick="renderSubQ(${i-1})">← Prev</button><button class="btn" ${i>=subQuestionState.length-1?'disabled':''} onclick="renderSubQ(${i+1})">Next →</button><span class="spacer" style="flex:1"></span><button class="feedback-btn" onclick="openFeedback(q)">⚠ Report a mistake</button></div></div>`;
   renderKatex(a);
   a.querySelectorAll('.opt[data-k]').forEach(b=>b.onclick=()=>{const fb=a.querySelector('[data-fb]');b.classList.add('selected');const correct=norm(q.correct);const k=b.dataset.k;b.classList.add(k===correct?'correct':'wrong');if(k!==correct)a.querySelectorAll('.opt').forEach(o=>{if(o.dataset.k===correct)o.classList.add('correct')});fb.className='feedback '+(k===correct?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=k===correct?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1400)});
-  a.querySelectorAll('.finput').forEach(inp=>inp.onchange=()=>{const fb=a.querySelector('[data-fb]');const ok=norm(inp.value)===norm(q.correct);fb.className='feedback '+(ok?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=ok?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1500)});
+  a.querySelectorAll('.finput').forEach(inp=>inp.onchange=()=>{const fb=a.querySelector('[data-fb]');const ok=frMatch(inp.value,q.correct);fb.className='feedback '+(ok?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=ok?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1500)});
 }
 
 /* ---------- EDITOR ---------- */
@@ -844,7 +880,7 @@ async function openFormula(){
 async function startCourse(){
   if(!currentName()){askName();return}
   if(!curCourse||!selectedLessons.size)return;
-  const size=Math.max(1,Math.min(44,parseInt(document.getElementById('course-size').value||'10',10)));
+  const size=Math.max(0,parseInt(document.getElementById('course-size').value||'0',10));
   const body={course_id:curCourse.id,subtopics:[...selectedLessons].map(Number),size,student_name:currentName()};
   try{
     const s=await go('/api/course-sessions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
