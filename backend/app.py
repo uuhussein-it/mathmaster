@@ -334,6 +334,10 @@ def course_q_to_dict(row):
         "question_image": f"/api/course-q-img/{row['id']}",
         "is_mcq": bool(row["is_mcq"]),
         "noptions": nopts,
+        # A stored answer with 2+ letters ('AB', 'AEF') means "select all that
+        # apply". Derive it from the answer itself rather than the prompt text,
+        # which is unreliable.
+        "multi_select": len(set(letters)) > 1,
         "topic": row["topic_name"] if "topic_name" in row.keys() else None,
         "subtopic": (row["subtopic_ref"] + " " + row["subtopic_name"]).strip()
                     if "subtopic_ref" in row.keys() else None,

@@ -39,6 +39,37 @@ body{background:linear-gradient(180deg,#eef2ff 0,var(--bg) 320px)}
 .hstat .l{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
 .home-rows{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:720px){.home-rows{grid-template-columns:1fr}}
+
+/* ---------- Two-choice intro ---------- */
+.pick{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:6px}
+@media(max-width:720px){.pick{grid-template-columns:1fr}}
+.pick-card{position:relative;overflow:hidden;border:none;cursor:pointer;text-align:left;
+  border-radius:22px;padding:30px 28px 26px;color:#fff;display:flex;flex-direction:column;
+  gap:6px;min-height:190px;transition:transform .18s,box-shadow .18s;font-family:inherit}
+.pick-card.sat{background:linear-gradient(140deg,#3b2fd0 0%,#5b46ff 45%,#8b5cf6 100%);
+  box-shadow:0 16px 34px rgba(91,70,255,.32)}
+.pick-card.school{background:linear-gradient(140deg,#0b7a5e 0%,#12a150 45%,#34c26b 100%);
+  box-shadow:0 16px 34px rgba(18,161,80,.30)}
+.pick-card:hover{transform:translateY(-4px) scale(1.015)}
+.pick-card.sat:hover{box-shadow:0 24px 46px rgba(91,70,255,.42)}
+.pick-card.school:hover{box-shadow:0 24px 46px rgba(18,161,80,.40)}
+.pick-card:active{transform:translateY(-1px) scale(.995)}
+.pick-glow{position:absolute;right:-40px;top:-40px;width:190px;height:190px;border-radius:50%;
+  background:radial-gradient(circle,rgba(255,255,255,.28),transparent 68%);pointer-events:none}
+.pick-card::after{content:"∑";position:absolute;right:14px;bottom:-30px;font-size:132px;font-weight:800;
+  opacity:.13;font-family:Georgia,serif;pointer-events:none;line-height:1}
+.pick-emoji{font-size:44px;line-height:1;filter:drop-shadow(0 4px 10px rgba(0,0,0,.22))}
+.pick-title{font-size:29px;font-weight:900;letter-spacing:-.5px;line-height:1.15}
+.pick-sub{font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.9);max-width:290px}
+.pick-go{margin-top:auto;align-self:flex-start;background:rgba(255,255,255,.95);color:#1d2540;
+  padding:8px 18px;border-radius:22px;font-weight:800;font-size:14px;box-shadow:0 4px 12px rgba(0,0,0,.16)}
+
+/* next-step chooser under the two big cards */
+.nextwrap{margin-top:22px;animation:riseIn .38s ease-out both}
+.nextwrap h3{font-size:19px;margin-bottom:4px}
+.nextwrap .sub{margin-bottom:14px}
+.nextwrap .backlink{background:none;border:none;color:var(--brand);font-weight:700;cursor:pointer;
+  font-size:14px;padding:0;margin-bottom:14px}
 .mode-card{display:flex;gap:18px;align-items:center;padding:24px;background:var(--card);border:1.5px solid var(--line);border-radius:14px;cursor:pointer;margin-bottom:0;transition:.15s;position:relative}
 .mode-card:hover{border-color:var(--brand);box-shadow:0 8px 20px rgba(47,91,255,.12);transform:translateY(-2px)}
 .mode-card .icon{font-size:34px;background:var(--brand-soft);border-radius:12px;width:60px;height:60px;display:flex;align-items:center;justify-content:center;flex:none}
@@ -92,6 +123,17 @@ body{background:linear-gradient(180deg,#eef2ff 0,var(--bg) 320px)}
 .imgopts{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin:4px 0 10px}
 .imgopts img{width:100%;border:1px solid var(--line);border-radius:6px;background:#fff}
 .opt.selected .key{background:var(--brand);color:#fff}
+/* Multi-answer ("select all that apply") options */
+.multihint{margin-bottom:10px;padding:9px 13px;border-radius:10px;font-size:13px;font-weight:700;
+  color:#7a3c00;background:linear-gradient(90deg,#fff2d6,#ffe9c2);border:1.5px solid #f0c078}
+.opt.multi{display:flex;align-items:flex-start;gap:11px;text-align:left;line-height:1.45}
+.opt.multi .tickbox{flex:0 0 24px;width:24px;height:24px;margin-top:1px;border-radius:7px;
+  border:2px solid #b6bfd4;background:#fff;display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:900;color:#fff;transition:all .15s}
+.opt.multi.selected{border-color:var(--brand);background:#eef2ff}
+.opt.multi.selected .tickbox{border-color:var(--brand);background:var(--brand)}
+.opt.multi .otext{flex:1 1 auto}
+
 .finput{width:100%;padding:13px 15px;border:1.5px solid var(--line);border-radius:11px;font-size:17px;font-variant-numeric:tabular-nums}
 .finput:focus{outline:none;border-color:var(--brand)}
 .feedback{margin-top:12px;padding:13px 15px;border-radius:10px;font-weight:600;font-size:14px}
@@ -259,29 +301,26 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
       <p class="sub">Every question comes from released Digital SAT math exams (2023–2025), organized by the MathBook subtopics you'll actually see on test day.</p>
     </div>
     <div class="home-stats" id="home-stats"></div>
-    <div class="home-rows">
-      <div class="mode-card" onclick="goView('test')">
-        <div class="icon">⏱️</div>
-        <div><div class="mtitle">Adaptive Timed Mock Test</div>
-        <div class="mdesc">Bluebook-style experience: 2 modules, adaptive routing, built-in Desmos calculator, reference sheet, and a scaled score at the end.</div>
-        <span class="mode-tag">Most realistic practice</span></div>
-        <span class="arrow">→</span>
-      </div>
-      <div class="mode-card" onclick="goView('practice')">
-        <div class="icon">🎯</div>
-        <div><div class="mtitle">Practice by Topic</div>
-        <div class="mdesc">Pick a subtopic from the full MathBook and solve questions in order, with instant feedback and your progress tracked.</div>
-        <span class="mode-tag">1,462 questions</span></div>
-        <span class="arrow">→</span>
-      </div>
-      <div class="mode-card" onclick="goView('courses')">
-        <div class="icon">📖</div>
-        <div><div class="mtitle">School Curriculum (Grades 9–12)</div>
-        <div class="mdesc">Practice by your school's grade, track (General / Advanced / ASP) and lessons — real workbook questions with screenshots and instant grading.</div>
-        <span class="mode-tag">1712 lesson questions</span></div>
-        <span class="arrow">→</span>
-      </div>
+
+    <div class="pick" id="home-pick">
+      <button class="pick-card sat" onclick="pickPath('sat')">
+        <span class="pick-glow"></span>
+        <span class="pick-emoji">🎯</span>
+        <span class="pick-title">SAT</span>
+        <span class="pick-sub">Digital SAT Math · 1,462 real exam questions</span>
+        <span class="pick-go">Start →</span>
+      </button>
+      <button class="pick-card school" onclick="pickPath('school')">
+        <span class="pick-glow"></span>
+        <span class="pick-emoji">🏫</span>
+        <span class="pick-title">School Topics</span>
+        <span class="pick-sub">Grades 9–12 · your textbook lessons · 1,712 questions</span>
+        <span class="pick-go">Start →</span>
+      </button>
     </div>
+
+    <div id="home-next" class="hidden"></div>
+
     <div class="site-footer">
       Unofficial independent study tool. SAT MathMaster is <b>not affiliated with, endorsed by, or sponsored by the College Board</b> or the Digital SAT® program. All questions are compiled from publicly shared released-exam materials and are transcribed/rendered in good faith — <b>errors may occur</b>. Every question includes a "Report a mistake" button, and reported issues are reviewed and corrected. The operator assumes no liability for inaccuracies, results, test scores, or any outcome arising from use of this site. Testing, scoring, and question text belong to their respective owners. By using this site you accept these terms of use.
     </div>
@@ -663,12 +702,41 @@ function goView(v){
   document.querySelectorAll('.navbtn').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
   document.querySelectorAll('.view').forEach(x=>x.classList.add('hidden'));
   document.getElementById('view-'+v).classList.remove('hidden');
-  if(v==='home')loadStats();
+  if(v==='home'){loadStats();resetPick();}
   if(v==='practice')loadPractice();
   if(v==='editor')loadEditor();
   if(v==='results')loadResults();
   if(v==='courses')loadCourses();
   if(v==='test'){const ra=document.getElementById('report-area');if(ra&&!ra.classList.contains('hidden'))resetTestUI();else loadTestSetup();}
+}
+
+/* Intro: two choices (SAT / School Topics), then the next step for that path. */
+function resetPick(){
+  const n=document.getElementById('home-next');
+  if(n){n.classList.add('hidden');n.innerHTML='';}
+  const p=document.getElementById('home-pick');
+  if(p)p.classList.remove('hidden');
+}
+function pickPath(which){
+  const n=document.getElementById('home-next');
+  document.getElementById('home-pick').classList.add('hidden');
+  const opts=which==='sat'
+    ?[['⏱️','Adaptive Mock Test','The full timed Bluebook experience: 2 modules, adaptive routing, Desmos calculator, reference sheet and a scaled score.','test','Most realistic'],
+       ['📚','Practice by Topic','Choose a subtopic and work through every question in order, with instant feedback.','practice','1,462 questions']]
+    :[['📖','School Curriculum','Pick your grade and track, choose the lessons you want, and practise with your real workbook questions.','courses','Grades 9–12']];
+  n.innerHTML=`<div class="nextwrap">
+      <button class="backlink" onclick="resetPick()">← Change subject</button>
+      <h3>${which==='sat'?'🎯 SAT — what would you like to do?':'🏫 School Topics — what would you like to do?'}</h3>
+      <p class="sub">Pick a starting point; you can switch any time using the menu above.</p>
+      <div class="home-rows">${opts.map(([ic,t,d,v,tag])=>`
+        <div class="mode-card" onclick="goView('${v}')">
+          <div class="icon">${ic}</div>
+          <div><div class="mtitle">${t}</div><div class="mdesc">${d}</div>
+          <span class="mode-tag">${tag}</span></div>
+          <span class="arrow">→</span>
+        </div>`).join('')}</div>
+    </div>`;
+  n.classList.remove('hidden');
 }
 async function go(url,opts){const r=await fetch(API+url,opts);if(!r.ok){const e=await r.text();throw new Error(e)}return r.json()}
 
@@ -901,11 +969,13 @@ function courseRenderQ(){
   const saved=CT.answers[String(q.id)]||'';
   let opts='';
   if(isMc){
-    const multiHint=(q.noptions||4)>4||/select all/i.test(q.prompt||'')?`<div class="small" style="margin-bottom:8px;color:var(--warn)">Select all answers that apply — tap each letter you choose.</div>`:'';
+    const multi=q.multi_select||(q.noptions||4)>4||/select all|all that apply|which of the following/i.test(q.prompt||'');
+    const multiHint=multi?`<div class="multihint">✓ This question has more than one correct answer — tick <b>every</b> box that applies.</div>`:'';
     opts=multiHint+keys.map(k=>{
       const sel=saved.includes(k)?' selected':'';
       const txt=q.options[keys.indexOf(k)]||'';
-      return `<button class="opt${sel}" data-k="${k}"><span class="key">${k}</span>${txt?esc(txt):'<em style="color:#9aa3b4">From the figure above</em>'}</button>`;
+      const box=multi?`<span class="tickbox" aria-hidden="true">${sel?'✓':''}</span>`:`<span class="key">${k}</span>`;
+      return `<button class="opt${sel}${multi?' multi':''}" data-k="${k}">${box}<span class="otext">${txt?esc(txt):'<em style="color:#9aa3b4">From the figure above</em>'}</span></button>`;
     }).join('');
   }else{
     opts=`<input class="finput" id="course-fr" value="${esc(saved)}" placeholder="Type your answer…">`;
@@ -921,7 +991,12 @@ function courseRenderQ(){
       if(cur.includes(k))cur=cur.filter(x=>x!==k);else cur.push(k);
       const val=cur.sort().join('');
       CT.answers[String(q.id)]=val;
-      area.querySelectorAll('.opt').forEach(o=>o.classList.toggle('selected',val.includes(o.dataset.k)));
+      area.querySelectorAll('.opt').forEach(o=>{
+        const on=val.includes(o.dataset.k);
+        o.classList.toggle('selected',on);
+        const tb=o.querySelector('.tickbox');
+        if(tb)tb.textContent=on?'✓':'';
+      });
       const n2=Object.keys(CT.answers).length;
       document.getElementById('cq-answered').textContent=`${n2} of ${CT.q.length} answered`;
     });
