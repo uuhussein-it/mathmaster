@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import db
 
-from flask import Flask, jsonify, request, send_from_directory, abort
+from flask import Flask, jsonify, request, send_from_directory, abort, session
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND = os.path.join(ROOT, "frontend")
@@ -14,6 +14,14 @@ OPTION_IMG_DIR = os.path.join(ROOT, "data", "option_imgs")
 Q_IMG_DIR = os.path.join(ROOT, "data", "question_imgs")
 
 app = Flask(__name__, static_folder=FRONTEND, static_url_path="")
+
+# --- Admin access -----------------------------------------------------------
+# ADMIN_PASSWORD and SECRET_KEY come from the environment (set them as Render
+# env vars). The fallbacks exist only so the app still boots locally.
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or "admin"
+app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
+app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
+                  PERMANENT_SESSION_LIFETIME=60 * 60 * 12)
 
 MODULE1_SIZE = 22
 MODULE2_SIZE = 22
@@ -94,6 +102,162 @@ def option_images_for(qid):
     ]
 
 
+def is_admin():
+    return bool(session.get("admin"))
+
+
+def require_admin():
+    if not is_admin():
+        abort(401, "admin login required")
+
+
+# --- Data quality checker ----------------------------------------------------
+# The imported textbook data went through OCR, so a chunk of it is unusable as
+# graded text. These heuristics build the admin's "needs fixing" queue.
+OCR_JUNK = re.compile(r'[!@#$%^&*_+=<>\\/|~`"\']{2,}')
+JUNK_CHARS = '!"#$%&\'@`~^_'
+
+
+def _looks_like_junk_option(text):
+    """True when an option is OCR debris rather than a real choice."""
+    t = (text or "").strip()
+    if not t:
+        return False
+    if OCR_JUNK.search(t):
+        return True
+    core = t.strip(JUNK_CHARS).strip()
+    # Things like '"', '&', '("' -- punctuation with no actual content.
+    if not core:
+        return True
+    # A single character with no number/letter content, e.g. a stray quote.
+    if len(core) == 1 and not (core.isalnum() or core in "=+-/^"):
+        return True
+    return False
+
+
+def flag_reasons(row, kind):
+    """Human-readable list of why this question probably can't be graded.
+
+    Long worked solutions are NOT flagged: grading already credits any step of a
+    '|' separated solution, so those are safe.
+    """
+    out = []
+    is_mcq = bool(row["is_mcq"]) if kind == "course" else (
+        len(re.findall(r"[A-D]", row["correct"] or "")) > 0
+        and not (row["correct"] or "").strip().replace(".", "", 1).isdigit()
+    )
+    keys = "abcdef" if kind == "course" else "abcd"
+    opts = [(row["option_" + k] or "") for k in keys]
+    nonempty = [o for o in opts if o.strip()]
+    correct = (row["correct"] or "").strip()
+
+    if not correct:
+        out.append("no answer stored")
+    if OCR_JUNK.search(correct) or re.search(r"[�]", correct):
+        out.append("answer text looks like OCR junk")
+
+    if is_mcq:
+        if not nonempty:
+            out.append("multiple choice but every option is empty")
+        junk = sum(1 for o in nonempty if _looks_like_junk_option(o))
+        if junk:
+            out.append(f"{junk} option(s) look like OCR junk")
+        letters = re.findall(r"[A-F]", correct)
+        if len(letters) == 1 and nonempty:
+            used = [o.strip() for o in nonempty]
+            idx = ord(letters[0]) - ord("A")
+            if idx < len(used) and not used[idx]:
+                out.append(f"answer says {letters[0]} but that option is empty")
+        elif len(letters) > 1:
+            idx = max(ord(c) - ord("A") for c in letters)
+            if idx >= len(nonempty):
+                out.append("answer letter points past the last option")
+    else:
+        # free response: a bare letter usually means the options were lost in OCR
+        if re.match(r"^\W{0,2}[A-F]\s*[.):]", correct) and not nonempty:
+            out.append("answer is a letter but the options are missing")
+        if re.match(r"^\s*[A-F]\s*$", correct):
+            out.append("answer is a single letter")
+    if not (row["prompt"] or "").strip():
+        out.append("prompt is empty")
+    return out
+
+
+# Higher = more broken; the admin queue sorts worst-first.
+_SEVERITY = [
+    ("no answer stored", 100),
+    ("every option is empty", 95),
+    ("options are missing", 90),
+    ("single letter", 80),
+    ("past the last option", 75),
+    ("option is empty", 70),
+    ("answer text looks like OCR junk", 60),
+    ("option(s) look like OCR junk", 55),
+    ("prompt is empty", 50),
+]
+
+
+def flag_score(reasons):
+    return max([s for r in reasons for k, s in _SEVERITY if r.startswith(k)] or [10])
+
+
+@app.route("/api/admin/flagged")
+def admin_flagged():
+    """Every question the checker thinks is unsafe to auto-grade."""
+    require_admin()
+    kind = request.args.get("kind", "all")
+    limit = min(int(request.args.get("limit", 400)), 2000)
+    course_id = request.args.get("course_id", type=int)
+
+    flagged = []
+    if kind in ("all", "course"):
+        sql = ("SELECT cq.*, cs.name AS subtopic_name, cs.ref AS subtopic_ref, "
+               "c.code AS course_code, c.name AS course_name "
+               "FROM course_questions cq "
+               "LEFT JOIN course_subtopics cs ON cs.id=cq.subtopic_id "
+               "LEFT JOIN courses c ON c.id=cq.course_id")
+        args = ()
+        if course_id:
+            sql += " WHERE cq.course_id=?"
+            args = (course_id,)
+        conn = db.get_conn()
+        rows = conn.execute(sql + " ORDER BY cq.id", args).fetchall()
+        conn.close()
+        for r in rows:
+            reasons = flag_reasons(r, "course")
+            if reasons:
+                flagged.append({
+                    "kind": "course", "id": r["id"], "reasons": reasons,
+                    "label": f"{r['course_code']} · {r['subtopic_ref']} {r['subtopic_name']}",
+                    "prompt": (r["prompt"] or "")[:120],
+                    "correct": r["correct"],
+                    "is_mcq": bool(r["is_mcq"]),
+                    "options": [r["option_" + k] for k in "abcdef"],
+                })
+
+    if kind in ("all", "sat"):
+        conn = db.get_conn()
+        rows = conn.execute(
+            """SELECT q.*, s.name AS sub_name FROM questions q
+               JOIN subtopics s ON s.id=q.subtopic_id ORDER BY q.id"""
+        ).fetchall()
+        conn.close()
+        for r in rows:
+            reasons = flag_reasons(r, "sat")
+            if reasons:
+                flagged.append({
+                    "kind": "sat", "id": r["id"], "reasons": reasons,
+                    "label": f"SAT · {r['sub_name']}",
+                    "prompt": (r["prompt"] or "")[:120],
+                    "correct": r["correct"],
+                    "is_mcq": r["option_a"] is not None,
+                    "options": [r["option_" + k] for k in "abcd"],
+                })
+
+    return jsonify({"count": len(flagged),
+                    "questions": sorted(flagged, key=lambda q: -flag_score(q["reasons"]))[:limit]})
+
+
 def q_to_dict(row, reveal=False):
     imgs = option_images_for(row["id"])
     d = {
@@ -114,6 +278,8 @@ def q_to_dict(row, reveal=False):
     if reveal:
         d["correct"] = row["correct"]
         d["clean"] = is_clean(row)
+        d["flags"] = flag_reasons(row, "sat")
+        d["subtopic"] = row["subtopic_name"] if "subtopic_name" in row.keys() else None
     return d
 
 
@@ -250,6 +416,75 @@ def topics():
     return jsonify(result)
 
 
+@app.route("/api/admin/course-questions")
+def admin_list_course_questions():
+    """Every curriculum question with its answer, for the admin browser."""
+    require_admin()
+    course_id = request.args.get("course_id", type=int)
+    limit = min(int(request.args.get("limit", 3000)), 6000)
+    sql = ("SELECT cq.*, cs.name AS subtopic_name, cs.ref AS subtopic_ref, "
+           "c.code AS course_code, c.name AS course_name "
+           "FROM course_questions cq "
+           "LEFT JOIN course_subtopics cs ON cs.id=cq.subtopic_id "
+           "LEFT JOIN courses c ON c.id=cq.course_id")
+    args = ()
+    if course_id:
+        sql += " WHERE cq.course_id=?"
+        args = (course_id,)
+    conn = db.get_conn()
+    rows = conn.execute(sql + " ORDER BY cq.id", args).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        d = course_q_to_dict(r, reveal=True)
+        out.append({
+            "kind": "course", "id": r["id"],
+            "label": f"{r['course_code']} · {r['subtopic_ref']} {r['subtopic_name']}",
+            "prompt": r["prompt"], "correct": r["correct"],
+            "is_mcq": bool(r["is_mcq"]), "options": d["options"], "flags": d["flags"],
+        })
+    return jsonify({"count": len(out), "questions": out[:limit]})
+
+
+@app.route("/api/admin/grade-test", methods=["POST"])
+def admin_grade_test():
+    """Dry-run a student answer against an answer key, so the admin can confirm
+    a fix grades correctly before students see it.
+
+    `answer_key` is optional: when given, the (possibly unsaved) key typed in the
+    admin form is tested instead of the stored one.
+    """
+    require_admin()
+    body = request.get_json(force=True) or {}
+    kind = body.get("kind") or "course"
+    qid = body.get("id")
+    answer = str(body.get("answer") or "")
+    key = body.get("answer_key")
+    conn = db.get_conn()
+    table = "questions" if kind == "sat" else "course_questions"
+    row = conn.execute(f"SELECT * FROM {table} WHERE id=?", (qid,)).fetchone()
+    conn.close()
+    if row is None:
+        abort(404, "no such question")
+    if key is not None:
+        key = str(key).strip()
+        if not key:
+            abort(400, "answer key is empty")
+        stored = key
+        if kind == "sat":
+            correct = normalize_match(answer, key.upper())
+        else:
+            correct = any(normalize_match(answer, part) for part in _solution_parts(key))
+    else:
+        stored = str(row["correct"]).strip()
+        if kind == "sat":
+            correct = normalize_match(answer, stored.upper())
+        else:
+            correct, _ = score_course_question(answer, row)
+    return jsonify({"correct": bool(correct), "stored_answer": row["correct"],
+                    "tested_key": stored})
+
+
 @app.route("/api/questions")
 def questions():
     subtopic = request.args.get("subtopic", type=int)
@@ -261,23 +496,78 @@ def questions():
     else:
         rows = conn.execute("SELECT * FROM questions ORDER BY id").fetchall()
     conn.close()
-    return jsonify([q_to_dict(r, reveal=True) for r in rows])
+    # The answer key is only exposed to signed-in admins.
+    return jsonify([q_to_dict(r, reveal=is_admin()) for r in rows])
+
+
+@app.route("/api/admin/me")
+def admin_me():
+    return jsonify({"is_admin": is_admin()})
+
+
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    body = request.get_json(force=True) or {}
+    given = str(body.get("password") or "")
+    if not ADMIN_PASSWORD or given != ADMIN_PASSWORD:
+        abort(401, "wrong password")
+    session.clear()
+    session["admin"] = True
+    session.permanent = True
+    return jsonify({"ok": True, "is_admin": True})
+
+
+@app.route("/api/admin/logout", methods=["POST"])
+def admin_logout():
+    session.clear()
+    return jsonify({"ok": True, "is_admin": False})
 
 
 @app.route("/api/questions/<int:qid>", methods=["PUT"])
 def update_question(qid):
+    require_admin()
     body = request.get_json(force=True) or {}
     prompt = (body.get("prompt") or "").strip()
     opts = [str(body.get("option_a") or ""), str(body.get("option_b") or ""),
             str(body.get("option_c") or ""), str(body.get("option_d") or "")]
-    correct = (body.get("correct") or "A").strip()
+    correct = (body.get("correct") or "").strip()
     number = body.get("number")
     source = (body.get("source") or "").strip()
     if not prompt:
         abort(400, "prompt required")
-    if not any(o.strip() for o in opts):
-        abort(400, "at least one option required")
+    if not correct:
+        abort(400, "correct answer required")
     db.update_question(qid, prompt, opts, correct, number, source)
+    return jsonify({"ok": True, "id": qid})
+
+
+@app.route("/api/admin/course-questions/<int:qid>")
+def admin_course_question(qid):
+    require_admin()
+    row = db.course_question(qid)
+    if row is None:
+        abort(404, "no such course question")
+    return jsonify(course_q_to_dict(row, reveal=True))
+
+
+@app.route("/api/admin/course-questions/<int:qid>", methods=["PUT"])
+def admin_update_course_question(qid):
+    require_admin()
+    if db.course_question(qid) is None:
+        abort(404, "no such course question")
+    body = request.get_json(force=True) or {}
+    prompt = (body.get("prompt") or "").strip()
+    if not prompt:
+        abort(400, "prompt required")
+    opts = [(body.get("option_" + k) or "").strip() for k in "abcdef"]
+    correct = (body.get("correct") or "").strip()
+    is_mcq = bool(body.get("is_mcq"))
+    number = body.get("number")
+    if not correct:
+        abort(400, "correct answer required")
+    if is_mcq and not sum(1 for o in opts if o):
+        abort(400, "a multiple-choice question needs at least one option")
+    db.update_course_question(qid, prompt, opts, correct, is_mcq, number)
     return jsonify({"ok": True, "id": qid})
 
 
@@ -319,14 +609,14 @@ COURSE_IMG_DIR = os.path.join(ROOT, "data", "course_imgs")
 FORMULA_DIR = os.path.join(ROOT, "data", "formulas")
 
 
-def course_q_to_dict(row):
+def course_q_to_dict(row, reveal=False):
     opts = [row["option_a"], row["option_b"], row["option_c"],
             row["option_d"], row["option_e"], row["option_f"]]
     nonempty = sum(1 for o in opts if o and o.strip())
     letters = re.findall(r"[A-F]", row["correct"] or "") if row["is_mcq"] else []
     nopts = max(4, nonempty, (ord(letters[-1]) - ord("A") + 1) if letters else 0) if row["is_mcq"] else 4
     nopts = min(6, nopts)
-    return {
+    d = {
         "id": row["id"],
         "number": row["number"],
         "prompt": row["prompt"],
@@ -342,6 +632,13 @@ def course_q_to_dict(row):
         "subtopic": (row["subtopic_ref"] + " " + row["subtopic_name"]).strip()
                     if "subtopic_ref" in row.keys() else None,
     }
+    if "course_code" in row.keys():
+        d["course"] = row["course_code"]
+        d["course_name"] = row["course_name"]
+    if reveal:
+        d["correct"] = row["correct"]
+        d["flags"] = flag_reasons(row, "course")
+    return d
 
 
 @app.route("/api/courses")

@@ -282,15 +282,58 @@ def student_results():
 
 
 def update_question(qid, prompt, opts, correct, number, source):
+    """SAT question edit. Allows free-response saves: options may all be empty.
+
+    `number`/`source` are kept as-is when not supplied.
+    """
     conn = get_conn()
     conn.execute(
         """UPDATE questions
-           SET prompt=?, option_a=?, option_b=?, option_c=?, option_d=?, correct=?, number=?, source=?
+           SET prompt=?, option_a=?, option_b=?, option_c=?, option_d=?, correct=?,
+               number=COALESCE(?, number), source=COALESCE(NULLIF(?,''), source)
            WHERE id=?""",
         (prompt, opts[0], opts[1], opts[2], opts[3], correct, number, source, qid),
     )
     conn.commit()
     conn.close()
+
+
+def update_course_question(qid, prompt, opts, correct, is_mcq, number=None):
+    """Curriculum question edit. opts is a list of up to 6 option strings.
+
+    Free-response questions keep empty options, and `correct` holds the
+    accepted answer (numbers, or '|'/newline separated solution steps).
+    `number` is kept as-is when not supplied.
+    """
+    opts = list(opts) + [""] * (6 - len(opts))
+    conn = get_conn()
+    conn.execute(
+        """UPDATE course_questions
+           SET prompt=?, option_a=?, option_b=?, option_c=?, option_d=?,
+               option_e=?, option_f=?, correct=?, is_mcq=?,
+               number=COALESCE(?, number)
+           WHERE id=?""",
+        (prompt, opts[0], opts[1], opts[2], opts[3], opts[4], opts[5],
+         correct, 1 if is_mcq else 0, number, qid),
+    )
+    conn.commit()
+    conn.close()
+
+
+def course_question(qid):
+    conn = get_conn()
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        """SELECT cq.*, cs.name AS subtopic_name, cs.ref AS subtopic_ref,
+                  c.code AS course_code, c.name AS course_name
+           FROM course_questions cq
+           LEFT JOIN course_subtopics cs ON cs.id = cq.subtopic_id
+           LEFT JOIN courses c ON c.id = cq.course_id
+           WHERE cq.id=?""",
+        (qid,),
+    ).fetchone()
+    conn.close()
+    return row
 
 
 def upsert_course(code, grade, branch, name, term=1):

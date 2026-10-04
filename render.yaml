@@ -9,9 +9,20 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
+      # Password for the Admin page (fix questions/answers). CHANGE THIS.
+      - key: ADMIN_PASSWORD
+        generateValue: true
+      # Signs the admin login cookie. CHANGE THIS to any long random string
+      # (openssl rand -hex 32), otherwise you are logged out on every restart.
+      - key: SECRET_KEY
+        generateValue: true
     # NOTE (persistent results, paid tier only):
-    # To keep student results across restarts, attach a disk and set the DB
-    # path to it, e.g. mount at /data and set:
+    # To keep student results -- AND your admin answer fixes -- across
+    # restarts, attach a disk and set the DB path to it, e.g. mount at /data:
+    #   disk:
+    #     name: data
+    #     mountPath: /data
+    #     sizeGB: 1
     #   - key: SAT_DB_PATH
     #     value: /data/sat.db
-    # (then change backend/db.py to read SAT_DB_PATH, see README)
+    # backend/db.py already reads SAT_DB_PATH.

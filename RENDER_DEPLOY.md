@@ -47,13 +47,24 @@ site is at `https://<your-service>.onrender.com`.
 - Open the home page → click **Grades 9–12** tab.
 
 ## Notes / gotchas
+- **Set these two environment variables in Render before going live** (Dashboard
+  → your service → Environment):
+  - `ADMIN_PASSWORD` — the password for the **Admin** page where you fix
+    questions and answers. Any value you choose. Without it the app falls back
+    to the literal `admin`, which is fine locally but not in production.
+  - `SECRET_KEY` — any long random string, e.g. `openssl rand -hex 32`. It signs
+    the admin login cookie. Without it a new key is generated on every restart,
+    which logs you out each time the server restarts.
+- The **Admin** button only appears in the nav bar once you are signed in, and
+  the answer key is stripped from `/api/questions` for everyone else.
 - **Free tier sleeps** when idle (~1 min cold start on first hit). Fine for a
   practice site. The paid tier ($7/mo) keeps it always-on and adds a persistent
   disk.
-- **SQLite is stored on the container's ephemeral disk on the free tier**, so
-  student results reset whenever Render redeploys/restarts. If you want results
-  to persist, attach a **persistent disk** (paid) and point `data/sat.db` at it
-  (see `render.yaml` comment), or move to Postgres.
+- **⚠️ Admin edits need a persistent disk.** SQLite lives on the container's
+  ephemeral disk on the free tier, so **every answer you fix in the Admin page
+  is lost when Render restarts or redeploys** — and student results reset too.
+  To make your fixes stick, attach a **persistent disk** (paid) and point
+  `SAT_DB_PATH` at it (see the comment in `render.yaml`), or move to Postgres.
 - The DB is already seeded — you do NOT need to run `seed.py`/`seed_courses.py`
   on the server. Those scripts are included only for reference / rebuilding.
 - Health check: `/api/courses` (returns 200 once up).

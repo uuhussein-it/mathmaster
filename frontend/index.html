@@ -275,6 +275,49 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
 .edid{font-weight:700;color:var(--brand);min-width:38px}
 .edp{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #editor-form textarea{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+
+/* ---------- ADMIN ---------- */
+.adm-wrap{max-width:1080px;margin:0 auto}
+.adm-login{max-width:400px;margin:60px auto;background:#fff;border:1px solid var(--line);
+  border-radius:20px;padding:34px 30px;box-shadow:0 18px 44px rgba(30,40,90,.10);text-align:center}
+.adm-login .lock{font-size:46px}
+.adm-login input{width:100%;margin:14px 0 10px;text-align:center;letter-spacing:2px}
+.adm-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.adm-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.adm-tab{border:1px solid var(--line);background:#fff;border-radius:22px;padding:8px 16px;
+  cursor:pointer;font-weight:700;font-size:13.5px;font-family:inherit;color:var(--ink)}
+.adm-tab.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+.adm-tab .cnt{background:rgba(0,0,0,.10);border-radius:10px;padding:1px 7px;margin-left:6px;font-size:12px}
+.adm-tab.on .cnt{background:rgba(255,255,255,.25)}
+.qcard{border:1px solid var(--line);border-left:5px solid #d8352f;border-radius:12px;
+  padding:12px 14px;margin-bottom:9px;background:#fff;cursor:pointer}
+.qcard:hover{background:#f7f9ff}
+.qcard.clean{border-left-color:#12a150}
+.qcard .qh{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-bottom:5px}
+.qcard .qid{font-weight:800;color:var(--brand);font-size:13px}
+.qcard .qlab{font-size:12px;color:var(--muted)}
+.qcard .qpr{font-size:13.5px;line-height:1.45;margin-bottom:6px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.qcard .qrs{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-size:11.5px;padding:3px 9px;border-radius:12px;background:#fdecea;color:#a3271f;font-weight:700}
+.chip.warn{background:#fff4e0;color:#8a5a00}
+.chip.ok{background:#e6f7ee;color:#0b7a3e}
+.chip.kind{background:#eef1ff;color:#3b2fd0}
+.chip.mcq{background:#e8f4ff;color:#0b5c8a}
+.flagbox{background:#fff5f4;border:1px solid #ffd4d0;border-radius:10px;
+  padding:9px 12px;margin-bottom:12px;font-size:13px}
+.flagbox b{color:#a3271f}
+.flagbox ul{margin:5px 0 0;padding-left:18px}
+.opedit{display:grid;grid-template-columns:26px 1fr;gap:8px;align-items:center;margin-bottom:6px}
+.opedit .k{font-weight:800;color:var(--brand);text-align:center}
+.opedit textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+.preview-box{border:1px dashed var(--line);border-radius:12px;padding:12px;background:#fbfcff;margin-top:14px}
+.preview-box .pv-t{font-size:11.5px;font-weight:800;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:8px}
+.savedflash{background:#e6f7ee;color:#0b7a3e;border-radius:10px;padding:9px 12px;
+  font-size:13px;font-weight:700;margin-bottom:10px}
+.errflash{background:#fdecea;color:#a3271f;border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:10px}
+.adm-hint{font-size:12px;color:var(--muted);line-height:1.5;margin-top:6px}
 </style>
 </head>
 <body>
@@ -287,7 +330,7 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
     <button class="navbtn" data-view="test">Mock Test</button>
     <button class="navbtn" data-view="courses">Grades 9–12</button>
     <button class="navbtn" data-view="results">Results</button>
-    <button class="navbtn" data-view="editor">Editor</button>
+    <button class="navbtn hidden" data-view="editor" id="adm-nav">🔐 Admin</button>
   </nav>
   <span class="whoami" id="whoami" onclick="askName()"></span>
 </div>
@@ -443,23 +486,59 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
   </div>
 </div>
 
-<!-- EDITOR -->
+<!-- ADMIN -->
 <div id="view-editor" class="view hidden">
-  <div class="container">
-    <button class="back" onclick="goView('home')">← Home</button>
-    <h2>Question Editor</h2>
-    <p class="sub" id="editor-intro">Review and fix question content (prompts/options/answers), including mistyped equations. Live math preview on the right.</p>
-    <div class="editor-grid">
-      <div>
-        <label>Jump to question ID</label>
-        <div style="display:flex;gap:8px">
-          <input class="finput" id="eqid" type="number" placeholder="e.g. 24">
-          <button class="btn" onclick="editorLoad()">Open</button>
+  <div class="container adm-wrap">
+
+    <!-- login -->
+    <div id="adm-login" class="adm-login">
+      <div class="lock">🔐</div>
+      <h2 style="margin:6px 0 2px">Admin</h2>
+      <p class="sub" style="margin:0">Sign in to fix questions and answers.</p>
+      <input class="finput" id="adm-pw" type="password" placeholder="Password" autocomplete="current-password">
+      <button class="btn" style="width:100%" onclick="adminLogin()">Sign in</button>
+      <div id="adm-login-msg" class="small" style="margin-top:10px;color:#a3271f"></div>
+    </div>
+
+    <!-- panel -->
+    <div id="adm-panel" class="hidden">
+      <div class="adm-bar">
+        <div>
+          <h2 style="margin:0">Question Admin</h2>
+          <div class="small" id="adm-summary">loading…</div>
         </div>
-        <p class="small" style="margin-top:10px"><b>Or pick from a subtopic:</b></p>
-        <div id="editor-picker" class="small"></div>
+        <div style="margin-left:auto;display:flex;gap:8px">
+          <input class="finput" id="adm-search" placeholder="Search id, prompt or answer…"
+                 style="width:230px" oninput="adminFilter()">
+          <button class="btn" onclick="adminSignOut()">Sign out</button>
+        </div>
       </div>
-      <div id="editor-form" class="card small hidden"></div>
+
+      <div class="adm-tabs">
+        <button class="adm-tab on" data-atab="queue" onclick="adminTab('queue')">
+          Needs fixing <span class="cnt" id="cnt-queue">–</span></button>
+        <button class="adm-tab" data-atab="course" onclick="adminTab('course')">
+          School Curriculum <span class="cnt" id="cnt-course">–</span></button>
+        <button class="adm-tab" data-atab="sat" onclick="adminTab('sat')">
+          SAT <span class="cnt" id="cnt-sat">–</span></button>
+      </div>
+
+      <div class="editor-grid">
+        <div>
+          <div class="small" id="adm-listinfo" style="margin-bottom:8px"></div>
+          <div id="adm-list"></div>
+        </div>
+        <div>
+          <div id="adm-form" class="card small hidden"></div>
+          <div id="adm-placeholder" class="card small">
+            <b>Select a question</b>
+            <div class="small" style="margin-top:6px">
+              Everything on the left is sorted worst-first. Click one to edit its prompt,
+              options and answer — the fix is graded for students immediately after you save.
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -704,7 +783,7 @@ function goView(v){
   document.getElementById('view-'+v).classList.remove('hidden');
   if(v==='home'){loadStats();resetPick();}
   if(v==='practice')loadPractice();
-  if(v==='editor')loadEditor();
+  if(v==='editor')adminBoot();
   if(v==='results')loadResults();
   if(v==='courses')loadCourses();
   if(v==='test'){const ra=document.getElementById('report-area');if(ra&&!ra.classList.contains('hidden'))resetTestUI();else loadTestSetup();}
@@ -738,7 +817,12 @@ function pickPath(which){
     </div>`;
   n.classList.remove('hidden');
 }
-async function go(url,opts){const r=await fetch(API+url,opts);if(!r.ok){const e=await r.text();throw new Error(e)}return r.json()}
+async function go(url,opts){const r=await fetch(API+url,opts);if(!r.ok){
+  const raw=await r.text();
+  // Flask's abort() replies with an HTML page; keep just the message.
+  const m=raw.match(/<p>([\s\S]*?)<\/p>/);
+  throw new Error((m?m[1]:raw).trim().slice(0,200));
+}return r.json()}
 
 async function loadStats(){try{const t=await go('/api/topics');let tot=0,sub=0,dom=Object.keys(t).length;Object.values(t).forEach(l=>l.forEach(s=>{tot+=s.count;sub++}));const el=document.getElementById('home-stats');el.innerHTML=`<div class="hstat"><div class="n">${tot}</div><div class="l">Questions</div></div><div class="hstat"><div class="n">${sub}</div><div class="l">Subtopics</div></div><div class="hstat"><div class="n">${dom}</div><div class="l">Domains</div></div><div class="hstat"><div class="n">2025</div><div class="l">Newest exams</div></div>`}catch(e){}}
 
@@ -778,98 +862,279 @@ function renderSubQ(i){subIdx=i;const q=subQuestionState[i];const a=document.get
   a.querySelectorAll('.finput').forEach(inp=>inp.onchange=()=>{const fb=a.querySelector('[data-fb]');const ok=frMatch(inp.value,q.correct);fb.className='feedback '+(ok?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=ok?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1500)});
 }
 
-/* ---------- EDITOR ---------- */
-let editorTopics=null;
-async function loadEditor(){
-  if(!editorTopics)editorTopics=await go('/api/topics');
-  document.getElementById('editor-form').innerHTML='';
-  document.getElementById('editor-form').classList.add('hidden');
-  const p=document.getElementById('editor-picker');
-  p.innerHTML='';
-  Object.entries(editorTopics).forEach(([tn,subs])=>{
-    subs.forEach(s=>{
-      const b=document.createElement('div');
-      b.className='topic';
-      b.innerHTML=`<div class="tname">${esc(tn)} · ${esc(s.name)}</div><div class="meta">${s.count} questions</div>`;
-      b.onclick=()=>editorListQ(s.id,s.name);
-      p.appendChild(b);
-    });
-  });
+/* ---------- ADMIN ---------- */
+const ADM={tab:'queue',queue:[],course:[],sat:[],cur:null,counts:{queue:0,course:0,sat:0}};
+
+async function adminState(){
+  try{return await go('/api/admin/me')}catch(e){return {is_admin:false}}
 }
-async function editorListQ(subId,name){
-  const qs=await go('/api/questions?subtopic='+subId);
-  const p=document.getElementById('editor-picker');
-  p.innerHTML=`<div class="small" style="margin-bottom:8px"><b>${esc(name)}</b> — ${qs.length} questions</div>`;
-  qs.forEach(q=>{
-    const r=document.createElement('div');
-    r.className='edrow'+(q.clean?'':' ed-bad');
-    r.innerHTML=`<span class="edid">#${q.id}</span>${q.clean?'':'<span class="badge hard" style="margin-top:0">broken</span>'}<span class="edp">${esc((q.prompt||'').slice(0,70))}</span>`;
-    r.onclick=()=>editorOpen(q);
-    p.appendChild(r);
-  });
+
+async function adminBoot(){
+  const {is_admin}=await adminState();
+  document.getElementById('adm-login').classList.toggle('hidden',is_admin);
+  document.getElementById('adm-panel').classList.toggle('hidden',!is_admin);
+  document.getElementById('adm-nav').classList.toggle('hidden',!is_admin);
+  if(is_admin)await adminLoadAll();
 }
-function editorOpen(q){currentEditing=q;redrawEditorForm(q)}
-function redrawEditorForm(q){
-  const f=document.getElementById('editor-form');
-  f.classList.remove('hidden');
-  const opts=(['A','B','C','D']).map((k,i)=>
-    `<textarea rows="1" id="ed-op-${i}" placeholder="Option ${k}">${esc(q.options[i]||'')}</textarea>`).join('');
-  f.innerHTML=`
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <b>Question #${q.id}</b>
-      <span class="badge ${q.difficulty}">${q.difficulty}</span>
+
+async function adminLogin(){
+  const pw=document.getElementById('adm-pw').value;
+  const msg=document.getElementById('adm-login-msg');
+  msg.textContent='';
+  try{
+    await go('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({password:pw})});
+    document.getElementById('adm-pw').value='';
+    await adminBoot();
+  }catch(e){msg.textContent='✗ '+e.message}
+}
+async function adminSignOut(){
+  await go('/api/admin/logout',{method:'POST'}).catch(()=>{});
+  ADM.queue=[];ADM.course=[];ADM.sat=[];ADM.cur=null;
+  await adminBoot();
+}
+
+async function adminLoadAll(){
+  document.getElementById('adm-summary').textContent='loading…';
+  const [flagged,satAll,courseAll]=await Promise.all([
+    go('/api/admin/flagged?limit=5000'),
+    go('/api/questions'),
+    go('/api/admin/course-questions?limit=6000')
+  ]);
+  ADM.queue=flagged.questions;
+  ADM.course=courseAll.questions;
+  ADM.sat=satAll.map(q=>({kind:'sat',id:q.id,label:'SAT · '+(q.subtopic||q.domain||''),
+    prompt:q.prompt,correct:q.correct,
+    is_mcq:(q.options||[]).some(o=>o&&o.trim()),
+    options:q.options||[],flags:q.flags||[],full:q}));
+  ADM.counts={queue:ADM.queue.length,course:ADM.course.length,sat:ADM.sat.length};
+  document.getElementById('cnt-queue').textContent=ADM.counts.queue;
+  document.getElementById('cnt-course').textContent=ADM.counts.course;
+  document.getElementById('cnt-sat').textContent=ADM.counts.sat;
+  document.getElementById('adm-summary').textContent=
+    ADM.counts.queue+' flagged of '+ADM.counts.sat+' SAT and '+ADM.counts.course+' curriculum questions';
+  adminRenderList();
+}
+
+function adminTab(t){
+  ADM.tab=t;
+  document.querySelectorAll('.adm-tab').forEach(b=>b.classList.toggle('on',b.dataset.atab===t));
+  ADM.cur=null;
+  document.getElementById('adm-form').classList.add('hidden');
+  document.getElementById('adm-placeholder').classList.remove('hidden');
+  adminRenderList();
+}
+
+function adminFilter(){
+  const q=document.getElementById('adm-search').value.trim().toLowerCase();
+  ADM.filter=q;
+  adminRenderList();
+}
+
+function adminItems(){
+  let items=ADM.tab==='queue'?ADM.queue:(ADM.tab==='sat'?ADM.sat:ADM.course);
+  const q=(ADM.filter||'').toLowerCase();
+  if(q)items=items.filter(x=>String(x.id).includes(q)||
+    (x.prompt||'').toLowerCase().includes(q)||(x.correct||'').toLowerCase().includes(q)||
+    (x.label||'').toLowerCase().includes(q));
+  return items;
+}
+
+function adminRenderList(){
+  const items=adminItems();
+  const el=document.getElementById('adm-list');
+  const info=document.getElementById('adm-listinfo');
+  info.textContent=ADM.tab==='queue'
+    ? items.length+' flagged, worst first'
+    : items.length+' question(s)';
+  if(!items.length){el.innerHTML='<div class="card small">🎉 Nothing here.</div>';return}
+  el.innerHTML=items.slice(0,400).map(x=>{
+    const rs=x.flags||x.reasons||[];
+    const clean=!rs.length;
+    return `<div class="qcard ${clean?'clean':''}" data-id="${x.id}" onclick="adminOpen(${x.kind==='sat'?1:0},${x.id})">
+      <div class="qh">
+        <span class="qid">#${x.id}</span>
+        <span class="chip kind">${x.kind==='sat'?'SAT':'Course'}</span>
+        ${x.is_mcq?'<span class="chip mcq">MCQ</span>':'<span class="chip warn">Free response</span>'}
+        ${clean?'<span class="chip ok">ok</span>':''}
+      </div>
+      <div class="small" style="margin-bottom:4px">${esc(x.label||'')}</div>
+      <div class="qpr">${esc((x.prompt||'').replace(/\s+/g,' ').trim())}</div>
+      <div class="qrs">${rs.map(r=>`<span class="chip">${esc(r)}</span>`).join('')}</div>
+    </div>`}).join('');
+}
+
+async function adminOpen(isSat,id){
+  const box=document.getElementById('adm-form');
+  const ph=document.getElementById('adm-placeholder');
+  box.classList.remove('hidden'); ph.classList.add('hidden');
+  box.innerHTML='<div class="small">loading…</div>';
+  let q,kind;
+  try{
+    if(isSat){
+      kind='sat';
+      q=await go('/api/admin/course-questions/'+id).catch(()=>null);
+      if(!q){ // SAT: fetch from the revealed list
+        const all=ADM.sat.find(x=>x.id===id);
+        q=all?all.full:null;
+      }
+    }else{
+      kind='course';
+      q=await go('/api/admin/course-questions/'+id);
+    }
+  }catch(e){box.innerHTML='<div class="errflash">✗ '+esc(e.message)+'</div>';return}
+  if(!q){box.innerHTML='<div class="errflash">Question not found.</div>';return}
+  ADM.cur={kind,id};
+  const opts=(q.options||[]).map(o=>o||'');
+  const nOpt=kind==='course'?6:4;
+  const letters='ABCDEF'.split('');
+  const flags=q.flags||[];
+  box.innerHTML=`
+    ${flags.length?`<div class="flagbox"><b>⚠ Needs fixing</b><ul>${flags.map(f=>`<li>${esc(f)}</li>`).join('')}</ul></div>`:
+      '<div class="savedflash">✓ No problems detected for this question.</div>'}
+    <div class="qh" style="margin-bottom:10px">
+      <b style="font-size:17px">${kind==='sat'?'SAT':'Course'} question #${q.id}</b>
+      <span class="chip kind">${esc(q.subtopic||q.course||'')}</span>
     </div>
-    <label>Prompt (supports $...$ LaTeX)</label>
-    <textarea rows="4" id="ed-prompt">${esc(q.prompt)}</textarea>
-${opts}
-    ${(q.option_images&&q.option_images.some(Boolean))?`<div class="small" style="margin:4px 0"><b>Printed options rendered from the book:</b></div><div class="imgopts">${(['A','B','C','D']).map((k,i)=>q.option_images[i]?`<img src="${q.option_images[i]}" alt="Option ${k}">`:'').join('')}</div>`:''}
-    <label>Correct answer</label>
-    <select id="ed-correct"><option value="A" ${q.correct==='A'?'selected':''}>A</option><option value="B" ${q.correct==='B'?'selected':''}>B</option><option value="C" ${q.correct==='C'?'selected':''}>C</option><option value="D" ${q.correct==='D'?'selected':''}>D</option></select>
-    <button class="btn" style="margin-top:12px" onclick="editorSave()">Save 💾</button>
-    <div class="small" style="margin-top:6px">Correct is stored as text for SPR questions — edit carefully.</div>
-    <div id="ed-status"></div>`;
+    ${q.question_image?`<div class="small" style="margin-bottom:8px">Book page:
+      <a href="${q.question_image}" target="_blank">open image</a></div>`:''}
+    <label>Prompt</label>
+    <textarea rows="4" id="af-prompt">${esc(q.prompt||'')}</textarea>
+
+    <label style="margin-top:10px">Question type</label>
+    <select id="af-mcq">
+      <option value="1" ${q.is_mcq!==false&&(q.is_mcq||opts.some(Boolean))?'selected':''}>Multiple choice</option>
+      <option value="0" ${!q.is_mcq&&!opts.some(Boolean)?'selected':''}>Free response (student types the answer)</option>
+    </select>
+
+    <div id="af-optwrap">
+      <label style="margin-top:10px">Options <span class="small">(for multiple choice)</span></label>
+      ${Array.from({length:nOpt},(_,i)=>`
+        <div class="opedit"><span class="k">${letters[i]}</span>
+          <textarea rows="1" id="af-op-${i}" placeholder="Option ${letters[i]}">${esc(opts[i]||'')}</textarea></div>`).join('')}
+    </div>
+
+    <label style="margin-top:10px">Correct answer</label>
+    <input class="finput" id="af-correct" value="${esc(q.correct||'')}" placeholder="A  ·  AB  ·  42  ·  x = 6 | x = 1">
+    <div class="adm-hint" id="af-hint"></div>
+
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn" onclick="adminSave()">💾 Save</button>
+      <button class="btn" id="af-test" onclick="adminTest()">Test this answer</button>
+    </div>
+    <div id="af-msg" style="margin-top:10px"></div>
+    <div id="af-testout"></div>
+
+    <div class="preview-box">
+      <div class="pv-t">Student preview</div>
+      <div id="af-preview"></div>
+    </div>`;
+  adminMcqToggle();
+  adminHint();
+  adminPreview();
 }
-function editorPreview(){
-  const f=document.getElementById('editor-form');
-  const el=document.createElement('div');
-  el.className='card small';
-  el.innerHTML=`<div class="qprompt">${esc(document.getElementById('ed-prompt').value)}</div>`;
-  f.appendChild(el);
+
+function adminMcqToggle(){
+  const mcq=document.getElementById('af-mcq').value==='1';
+  document.getElementById('af-optwrap').style.display=mcq?'':'none';
+  adminHint();adminPreview();
+}
+
+function adminHint(){
+  const el=document.getElementById('af-hint');
+  if(!el)return;
+  const mcq=document.getElementById('af-mcq').value==='1';
+  const v=document.getElementById('af-correct').value.trim();
+  if(mcq){
+    const L=[...new Set((v.match(/[A-F]/g)||[]))];
+    el.innerHTML=L.length>1
+      ? `Multi-answer: students will see <b>tick boxes</b> and must tick all of <b>${L.join(', ')}</b>.`
+      : `Students pick one letter. Use <b>A B</b> (with a space) if more than one is correct.`;
+  }else{
+    el.innerHTML=`Any of these is accepted: numbers, fractions (<b>3/4</b> = <b>0.75</b>), or a worked
+      solution separated by <b>|</b> — students are credited if any step matches
+      (so <b>x = 6 | x = 1</b> accepts either final value).`;
+  }
+}
+
+function adminPreview(){
+  const el=document.getElementById('af-preview');
+  if(!el)return;
+  const prompt=document.getElementById('af-prompt').value;
+  const mcq=document.getElementById('af-mcq').value==='1';
+  const v=document.getElementById('af-correct').value.trim();
+  const L=[...new Set((v.match(/[A-F]/g)||[]))];
+  const nOpt=ADM.cur&&ADM.cur.kind==='course'?6:4;
+  let html=`<div class="qprompt">${esc(prompt)||'<i style="color:#999">(empty prompt)</i>'}</div>`;
+  if(mcq){
+    const multi=L.length>1;
+    if(multi)html+=`<div class="multihint" style="margin:8px 0">✓ This question has more than one correct answer — tick every box that applies.</div>`;
+    html+='<div class="opts">'+Array.from({length:nOpt},(_,i)=>{
+      const t=(document.getElementById('af-op-'+i)||{}).value||'';
+      if(!t.trim())return '';
+      return multi
+        ? `<div class="opt multi"><span class="tickbox"></span><span class="key"></span><span class="otext">${esc(t)}</span></div>`
+        : `<div class="opt"><span class="key">${'ABCDEF'[i]}</span><span class="otext">${esc(t)}</span></div>`;
+    }).join('')+'</div>';
+  }else{
+    html+=`<div class="small" style="margin:8px 0">Student types an answer, graded against
+      <b>${esc(v)||'(nothing yet)'}</b></div>`;
+  }
+  el.innerHTML=html;
   renderKatex(el);
-  setTimeout(()=>el.remove(),0);
 }
-async function editorSave(){
-  const q=currentEditing;
-  if(!q)return;
-  const body={
-    prompt:document.getElementById('ed-prompt').value,
-    option_a:document.getElementById('ed-op-0').value,
-    option_b:document.getElementById('ed-op-1').value,
-    option_c:document.getElementById('ed-op-2').value,
-    option_d:document.getElementById('ed-op-3').value,
-    correct:document.getElementById('ed-correct').value,
-    number:q.number,
-    source:q.source
-  };
-  const st=document.getElementById('ed-status');
+
+async function adminSave(){
+  const c=ADM.cur;if(!c)return;
+  const msg=document.getElementById('af-msg');
+  const mcq=document.getElementById('af-mcq').value==='1';
+  const nOpt=c.kind==='course'?6:4;
+  const body={prompt:document.getElementById('af-prompt').value.trim(),
+    correct:document.getElementById('af-correct').value.trim(),is_mcq:mcq};
+  if(mcq)for(let i=0;i<nOpt;i++)body['option_'+'abcdef'[i]]=document.getElementById('af-op-'+i).value.trim();
   try{
-    await go('/api/questions/'+q.id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-    st.textContent='✅ Saved.';
-    st.style.color='green';
-  }catch(e){st.textContent='✗ '+e.message;st.style.color='red'}
+    if(c.kind==='sat'){
+      await go('/api/questions/'+c.id,{method:'PUT',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({prompt:body.prompt,correct:body.correct,
+          option_a:body.option_a||'',option_b:body.option_b||'',
+          option_c:body.option_c||'',option_d:body.option_d||''})});
+    }else{
+      await go('/api/admin/course-questions/'+c.id,{method:'PUT',
+        headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    }
+    msg.innerHTML='<div class="savedflash">✅ Saved. Students get this answer now.</div>';
+    await adminLoadAll();
+    adminOpen(c.kind==='sat',c.id);
+  }catch(e){msg.innerHTML='<div class="errflash">✗ '+esc(e.message)+'</div>'}
 }
-document.getElementById('eqid').addEventListener('keydown',e=>{if(e.key==='Enter')editorLoad()});
-async function editorLoad(){
-  const id=parseInt(document.getElementById('eqid').value,10);
-  if(!id)return;
-  try{
-    const qs=await go('/api/questions');
-    const q=qs.find(x=>x.id===id);
-    if(!q){alert('No question with id '+id);return}
-    editorOpen(q);
-    document.getElementById('editor-picker').innerHTML='<div class="small">Jumped to #'+id+'</div>';
-  }catch(e){alert('Load failed: '+e.message)}
+
+async function adminTest(){
+  const out=document.getElementById('af-testout');
+  const want=document.getElementById('af-correct').value.trim();
+  const mcq=document.getElementById('af-mcq').value==='1';
+  const L=[...new Set((want.match(/[A-F]/g)||[]))];
+  const samples=mcq
+    ? [[L.join('')||'A',true],['Z',false]]
+    : [[want,true],[want.split('=').pop().trim()||'x',true],['zzz',false]];
+  out.innerHTML='<div class="small" style="margin-top:10px">checking…</div>';
+  let rows='';
+  for(const [ans,exp] of samples){
+    let got=false;
+    try{
+      const r=await fetch('/api/admin/grade-test',{method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({kind:ADM.cur.kind,id:ADM.cur.id,answer:ans,answer_key:want})});
+      got=(await r.json()).correct;
+    }catch(e){got='error'}
+    rows+=`<div class="qrs" style="margin-top:6px">
+      <span class="chip ${got===exp?'ok':'warn'}">${esc(ans)||'(empty)'} → ${got?'accepted':'rejected'}</span>
+      ${got!==exp?'<span class="chip">expected '+(exp?'accept':'reject')+'</span>':''}</div>`;
+  }
+  out.innerHTML='<div class="small" style="margin-top:10px">Testing the key in the box (not yet saved):</div>'+rows;
 }
+
+document.getElementById('adm-pw').addEventListener('keydown',e=>{
+  if(e.key==='Enter')adminLogin()});
 
 /* ---------- TEST SETUP ---------- */
 async function loadTestSetup(){topics=await go('/api/topics');const sc=document.getElementById('mock-scope');if(!sc)return;sc.innerHTML='<option value="all">All topics (adaptively mixed)</option>';Object.entries(topics).forEach(([tn,subs])=>{const og=document.createElement('optgroup');og.label=tn;subs.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.name+' ('+s.count+')';og.appendChild(o)});sc.appendChild(og)})}
@@ -1378,6 +1643,9 @@ function autosaveStop(){if(autosaveId){clearInterval(autosaveId);autosaveId=null
 
 /* CALCULATOR: load on demand */
 document.getElementById('tool-calc').onclick=function(){toggleDrawer('calc');loadDesmos()};
+
+/* ADMIN: reveal the nav button only for a signed-in admin */
+adminBoot();
 </script>
 </body>
 </html>
