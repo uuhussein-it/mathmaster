@@ -718,7 +718,7 @@ function esc(s){return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g
 function fmtT(s){s=Math.max(0,Math.floor(s));const m=Math.floor(s/60);const sec=s%60;return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0')}
 function optBody(q,ki){const img=q.option_images&&q.option_images[ki];const t=(q.options&&q.options[ki])||'';return img?`<img src="${img}" alt="Option ${'ABCD'[ki]}">`:esc(t)}
 function isMC(q){return q.type!=='SPR'&&((q.options&&q.options.some(o=>o&&o.trim()))||(q.option_images&&q.option_images.some(Boolean)))}
-function bodyHTML(q,isMc){return q.question_image?`<img class="qshot" src="${q.question_image}" loading="lazy" alt="Question">`:`<div class="qprompt">${isMc?esc(q.prompt):esc(q.prompt)}</div>`}
+function bodyHTML(q,isMc){return q.question_image?`<img class="qshot" src="${q.question_image}" alt="Question">`:`<div class="qprompt">${isMc?esc(q.prompt):esc(q.prompt)}</div>`}
 function optsHTML(q,isMc){return isMc?['A','B','C','D'].map((k,ki)=>`<button class="opt" data-k="${k}"><span class="key">${k}</span>${optBody(q,ki)}</button>`).join(''):`<input class="finput" placeholder="Type your answer…">`}
 function norm(s){return (s||'').toString().trim().replace(/,$/,'').toUpperCase()}
 
@@ -1309,7 +1309,7 @@ function courseRenderQ(){
     opts=`<input class="finput" id="course-fr" value="${esc(saved)}" placeholder="Type your answer…">`;
   }
   document.getElementById('cq-sub').textContent=q.subtopic?(esc(q.topic||'')+' · '+esc(q.subtopic)):'';
-  area.innerHTML=`<img class="qshot" src="${q.question_image||''}" loading="lazy" alt="Lesson question" onerror="this.style.display='none'">${isMc?opts:`<div class="small" style="margin-bottom:8px">Show your working (if needed), then type the final answer. Fractions ok (e.g. 3/4 or 1.5).</div>${opts}`}`;
+  area.innerHTML=`<img class="qshot" src="${q.question_image||''}" alt="Lesson question" onerror="this.style.display='none'">${isMc?opts:`<div class="small" style="margin-bottom:8px">Show your working (if needed), then type the final answer. Fractions ok (e.g. 3/4 or 1.5).</div>${opts}`}`;
   const n=Object.keys(CT.answers).length;
   document.getElementById('cq-answered').textContent=`${n} of ${CT.q.length} answered`;
   if(isMc){
@@ -1747,6 +1747,11 @@ document.getElementById('tool-calc').onclick=function(){toggleDrawer('calc');loa
 
 /* ADMIN: reveal the nav button only for a signed-in admin */
 adminBoot();
+
+/* HOME: the home view is visible on first paint, so load its stats up front
+   (goView('home') only fires when the Home nav button is clicked). */
+loadStats();
+resetPick();
 </script>
 </body>
 </html>
