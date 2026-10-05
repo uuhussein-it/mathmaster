@@ -172,7 +172,67 @@ def init_db():
     _ensure_column(conn, "test_sessions", "student_name", "TEXT")
     _ensure_column(conn, "question_feedback", "student_name", "TEXT")
     conn.commit()
+    # Student-reported mistakes, for both the SAT bank and the curriculum.
+    # `student_answer`/`was_correct` are captured at report time so the admin can
+    # see exactly what the student typed versus what the key expected.
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS mistake_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kind TEXT NOT NULL DEFAULT 'sat',
+            question_id INTEGER NOT NULL,
+            student_name TEXT,
+            student_answer TEXT,
+            stored_answer TEXT,
+            was_correct INTEGER,
+            category TEXT,
+            message TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            resolved INTEGER DEFAULT 0
+        );
+        """
+    )
+    for col, decl in (("student_answer", "TEXT"), ("stored_answer", "TEXT"),
+                      ("was_correct", "INTEGER"), ("category", "TEXT"),
+                      ("kind", "TEXT")):
+        _ensure_column(conn, "mistake_reports", col, decl)
+    conn.commit()
     conn.close()
+
+
+def add_mistake_report(kind, question_id, student_name, student_answer,
+                       stored_answer, was_correct, category, message):
+    conn = get_conn()
+    cur = conn.execute(
+        """INSERT INTO mistake_reports
+           (kind, question_id, student_name, student_answer, stored_answer,
+            was_correct, category, message)
+           VALUES(?,?,?,?,?,?,?,?)""",
+        (kind or "sat", question_id, student_name, student_answer,
+         stored_answer, 1 if was_correct else 0, category, message),
+    )
+    conn.commit()
+    fid = cur.lastrowid
+    conn.close()
+    return fid
+
+
+def resolve_mistake_report(rid, resolved=1):
+    conn = get_conn()
+    conn.execute("UPDATE mistake_reports SET resolved=? WHERE id=?", (1 if resolved else 0, rid))
+    conn.commit()
+    conn.close()
+
+
+def mistake_reports(only_open=False, limit=500):
+    conn = get_conn()
+    sql = "SELECT * FROM mistake_reports"
+    if only_open:
+        sql += " WHERE COALESCE(resolved,0)=0"
+    sql += " ORDER BY COALESCE(resolved,0), id DESC LIMIT ?"
+    rows = conn.execute(sql, (limit,)).fetchall()
+    conn.close()
+    return rows
 
 
 def _ensure_column(conn, table, column, decl):

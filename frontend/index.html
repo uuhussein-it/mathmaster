@@ -182,6 +182,14 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
 .review-dot{font-size:14px}
 .feedback-btn{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);border:1px solid var(--line);background:transparent;border-radius:9px;padding:6px 12px;cursor:pointer}
 .feedback-btn:hover{color:var(--err);border-color:var(--err)}
+.feedback-btn.hot{color:#fff;background:var(--err);border-color:var(--err);font-weight:700;animation:pulseHot 1.6s ease-in-out infinite}
+.feedback-btn.hot:hover{background:#b3251f;color:#fff}
+@keyframes pulseHot{0%,100%{box-shadow:0 0 0 0 rgba(216,53,47,.45)}50%{box-shadow:0 0 0 7px rgba(216,53,47,0)}}
+.dispute{background:#f6f8ff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0 14px;font-size:13.5px}
+.dispute .ds-row{display:flex;justify-content:space-between;gap:12px;padding:2px 0}
+.dispute .ds-row span{color:var(--muted)}
+.dispute .ok{color:var(--ok)}
+.dispute .bad{color:var(--err)}
 .whoami{font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 14px;cursor:pointer;white-space:nowrap}
 .whoami:hover{border-color:var(--brand);color:var(--brand)}
 .name-form{display:flex;gap:10px;margin-top:12px}
@@ -471,6 +479,9 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
         <span class="qmeta"><span class="small" id="cq-sub"></span></span>
       </div>
       <div id="course-q-area"></div>
+      <div class="row-actions" style="margin-top:10px;display:flex;justify-content:flex-end">
+        <button class="feedback-btn" data-reportbtn onclick="reportThis(courseCurQ(),'course')">⚠ Report a mistake</button>
+      </div>
     </div>
     <div class="row-actions" style="display:flex;align-items:center">
       <button class="nav-arrow" onclick="courseNav(-1)">← Prev</button>
@@ -517,6 +528,8 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
       <div class="adm-tabs">
         <button class="adm-tab on" data-atab="queue" onclick="adminTab('queue')">
           Needs fixing <span class="cnt" id="cnt-queue">–</span></button>
+        <button class="adm-tab" data-atab="reports" onclick="adminTab('reports')">
+          📨 Reports <span class="cnt" id="cnt-reports">–</span></button>
         <button class="adm-tab" data-atab="course" onclick="adminTab('course')">
           School Curriculum <span class="cnt" id="cnt-course">–</span></button>
         <button class="adm-tab" data-atab="sat" onclick="adminTab('sat')">
@@ -645,16 +658,17 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
     <button class="close" onclick="closeFeedback()">×</button>
     <h3>Report a mistake</h3>
     <p class="sub" id="feedback-q-ref">Help us keep the bank accurate.</p>
+    <div id="fb-dispute" class="dispute hidden"></div>
     <label for="fb-kind">What's wrong?</label>
     <select id="fb-kind">
-      <option value="screenshot">Screenshot / image is wrong or cropped</option>
+      <option value="answer">The answer key is wrong</option>
       <option value="text">Question text or options are wrong</option>
-      <option value="answer">Answer key is wrong</option>
+      <option value="screenshot">Screenshot / image is wrong or cropped</option>
       <option value="other">Other issue</option>
     </select>
     <div style="margin-top:12px">
       <label for="fb-msg">Details (optional but helpful)</label>
-      <textarea id="fb-msg" rows="3" style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px" placeholder="e.g. option C should read …, the graph is cut off, the correct answer should be D…"></textarea>
+      <textarea id="fb-msg" rows="3" style="width:100%;padding:11px;border:1.5px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px" placeholder="e.g. the correct answer should be D, option C should read …, the graph is cut off…"></textarea>
     </div>
     <div class="row-actions" style="justify-content:space-between;align-items:center">
       <span class="small" id="fb-status"></span>
@@ -856,10 +870,10 @@ let subIdx=0;
 function renderSubQ(i){subIdx=i;const q=subQuestionState[i];const a=document.getElementById('question-area');if(i>=subQuestionState.length){a.innerHTML=`<div class="card"><h2>Done! 🎉</h2><p class="sub">You practiced all ${subQuestionState.length} questions.</p><button class="btn" onclick="document.getElementById('back-topics').click()">Choose another subtopic</button></div>`;return}
   const isMc=isMC(q);
   let opts=isMc?['A','B','C','D'].map((k,ki)=>`<button class="opt" data-k="${k}"><span class="key">${k}</span>${esc(q.options[ki]||'')}</button>`).join(''):`<input class="finput" placeholder="Type your answer…">`;
-  a.innerHTML=`<div class="card qcard"><div class="qhead"><span class="qnum">Question ${i+1} of ${subQuestionState.length}</span><span class="qmeta"><span class="badge ${q.difficulty}">${q.difficulty}</span><span class="small">${esc(q.source||'')}</span><span class="small">${q.type}</span></span></div>${bodyHTML(q,isMc)}${opts}<div class="feedback hidden" data-fb></div><div class="row-actions"><button class="btn secondary" ${i<=0?'disabled':''} onclick="renderSubQ(${i-1})">← Prev</button><button class="btn" ${i>=subQuestionState.length-1?'disabled':''} onclick="renderSubQ(${i+1})">Next →</button><span class="spacer" style="flex:1"></span><button class="feedback-btn" onclick="openFeedback(q)">⚠ Report a mistake</button></div></div>`;
+  a.innerHTML=`<div class="card qcard"><div class="qhead"><span class="qnum">Question ${i+1} of ${subQuestionState.length}</span><span class="qmeta"><span class="badge ${q.difficulty}">${q.difficulty}</span><span class="small">${esc(q.source||'')}</span><span class="small">${q.type}</span></span></div>${bodyHTML(q,isMc)}${opts}<div class="feedback hidden" data-fb></div><div class="row-actions"><button class="btn secondary" ${i<=0?'disabled':''} onclick="renderSubQ(${i-1})">← Prev</button><button class="btn" ${i>=subQuestionState.length-1?'disabled':''} onclick="renderSubQ(${i+1})">Next →</button><span class="spacer" style="flex:1"></span><button class="feedback-btn" data-reportbtn id="subq-report" onclick="reportThis(q,'sat')">⚠ Report a mistake</button></div></div>`;
   renderKatex(a);
-  a.querySelectorAll('.opt[data-k]').forEach(b=>b.onclick=()=>{const fb=a.querySelector('[data-fb]');b.classList.add('selected');const correct=norm(q.correct);const k=b.dataset.k;b.classList.add(k===correct?'correct':'wrong');if(k!==correct)a.querySelectorAll('.opt').forEach(o=>{if(o.dataset.k===correct)o.classList.add('correct')});fb.className='feedback '+(k===correct?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=k===correct?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1400)});
-  a.querySelectorAll('.finput').forEach(inp=>inp.onchange=()=>{const fb=a.querySelector('[data-fb]');const ok=frMatch(inp.value,q.correct);fb.className='feedback '+(ok?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=ok?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1500)});
+  a.querySelectorAll('.opt[data-k]').forEach(b=>b.onclick=()=>{const fb=a.querySelector('[data-fb]');b.classList.add('selected');const correct=norm(q.correct);const k=b.dataset.k;const ok=k===correct;b.classList.add(ok?'correct':'wrong');if(!ok)a.querySelectorAll('.opt').forEach(o=>{if(o.dataset.k===correct)o.classList.add('correct')});fb.className='feedback '+(ok?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=ok?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;markReported(q,'sat',k,ok);setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1400)});
+  a.querySelectorAll('.finput').forEach(inp=>inp.onchange=()=>{const fb=a.querySelector('[data-fb]');const ok=frMatch(inp.value,q.correct);fb.className='feedback '+(ok?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=ok?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;markReported(q,'sat',inp.value,ok);setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1500)});
 }
 
 /* ---------- ADMIN ---------- */
@@ -896,11 +910,13 @@ async function adminSignOut(){
 
 async function adminLoadAll(){
   document.getElementById('adm-summary').textContent='loading…';
-  const [flagged,satAll,courseAll]=await Promise.all([
+  const [flagged,satAll,courseAll,reports]=await Promise.all([
     go('/api/admin/flagged?limit=5000'),
     go('/api/questions'),
-    go('/api/admin/course-questions?limit=6000')
+    go('/api/admin/course-questions?limit=6000'),
+    go('/api/admin/reports?limit=500')
   ]);
+  ADM.reports=reports.reports;ADM.reportsOpen=reports.open;
   ADM.queue=flagged.questions;
   ADM.course=courseAll.questions;
   ADM.sat=satAll.map(q=>({kind:'sat',id:q.id,label:'SAT · '+(q.subtopic||q.domain||''),
@@ -909,16 +925,24 @@ async function adminLoadAll(){
     options:q.options||[],flags:q.flags||[],full:q}));
   ADM.counts={queue:ADM.queue.length,course:ADM.course.length,sat:ADM.sat.length};
   document.getElementById('cnt-queue').textContent=ADM.counts.queue;
+  const rc=document.getElementById('cnt-reports');
+  rc.textContent=ADM.reportsOpen;
+  rc.style.background=ADM.reportsOpen?'var(--err)':'rgba(0,0,0,.10)';
+  rc.style.color=ADM.reportsOpen?'#fff':'';
   document.getElementById('cnt-course').textContent=ADM.counts.course;
   document.getElementById('cnt-sat').textContent=ADM.counts.sat;
   document.getElementById('adm-summary').textContent=
-    ADM.counts.queue+' flagged of '+ADM.counts.sat+' SAT and '+ADM.counts.course+' curriculum questions';
+    ADM.counts.queue+' flagged · '+ADM.reportsOpen+' open student report(s) · '+
+    ADM.counts.sat+' SAT and '+ADM.counts.course+' curriculum questions';
   adminRenderList();
 }
 
 function adminTab(t){
   ADM.tab=t;
+  window.scrollTo({top:0,behavior:'smooth'});
   document.querySelectorAll('.adm-tab').forEach(b=>b.classList.toggle('on',b.dataset.atab===t));
+  document.getElementById('cnt-reports').style.background=
+    (t==='reports'||!ADM.reportsOpen)?'rgba(0,0,0,.10)':'var(--err)';
   ADM.cur=null;
   document.getElementById('adm-form').classList.add('hidden');
   document.getElementById('adm-placeholder').classList.remove('hidden');
@@ -932,6 +956,7 @@ function adminFilter(){
 }
 
 function adminItems(){
+  if(ADM.tab==='reports')return ADM.reports||[];
   let items=ADM.tab==='queue'?ADM.queue:(ADM.tab==='sat'?ADM.sat:ADM.course);
   const q=(ADM.filter||'').toLowerCase();
   if(q)items=items.filter(x=>String(x.id).includes(q)||
@@ -944,6 +969,14 @@ function adminRenderList(){
   const items=adminItems();
   const el=document.getElementById('adm-list');
   const info=document.getElementById('adm-listinfo');
+  if(ADM.tab==='reports'){
+    const open=(ADM.reports||[]).filter(r=>!r.resolved).length;
+    info.textContent=open+' open · '+items.length+' total';
+    el.innerHTML=(ADM.reports||[]).length
+      ? ADM.reports.map(r=>adminReportCard(r)).join('')
+      : '<div class="card small">📭 No student reports yet.</div>';
+    return;
+  }
   info.textContent=ADM.tab==='queue'
     ? items.length+' flagged, worst first'
     : items.length+' question(s)';
@@ -964,6 +997,35 @@ function adminRenderList(){
     </div>`}).join('');
 }
 
+function adminReportCard(r){
+  const agree=Number(r.was_correct)===1;
+  return `<div class="qcard rep ${r.resolved?'clean':''}" style="border-left-color:${r.resolved?'#12a150':'#e8a33d'}">
+    <div class="qh">
+      <span class="qid">#${r.question_id}</span>
+      <span class="chip kind">${r.kind==='sat'?'SAT':'Course'}</span>
+      <span class="chip ${agree?'warn':'ok'}">${r.was_correct===null?'unclear':(agree?'⚠ marked wrong but student was right':'student was wrong')}</span>
+      ${r.category?`<span class="chip">${esc(r.category)}</span>`:''}
+      ${r.resolved?'<span class="chip ok">resolved</span>':'<span class="chip">open</span>'}
+    </div>
+    <div class="small" style="margin-bottom:5px">${esc(r.label||'')}</div>
+    <div class="qpr">${esc((r.prompt||'').replace(/\s+/g,' ').trim())}</div>
+    <div class="ds-row" style="margin:6px 0 4px;font-size:12.5px"><span>Student answered</span>
+      <b style="color:${agree?'var(--ok)':'var(--err)'}">${esc(r.student_answer||'—')}</b></div>
+    <div class="ds-row" style="font-size:12.5px"><span>Key right now</span>
+      <b>${esc(r.current_answer==null?'(question deleted)':(r.current_answer||'(empty)'))}</b></div>
+    ${r.message?`<div class="small" style="margin-top:6px;font-style:italic;color:var(--muted)">"${esc(r.message)}"</div>`:''}
+    <div class="small" style="margin-top:6px;color:var(--muted)">
+      ${esc(r.student_name||'anonymous')} · ${esc(r.created_at||'')}</div>
+    <div class="row-actions" style="margin-top:9px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn" onclick="event.stopPropagation();adminTab('${r.kind==='sat'?'sat':'course'}');adminOpen(${r.kind==='sat'?1:0},${r.question_id})">✏️ Fix this question</button>
+      ${r.resolved?'':`<button class="btn secondary" onclick="event.stopPropagation();adminResolve(${r.id})">✓ Mark resolved</button>`}
+    </div></div>`;
+}
+async function adminResolve(rid){
+  await go('/api/admin/reports/'+rid,{method:'POST'}).catch(e=>alert(e.message));
+  ADM.reportsOpen=Math.max(0,(ADM.reportsOpen||1)-1);
+  await adminLoadAll();
+}
 async function adminOpen(isSat,id){
   const box=document.getElementById('adm-form');
   const ph=document.getElementById('adm-placeholder');
@@ -1225,6 +1287,7 @@ async function startCourse(){
   }catch(e){alert(e.message)}
 }
 function courseNav(d){const nx=CT.cur+d;if(nx<0||nx>=CT.q.length)return;CT.cur=nx;courseRenderQ()}
+function courseCurQ(){return CT.q[CT.cur]||{}}
 function courseRenderQ(){
   const q=CT.q[CT.cur];
   document.getElementById('cq-pos').textContent=`Question ${CT.cur+1} of ${CT.q.length}`;
@@ -1264,10 +1327,12 @@ function courseRenderQ(){
       });
       const n2=Object.keys(CT.answers).length;
       document.getElementById('cq-answered').textContent=`${n2} of ${CT.q.length} answered`;
+      if(val)REPORTED={id:q.id,kind:'course',answer:val,wasCorrect:null};
     });
   }else{
     const inp=document.getElementById('course-fr');
-    inp.oninput=()=>{CT.answers[String(q.id)]=inp.value;document.getElementById('cq-answered').textContent=`${Object.keys(CT.answers).length} of ${CT.q.length} answered`};
+    inp.oninput=()=>{CT.answers[String(q.id)]=inp.value;document.getElementById('cq-answered').textContent=`${Object.keys(CT.answers).length} of ${CT.q.length} answered`;
+      if(inp.value.trim())REPORTED={id:q.id,kind:'course',answer:inp.value,wasCorrect:null};};
   }
 }
 async function submitCourse(){
@@ -1388,7 +1453,7 @@ function renderQuestion(){
       <button class="tool" onclick="toggleEliminator()">✂ Cross-out (ABC)</button>
       <button class="tool" onclick="toggleFlag()">⚑ ${T.flags[String(q.id)]?'Reviewed':'Mark for review'}</button>
       <span class="spacer"></span>
-      <button class="feedback-btn" onclick="openFeedback(q)">⚠ Report a mistake</button>
+      <button class="feedback-btn" data-reportbtn onclick="reportThis(q,'sat')">⚠ Report a mistake</button>
     </div>
   </div>`;
   renderKatex(canvas);
@@ -1504,11 +1569,39 @@ function ensureName(){
 }
 
 /* FEEDBACK */
+/* ---------- MISTAKE REPORTING ---------- */
+/* After a question is graded we remember what the student answered so the
+   "Report a mistake" button can submit the whole disagreement in one tap. */
+let REPORTED=null;
+function markReported(q,kind,answer,wasCorrect){
+  REPORTED={id:q.id,kind:kind,answer:String(answer==null?'':answer),wasCorrect:!!wasCorrect};
+  document.querySelectorAll('[data-reportbtn]').forEach(b=>{
+    b.classList.add('hot');
+    b.innerHTML='⚠ Think the answer is wrong? Report it';
+  });
+}
+function reportThis(q,kind){
+  const r=REPORTED;
+  openFeedback(q,kind||'sat',
+    r&&r.id===q.id?r.answer:undefined,
+    r&&r.id===q.id?r.wasCorrect:undefined);
+}
 let feedbackQ=null;
-function openFeedback(q){
-  feedbackQ=q;
-  document.getElementById('feedback-q-ref').textContent='Reporting: '+(q.subtopic?esc(q.subtopic)+' — ':'')+'Question #'+q.id+(q.source?' ('+esc(q.source)+')':'');
-  document.getElementById('fb-kind').value='screenshot';
+/* Reports carry what the student actually answered, so the admin sees the exact
+   disagreement instead of having to guess. Works for both banks. */
+function openFeedback(q,kind,studentAnswer,wasCorrect){
+  feedbackQ={id:q.id,kind:kind||'sat',answer:studentAnswer,wasCorrect:wasCorrect};
+  const where=q.subtopic?(q.subtopic+' · '):'';
+  document.getElementById('feedback-q-ref').textContent=
+    'Reporting: '+(kind==='course'?(q.course||'Course')+' · ':'SAT · ')+where+'Question #'+q.id;
+  const d=document.getElementById('fb-dispute');
+  if(studentAnswer!==undefined&&studentAnswer!==null&&String(studentAnswer).trim()!==''){
+    d.classList.remove('hidden');
+    d.innerHTML=`<div class="ds-row"><span>Your answer</span><b>${esc(String(studentAnswer))}</b></div>
+      <div class="ds-row"><span>Marked correct</span><b class="${wasCorrect?'ok':'bad'}">${wasCorrect?'yes':'no'}</b></div>`;
+  }else d.classList.add('hidden');
+  // Pre-pick the most likely reason given how they were graded.
+  document.getElementById('fb-kind').value=(wasCorrect===true)?'answer':'answer';
   document.getElementById('fb-msg').value='';
   document.getElementById('fb-status').textContent='';
   document.getElementById('feedback-modal').classList.add('on');
@@ -1519,12 +1612,20 @@ async function submitFeedback(){
   const kind=document.getElementById('fb-kind').value;
   const extra=(document.getElementById('fb-msg').value||'').trim();
   const st=document.getElementById('fb-status');
-  const message='['+kind+'] '+(extra||'no details');
   try{
-    await go('/api/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question_id:feedbackQ.id,message,student_name:currentName()})});
-    st.textContent='✅ Report sent — thank you!';
+    await go('/api/mistake-reports',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        kind:feedbackQ.kind,
+        question_id:feedbackQ.id,
+        category:kind,
+        message:extra,
+        student_answer:(feedbackQ.answer||'').toString(),
+        was_correct:feedbackQ.wasCorrect,
+        student_name:currentName()
+      })});
+    st.innerHTML='✅ Report sent — it will show up in Admin → Reports.';
     st.style.color='var(--ok)';
-    setTimeout(()=>closeFeedback(),1200);
+    setTimeout(()=>closeFeedback(),1400);
   }catch(e){
     st.textContent='✗ Failed to send: '+esc(e.message);
     st.style.color='var(--err)';

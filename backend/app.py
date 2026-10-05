@@ -485,6 +485,117 @@ def admin_grade_test():
                     "tested_key": stored})
 
 
+@app.route("/api/mistake-reports", methods=["POST"])
+def submit_mistake_report():
+    """Student-facing: report a wrong question/answer after grading.
+
+    `kind` is 'sat' or 'course'. The stored answer is captured server-side so the
+    student cannot tamper with it, and the student's own answer is stored with it
+    so the admin sees the disagreement directly.
+    """
+    body = request.get_json(force=True) or {}
+    kind = "course" if body.get("kind") == "course" else "sat"
+    try:
+        qid = int(body.get("question_id"))
+    except (TypeError, ValueError):
+        abort(400, "question_id required")
+    table = "course_questions" if kind == "course" else "questions"
+    conn = db.get_conn()
+    row = conn.execute(f"SELECT * FROM {table} WHERE id=?", (qid,)).fetchone()
+    conn.close()
+    if row is None:
+        abort(404, "no such question")
+
+    student_answer = str(body.get("student_answer") or "").strip()[:200]
+    stored = str(row["correct"] or "")
+    was_correct = bool(body.get("was_correct")) if body.get("was_correct") is not None else None
+    if was_correct is None:
+        if kind == "sat":
+            was_correct = normalize_match(student_answer, stored.strip().upper())
+        else:
+            try:
+                was_correct, _ = score_course_question(student_answer, row)
+            except Exception:
+                was_correct = False
+    fid = db.add_mistake_report(
+        kind, qid,
+        (body.get("student_name") or "").strip() or None,
+        student_answer, stored,
+        was_correct,
+        (body.get("category") or "").strip()[:40] or None,
+        (body.get("message") or "").strip()[:1000] or None,
+    )
+    return jsonify({"ok": True, "id": fid})
+
+
+@app.route("/api/admin/reports")
+def admin_reports():
+    require_admin()
+    only_open = request.args.get("open") == "1"
+    rows = db.mistake_reports(only_open=only_open,
+                              limit=min(int(request.args.get("limit", 500)), 2000))
+    out = []
+    for r in rows:
+        kind = (r["kind"] or "sat") if "kind" in r.keys() else "sat"
+        conn = db.get_conn()
+        table = "course_questions" if kind == "course" else "questions"
+        q = conn.execute(
+            f"SELECT id, prompt, correct FROM {table} WHERE id=?", (r["question_id"],)
+        ).fetchone()
+        label = ""
+        if kind == "course" and q is not None:
+            m = conn.execute(
+                """SELECT c.code AS code, cs.ref AS ref, cs.name AS name
+                   FROM course_questions cq
+                   LEFT JOIN course_subtopics cs ON cs.id=cq.subtopic_id
+                   LEFT JOIN courses c ON c.id=cq.course_id WHERE cq.id=?""",
+                (r["question_id"],)).fetchone()
+            if m:
+                label = f"{m['code']} · {m['ref']} {m['name']}"
+        elif q is not None:
+            m = conn.execute(
+                """SELECT s.name AS name FROM questions qq
+                   JOIN subtopics s ON s.id=qq.subtopic_id WHERE qq.id=?""",
+                (r["question_id"],)).fetchone()
+            label = f"SAT · {m['name']}" if m else "SAT"
+        conn.close()
+        out.append({
+            "id": r["id"], "kind": kind, "question_id": r["question_id"],
+            "label": label,
+            "prompt": (q["prompt"] if q else "") or "",
+            "current_answer": (q["correct"] if q else None),
+            "student_name": r["student_name"],
+            "student_answer": r["student_answer"] if "student_answer" in r.keys() else None,
+            "stored_answer": r["stored_answer"] if "stored_answer" in r.keys() else None,
+            "was_correct": r["was_correct"] if "was_correct" in r.keys() else None,
+            "category": r["category"] if "category" in r.keys() else None,
+            "message": r["message"],
+            "created_at": r["created_at"],
+            "resolved": int(r["resolved"] or 0),
+            "question_missing": q is None,
+        })
+    open_count = sum(1 for x in out if not x["resolved"])
+    # A student who was right but marked wrong is the most important report, so
+    # surface it first; then reports whose key has since changed; then the rest.
+    def rank(x):
+        if x["resolved"]:
+            return (3, 0)
+        if x["was_correct"] == 1:
+            return (0, 0)
+        if x["current_answer"] != x["stored_answer"]:
+            return (1, 0)
+        return (2, 0)
+    out.sort(key=rank)
+    return jsonify({"count": len(out), "open": open_count, "reports": out})
+
+
+@app.route("/api/admin/reports/<int:rid>", methods=["POST"])
+def admin_resolve_report(rid):
+    require_admin()
+    db.resolve_mistake_report(rid, resolved=True)
+    return jsonify({"ok": True, "id": rid})
+
+
 @app.route("/api/questions")
 def questions():
     subtopic = request.args.get("subtopic", type=int)
