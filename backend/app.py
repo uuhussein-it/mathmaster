@@ -1,6 +1,7 @@
 import os
 import random
 import re
+import secrets
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -16,9 +17,11 @@ Q_IMG_DIR = os.path.join(ROOT, "data", "question_imgs")
 app = Flask(__name__, static_folder=FRONTEND, static_url_path="")
 
 # --- Admin access -----------------------------------------------------------
-# ADMIN_PASSWORD and SECRET_KEY come from the environment (set them as Render
-# env vars). The fallbacks exist only so the app still boots locally.
-ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD") or "admin"
+# TEACHER_USERNAME / TEACHER_PASSWORD / SECRET_KEY come from the environment
+# (set them as Render env vars). The fallbacks exist only so the app still boots
+# locally. Students never authenticate at all -- they only type a display name.
+TEACHER_USERNAME = os.environ.get("TEACHER_USERNAME") or os.environ.get("ADMIN_USERNAME") or "teacher"
+TEACHER_PASSWORD = os.environ.get("ADMIN_PASSWORD") or "teacher"
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
 app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
                   PERMANENT_SESSION_LIFETIME=60 * 60 * 12)
@@ -103,6 +106,15 @@ def option_images_for(qid):
 
 
 def is_admin():
+    return bool(session.get("admin"))
+
+
+def _consttime_eq(a, b):
+    return secrets.compare_digest(a.encode(), b.encode())
+
+
+def is_teacher():
+    """True only for a session created by the teacher username+password login."""
     return bool(session.get("admin"))
 
 
@@ -613,19 +625,26 @@ def questions():
 
 @app.route("/api/admin/me")
 def admin_me():
-    return jsonify({"is_admin": is_admin()})
+    return jsonify({"is_admin": is_admin(),
+                    "username": session.get("teacher") if is_admin() else None})
 
 
 @app.route("/api/admin/login", methods=["POST"])
 def admin_login():
     body = request.get_json(force=True) or {}
-    given = str(body.get("password") or "")
-    if not ADMIN_PASSWORD or given != ADMIN_PASSWORD:
-        abort(401, "wrong password")
+    given_user = str(body.get("username") or "").strip()
+    given_pass = str(body.get("password") or "")
+    # Both halves must match. We compare with a constant-time helper so the
+    # response time does not leak how much of the username was correct.
+    user_ok = _consttime_eq(given_user, TEACHER_USERNAME)
+    pass_ok = _consttime_eq(given_pass, TEACHER_PASSWORD)
+    if not (user_ok and pass_ok):
+        abort(401, "wrong username or password")
     session.clear()
     session["admin"] = True
+    session["teacher"] = TEACHER_USERNAME
     session.permanent = True
-    return jsonify({"ok": True, "is_admin": True})
+    return jsonify({"ok": True, "is_admin": True, "username": TEACHER_USERNAME})
 
 
 @app.route("/api/admin/logout", methods=["POST"])

@@ -9,7 +9,11 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: "3.11.9"
-      # Password for the Admin page (fix questions/answers). CHANGE THIS.
+      # Teacher sign-in for the Admin page (fix questions/answers).
+      # Set BOTH of these in the Render dashboard before your first teacher
+      # login, otherwise the site falls back to teacher/teacher.
+      - key: TEACHER_USERNAME
+        value: teacher
       - key: ADMIN_PASSWORD
         generateValue: true
       # Signs the admin login cookie. CHANGE THIS to any long random string
