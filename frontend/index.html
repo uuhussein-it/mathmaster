@@ -192,6 +192,7 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
 .dispute .bad{color:var(--err)}
 .whoami{font-size:12.5px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 14px;cursor:pointer;white-space:nowrap}
 .whoami:hover{border-color:var(--brand);color:var(--brand)}
+.top-actions{display:flex;align-items:center;gap:8px;margin-left:auto;flex-wrap:wrap}
 .name-form{display:flex;gap:10px;margin-top:12px}
 .name-form input{flex:1;padding:12px 14px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;font-family:inherit}
 .name-form input:focus{outline:none;border-color:var(--brand)}
@@ -353,7 +354,10 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
     <button class="navbtn" data-view="results">Results</button>
     <button class="navbtn hidden" data-view="editor" id="adm-nav">🔐 Teacher</button>
   </nav>
-  <span class="whoami" id="whoami" onclick="askName()"></span>
+  <div class="top-actions">
+    <button class="navbtn" id="teacher-login-btn" type="button" onclick="askTeacher()">🔐 Teacher Login</button>
+    <span class="whoami" id="whoami" onclick="askName()"></span>
+  </div>
 </div>
 
 <!-- ROLE GATE -->
@@ -386,8 +390,11 @@ select,input[type=number]{width:100%;padding:12px;border:1.5px solid var(--line)
   <div class="container">
     <div class="hero">
       <span class="hero-chip">Updated · MathBook 2.0 · 2023–2025 exams</span>
-      <h1>Master SAT Math with real exam questions</h1>
-      <p class="sub">Every question comes from released Digital SAT math exams (2023–2025), organized by the MathBook subtopics you'll actually see on test day.</p>
+      <h1>Welcome to SAT MathMaster</h1>
+      <p class="sub">My name : Hussein Saleh</p>
+      <div style="margin-top:16px">
+        <button class="btn" type="button" onclick="goView('practice')">Start Practicing</button>
+      </div>
     </div>
     <div class="home-stats" id="home-stats"></div>
 
