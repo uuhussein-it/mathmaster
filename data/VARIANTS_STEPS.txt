@@ -1,0 +1,21 @@
+Option A: Use Claude web/app (no API key needed in code)
+1. Open Claude (claude.ai) in your browser
+2. Copy the contents of: /Users/hussein/Work/sat-math-site/data/claude_gen_prompt.txt
+3. Paste into Claude's message
+4. Copy the contents of: /Users/hussein/Work/sat-math-site/data/match_complete_export.json
+5. Paste after "[PASTE JSON HERE]" in the same message
+6. Claude will return a JSON array (variants). Save it as: variants.json on your computer
+7. On your Mac, put variants.json in /Users/hussein/Work/sat-math-site/
+8. In Terminal, run:
+   cd /Users/hussein/Work/sat-math-site && python3 backend/import_variants.py variants.json
+9. Commit and push:
+   git add data/sat.db && git commit -m "Add question variants from Claude" && git push origin main
+10. Render will auto-deploy. Check after ~1 min.
+
+Option B: Add live Claude button in Admin (needs API key)
+- Add CLAUDE_API_KEY to Render env vars, I add admin endpoint + button. Slower to set up now.
+
+Widen question types (UI for matching/complete/dropdown):
+- Minimal safe way: infer type in API (matching/complete/fr/mcq) and render accordingly in frontend. Needs small frontend changes. I'll do that if you want.
+
+Start with Option A first (fastest). Do steps 1-6, share variants.json if you want me to validate/import/commit for you.
