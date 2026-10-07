@@ -1,0 +1,21 @@
+You are generating math question variants. I need variants of existing questions with different numbers but same structure.
+
+Input: JSON array of questions (each has id, course_id, subtopic_id, prompt, options A-F, correct). 
+Output: JSON array of NEW questions (do NOT overwrite originals). For each variant include:
+- source_original_id (original question id)
+- course_id, subtopic_id (same as original)
+- prompt (rewritten with different numbers, keep same style/type)
+- option_a..option_f (with new numbers; keep format)
+- correct (adjusted to match new correct option/answer)
+- type hint: "mcq", "matching", "complete", or "free_response"
+
+Rules:
+- Change numbers (integers/fractions/decimals) randomly but keep validity (slopes/intersections valid).
+- Keep mathematical structure identical.
+- Preserve LaTeX if present ($...$).
+- For matching/complete questions, keep the matching structure.
+- Generate 2-3 variants per question.
+- Output valid JSON only.
+
+Here are the questions:
+[PASTE JSON HERE]
