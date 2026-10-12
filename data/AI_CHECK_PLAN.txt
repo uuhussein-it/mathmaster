@@ -1,0 +1,15 @@
+AI Checking approach
+1. Add env vars: CLAUDE_API_KEY (or OPENAI_API_KEY). Start with Claude (matches existing tooling).
+2. Backend endpoint: POST /api/ai/check
+   Body: {question_id, source: 'sat'|'course', student_answer: 'A' or text, question: {...}}
+   Returns: {is_correct, explanation, confidence}
+3. Frontend: add "AI Check" button per question (practice, course, test review). When clicked, call endpoint and show result.
+4. For "test" mode, can add "AI Check my answers" at end to check all (or per item). Student chooses.
+
+Also: since correct answers removed, existing auto-grade (compare to stored correct) is useless. We can either:
+- keep manual/AI only
+- or not auto-show "correct/wrong" until AI checks
+
+But easier: add AI check button; disable old "Submit & Grade" relying on stored keys? Or just add AI path.
+
+Need to add backend route + maybe http call to Claude API. Also keep it simple.
