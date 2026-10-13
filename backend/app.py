@@ -1277,6 +1277,26 @@ def grade_questions(grade, level, term):
     return jsonify(out)
 
 
+@app.route("/api/grades/<int:grade>/<path:level>/<int:term>/subtopics")
+def grade_subtopics(grade, level, term):
+    conn = db.get_conn()
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """SELECT cs.id, cs.name, cs.ref, COUNT(q.id) as qcount
+           FROM course_questions q
+           JOIN course_subtopics cs ON cs.id=q.subtopic_id
+           WHERE q.grade=? AND lower(q.level)=lower(?) AND q.term=?
+           GROUP BY cs.id, cs.name, cs.ref
+           ORDER BY cs.ref""",
+        (grade, level, term),
+    ).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        out.append({"id": r["id"], "name": r["name"], "ref": r["ref"], "count": r["qcount"]})
+    return jsonify(out)
+
+
 @app.route("/api/q-img/<int:qid>")
 def q_image(qid):
     conn = db.get_conn()
