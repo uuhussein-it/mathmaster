@@ -44,7 +44,10 @@ nav .navbtn{background:transparent;color:var(--text);border:1px solid var(--bord
 <nav>
   <div class="brand">Math with Mr. Hussein</div>
   <div>
-    <button class="navbtn" onclick="goHome()">Home</button>
+    <button class="navbtn" onclick="
+
+
+  goHome()">Home</button>
     <button class="navbtn" id="adm-nav" class="hidden">🔐 Teacher</button>
   </div>
 </nav>
@@ -63,7 +66,10 @@ nav .navbtn{background:transparent;color:var(--text);border:1px solid var(--bord
 </div>
 
 <div class="container hidden" id="grade">
-  <button class="btn secondary" onclick="goHome()">← Home</button>
+  <button class="btn secondary" onclick="
+
+
+  goHome()">← Home</button>
   <div class="panel">
     <h2 id="gtitle">Grade</h2>
     <div class="row"><button class="btn secondary" data-lvl="Advanced">Advanced</button><button class="btn secondary" data-lvl="General">General</button><button class="btn secondary" data-lvl="ASP">ASP</button></div>
@@ -74,12 +80,18 @@ nav .navbtn{background:transparent;color:var(--text);border:1px solid var(--bord
 </div>
 
 <div class="container hidden" id="work">
-  <button class="btn secondary" onclick="goHome()">← Home</button>
+  <button class="btn secondary" onclick="
+
+
+  goHome()">← Home</button>
   <div class="qcard" id="qwrap"></div>
 </div>
 
 <div class="container hidden" id="sat">
-  <button class="btn secondary" onclick="goHome()">← Home</button>
+  <button class="btn secondary" onclick="
+
+
+  goHome()">← Home</button>
   <div class="panel">
     <h2>Math SAT</h2>
     <div class="row"><button class="btn" onclick="satPractice()">SAT Practice</button><button class="btn" onclick="satExam()">SAT Exam</button></div>
@@ -89,15 +101,30 @@ nav .navbtn{background:transparent;color:var(--text);border:1px solid var(--bord
 function $(id){return document.getElementById(id)}
 function show(id){$(id).classList.remove('hidden')}
 function hide(id){$(id).classList.add('hidden')}
-function goHome(){show('home');hide('grade');hide('work');hide('sat')}
+function 
+
+
+  goHome(){show('home');hide('grade');hide('work');hide('sat')}
 let G={grade:0,lvl:'',term:''}
 function openGrade(g){G={grade:g,lvl:'',term:''};$('gtitle').textContent='Grade '+g;show('grade');hide('home');hide('work');hide('sat')}
 function openSAT(){show('sat');hide('home');hide('grade');hide('work')}
-function gradePractice(){show('work');hide('grade')}
+async function gradePractice(){
+  G.mode='practice';
+  try{
+    const qs = await go('/api/grades/'+G.grade+'/'+encodeURIComponent(G.lvl)+'/'+G.term+'/questions');
+    G.qs = qs;
+    G.i = 0;
+    show('work');hide('grade');
+    renderGQ();
+  }catch(e){alert(e.message)}
+}
 function gradeQuiz(){show('work');hide('grade')}
 function satPractice(){show('work');hide('sat')}
 function satExam(){show('work');hide('sat')}
-goHome()
+
+
+
+  goHome()
 </script>
 </body>
 </html>
