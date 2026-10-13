@@ -111,11 +111,9 @@ function openSAT(){show('sat');hide('home');hide('grade');hide('work')}
 async function gradePractice(){
   G.mode='practice';
   try{
-    const qs = await go('/api/grades/'+G.grade+'/'+encodeURIComponent(G.lvl)+'/'+G.term+'/questions');
-    G.qs = qs;
-    G.i = 0;
-    show('work');hide('grade');
-    renderGQ();
+    const subs = await go('/api/grades/'+G.grade+'/'+encodeURIComponent(G.lvl)+'/'+G.term+'/subtopics');
+    G.subs = subs;
+    show('subs'); hide('grade'); renderSubs();
   }catch(e){alert(e.message)}
 }
 function gradeQuiz(){show('work');hide('grade')}
@@ -126,5 +124,15 @@ function satExam(){show('work');hide('sat')}
 
   goHome()
 </script>
+
+<div class="container hidden" id="subs">
+  <button class="btn secondary" onclick="goHome()">← Home</button>
+  <div class="panel">
+    <h2>Select lessons</h2>
+    <p class="small">Choose one or more lessons to practice</p>
+    <div id="slist"></div>
+    <div class="row" style="margin-top:16px"><button class="btn" onclick="startSelected()">Start</button></div>
+  </div>
+</div>
 </body>
 </html>
