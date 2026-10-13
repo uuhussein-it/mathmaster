@@ -926,8 +926,28 @@ let subIdx=0;
 function renderSubQ(i){subIdx=i;const q=subQuestionState[i];const a=document.getElementById('question-area');if(i>=subQuestionState.length){a.innerHTML=`<div class="card"><h2>Done! 🎉</h2><p class="sub">You practiced all ${subQuestionState.length} questions.</p><button class="btn" onclick="document.getElementById('back-topics').click()">Choose another subtopic</button></div>`;return}
   const isMc=isMC(q);
   let opts=isMc?['A','B','C','D'].map((k,ki)=>`<button class="opt" data-k="${k}"><span class="key">${k}</span>${esc(q.options[ki]||'')}</button>`).join(''):`<input class="finput" placeholder="Type your answer…">`;
-  a.innerHTML=`<div class="card qcard"><div class="qhead"><span class="qnum">Question ${i+1} of ${subQuestionState.length}</span><span class="qmeta"><span class="badge ${q.difficulty}">${q.difficulty}</span><span class="small">${esc(q.source||'')}</span><span class="small">${q.type}</span></span></div>${bodyHTML(q,isMc)}${opts}<div class="feedback hidden" data-fb></div><div class="row-actions"><button class="btn secondary" ${i<=0?'disabled':''} onclick="renderSubQ(${i-1})">← Prev</button><button class="btn" ${i>=subQuestionState.length-1?'disabled':''} onclick="renderSubQ(${i+1})">Next →</button><span class="spacer" style="flex:1"></span><button class="feedback-btn" data-reportbtn id="subq-report" onclick="reportThis(q,'sat')">⚠ Report a mistake</button></div></div>`;
+  a.innerHTML=`<div class="card qcard"><div class="qhead"><span class="qnum">Question ${i+1} of ${subQuestionState.length}</span><span class="qmeta"><span class="badge ${q.difficulty}">${q.difficulty}</span><span class="small">${esc(q.source||'')}</span><span class="small">${q.type}</span></span></div>${bodyHTML(q,isMc)}${opts}<div class="feedback hidden" data-fb></div><div class="row-actions"><button class="btn secondary" ${i<=0?'disabled':''} onclick="renderSubQ(${i-1})">← Prev</button><button class="btn" ${i>=subQuestionState.length-1?'disabled':''} onclick="renderSubQ(${i+1})">Next →</button><span class="spacer" style="flex:1"></span><button type="button" class="feedback-btn" id="aic-sub-{q.id}">AI Check</button><button class="feedback-btn" data-reportbtn id="subq-report" onclick="reportThis(q,'sat')">⚠ Report a mistake</button></div></div>`;
   renderKatex(a);
+  setTimeout(()=>{
+    const ab=document.getElementById('aic-sub-'+q.id);
+    if(ab){
+      ab.onclick=async ()=>{
+        const wrap=a.querySelector('.qcard');
+        const isMc=isMC(q);
+        let ans='';
+        if(isMc){
+          const sels=[]; wrap.querySelectorAll('.opt.selected').forEach(x=>sels.push(x.dataset.k)); ans=sels.join('');
+          if(ans===''){ const inp=wrap.querySelector('.finput'); ans=inp?inp.value:''; }
+        }else{ const inp=wrap.querySelector('.finput'); ans=inp?inp.value:''; }
+        const r=await aiCheckQuestion('sat',q.id,ans,q);
+        const fb=a.querySelector('[data-fb]');
+        if(fb){
+          if(!r.ok){fb.textContent=r.msg;fb.className='feedback';fb.classList.remove('hidden');}
+          else{const d=r.data;fb.textContent=(d.is_correct===true?'AI: Correct':d.is_correct===false?'AI: Incorrect':d.is_correct===null?'AI: Uncertain':'AI result')+(d.explanation?(' — '+d.explanation):'');fb.className='feedback '+(d.is_correct===true?'ok':d.is_correct===false?'bad':'');fb.classList.remove('hidden');}
+        }
+      };
+    }
+  },0);
   a.querySelectorAll('.opt[data-k]').forEach(b=>b.onclick=()=>{const fb=a.querySelector('[data-fb]');b.classList.add('selected');const correct=norm(q.correct);const k=b.dataset.k;const ok=k===correct;b.classList.add(ok?'correct':'wrong');if(!ok)a.querySelectorAll('.opt').forEach(o=>{if(o.dataset.k===correct)o.classList.add('correct')});fb.className='feedback '+(ok?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=ok?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;markReported(q,'sat',k,ok);setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1400)});
   a.querySelectorAll('.finput').forEach(inp=>inp.onchange=()=>{const fb=a.querySelector('[data-fb]');const ok=frMatch(inp.value,q.correct);fb.className='feedback '+(ok?'ok':'bad');fb.classList.remove('hidden');fb.innerHTML=ok?'✅ Correct!':`✗ Incorrect. Correct: <b>${esc(q.correct)}</b>`;markReported(q,'sat',inp.value,ok);setTimeout(()=>{if(i<subQuestionState.length-1)renderSubQ(i+1)},1500)});
 }
@@ -1872,6 +1892,24 @@ if(savedRole==='teacher'){
    (goView('home') only fires when the Home nav button is clicked). */
 loadStats();
 resetPick();
+
+async function aiCheckQuestion(source, questionId, studentAnswer, qObj){
+  try {
+    const res = await fetch('/api/ai/check', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({source, question_id: questionId, student_answer: studentAnswer, question: qObj})
+    });
+    const data = await res.json();
+    if(!data.configured){
+      return {ok:false, msg: data.explanation || 'AI not configured yet'};
+    }
+    return {ok:true, data};
+  } catch(e){
+    return {ok:false, msg:'AI check failed'};
+  }
+}
+
 </script>
 </body>
 </html>

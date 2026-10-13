@@ -1,3 +1,4 @@
+import json
 import os
 import random
 import re
@@ -1242,3 +1243,50 @@ if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "5000"))
     app.run(host=host, port=port)
+@app.route("/api/ai/check", methods=["POST"])
+def ai_check():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+        api_key = os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            return jsonify({"error": "AI not configured", "configured": False, "is_correct": None, "explanation": "AI checking not configured yet."}), 200
+        qid = data.get("question_id")
+        source = data.get("source") or "sat"
+        student_answer = data.get("student_answer") or ""
+        # build question context
+        q = data.get("question") or {}
+        prompt = f"""You are an expert math grader. Grade the student's answer.
+Question: {q.get('prompt','')}
+Options: A) {q.get('option_a','')} B) {q.get('option_b','')} C) {q.get('option_c','')} D) {q.get('option_d','')} E) {q.get('option_e','')} F) {q.get('option_f','')}
+Student answer: {student_answer}
+Return JSON only: {{"is_correct": true|false|null, "explanation": "brief", "confidence": 0-1}}"""
+        # try to call Claude if ANTHROPIC key style? but keep simple stub-safe
+        # minimal: attempt Claude API via urllib if ANTHROPIC key present
+        if os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"):
+            try:
+                import urllib.request as ureq
+                import json as j
+                key = os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+                body = {
+                    "model": "claude-3-5-sonnet-20240620",
+                    "max_tokens": 300,
+                    "messages": [{"role": "user", "content": prompt}]
+                }
+                req = ureq.Request("https://api.anthropic.com/v1/messages",
+                                  data=j.dumps(body).encode("utf-8"),
+                                  headers={"Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-07"})
+                with ureq.urlopen(req, timeout=30) as resp:
+                    res = j.loads(resp.read().decode("utf-8"))
+                    # parse simple
+                    txt = res.get("content", [{}])[0].get("text", "{}")
+                    try:
+                        out = j.loads(txt)
+                    except:
+                        out = {"is_correct": None, "explanation": txt[:200], "confidence": 0.5}
+                    return jsonify({"configured": True, **out}), 200
+            except Exception as e:
+                return jsonify({"error": "ai_call_failed", "configured": True, "is_correct": None, "explanation": "AI check failed."}), 200
+        return jsonify({"configured": False, "is_correct": None, "explanation": "AI not configured yet."}), 200
+    except Exception as e:
+        return jsonify({"error": "bad_request", "is_correct": None}), 400
+
