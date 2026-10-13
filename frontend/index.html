@@ -117,13 +117,55 @@ async function gradePractice(){
     show('subs'); hide('grade'); renderSubs();
   }catch(e){alert(e.message)}
 }
-function gradeQuiz(){show('work');hide('grade')}
+async function gradeQuiz(){
+  G.mode='quiz';
+  try{
+    const subs = await go('/api/grades/'+G.grade+'/'+encodeURIComponent(G.lvl)+'/'+G.term+'/subtopics');
+    G.subs=subs; show('subs'); hide('grade'); renderSubs();
+  }catch(e){alert(e.message)}
+}
 function satPractice(){show('work');hide('sat')}
 function satExam(){show('work');hide('sat')}
 
 
 
   goHome()
+
+function renderGQuiz(){
+  const q=G.qs[G.i]; if(!q){ submitGQuiz(); return; }
+  const isMc=q.is_mcq && q.options.length>0;
+  let opts='';
+  if(isMc){
+    const multi=q.multi_select;
+    opts=q.options.map((txt,ki)=>{
+      const k='ABCDEF'[ki]; const sel=(G.answers[q.id]||'').includes(k)?' selected':'';
+      return '<button class="opt'+sel+'" data-k="'+k+'"><span class="key">'+k+'</span>'+esc(txt)+'</button>';
+    }).join('');
+  }else{ opts='<input class="finput" id="qzfr" value="'+esc(G.answers[q.id]||'')+'">'; }
+  $('qwrap').innerHTML='<div class="card qcard"><div class="qhead"><span class="qnum">Q '+(G.i+1)+'/'+G.qs.length+'</span></div>'+bodyHTML(q,isMc)+opts+'<div class="row-actions"><button class="btn secondary" onclick="if(G.i>0){G.i--;renderGQuiz()}">← Prev</button><button class="btn secondary" onclick="if(G.i<G.qs.length-1){G.i++;renderGQuiz()}">Next →</button><span class="spacer"></span><button class="btn" onclick="submitGQuiz()">Submit All</button></div></div>';
+  renderKatex($('qwrap'));
+  if(isMc){
+    $('qwrap').querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
+      const k=b.dataset.k; const multi=q.multi_select;
+      if(!multi){ G.answers[q.id]=k; $('qwrap').querySelectorAll('.opt').forEach(x=>x.classList.remove('selected')); b.classList.add('selected'); return; }
+      let cur=(G.answers[q.id]||'').split(''); const idx=cur.indexOf(k); if(idx>=0)cur.splice(idx,1); else cur.push(k); G.answers[q.id]=cur.join(''); b.classList.toggle('selected');
+    });
+  }else{
+    const inp=$('qzfr'); if(inp){ inp.oninput=()=>{G.answers[q.id]=inp.value;}; }
+  }
+}
+async function submitGQuiz(){
+  let correct=0; const results=[]; for(let i=0;i<G.qs.length;i++){ const q=G.qs[i]; const ans=G.answers[q.id]||''; let ok=false; if(q.is_mcq){ ok=(ans.toUpperCase()===String(q.correct||'').toUpperCase()); } else { ok=(String(ans).trim().toLowerCase()===String(q.correct||'').trim().toLowerCase()); } if(ok) correct++; results.push({q:q,ans:ans,ok:ok}); }
+  const pct=Math.round(correct*100/G.qs.length); let html='<div class="card"><h2>Results</h2><div class="small">'+correct+'/'+G.qs.length+' correct ('+pct+'%)</div>';
+  for(let i=0;i<results.length;i++){ const r=results[i]; html+='<div class="panel"><div class="small">Q'+(i+1)+'</div><div>'+esc(r.q.prompt)+'</div><div class="small">Your answer: '+esc(r.ans||'-')+' · '+(r.ok?'Correct':'Incorrect')+'</div><div class="small">Answer: '+esc(r.q.correct||'-')+'</div></div>'; }
+  html+='<div class="row"><button class="btn" onclick="remediateG()">Practice My Mistakes</button></div></div>';
+  $('qwrap').innerHTML=html; renderKatex($('qwrap'));
+}
+async function remediateG(){
+  const wrong=[]; G.qs.forEach(q=>{ if(!(G.answers[q.id]&&G.answers[q.id].toUpperCase()===String(q.correct||'').toUpperCase())) wrong.push(q); });
+  if(wrong.length==0){ $('qwrap').innerHTML='<div class="card">All correct! Try more lessons.</div>'; return; }
+  G.qs=wrong; G.i=0; G.answers={}; renderGQuiz();
+}
 </script>
 
 <div class="container hidden" id="subs">
