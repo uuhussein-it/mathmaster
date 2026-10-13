@@ -1,3 +1,4 @@
+import sqlite3
 import json
 import os
 import random
@@ -740,6 +741,25 @@ COURSE_IMG_DIR = os.path.join(ROOT, "data", "course_imgs")
 FORMULA_DIR = os.path.join(ROOT, "data", "formulas")
 
 
+def infer_type(row):
+    p = str(row["prompt"] if "prompt" in row.keys() else row.get("prompt") or "").lower()
+    if "match" in p: return "matching"
+    if "complete" in p: return "complete"
+    opts = []
+    for k in ("option_a","option_b","option_c","option_d","option_e","option_f"):
+        try:
+            if row[k]: opts.append(row[k])
+        except Exception:
+            try:
+                if row.get(k): opts.append(row.get(k))
+            except Exception:
+                pass
+    letters = re.findall(r"[A-F]", str((row.get("correct") if hasattr(row,"get") else row["correct"]) or ""))
+    if len(set(letters)) > 1: return "multi"
+    if len(opts) > 0: return "mcq"
+    return "fr"
+
+
 def course_q_to_dict(row, reveal=False):
     opts = [row["option_a"], row["option_b"], row["option_c"],
             row["option_d"], row["option_e"], row["option_f"]]
@@ -1215,6 +1235,46 @@ def option_img(qid, letter):
         abort(404)
     name = f"{option_image_slug(row['sub'])}_{row['number']}_{letter}.png"
     return send_from_directory(OPTION_IMG_DIR, name)
+
+
+@app.route("/api/grades/<int:grade>/<path:level>/<int:term>/questions")
+def grade_questions(grade, level, term):
+    conn = db.get_conn()
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """SELECT q.id, q.course_id, q.subtopic_id, q.prompt, q.option_a,q.option_b,q.option_c,q.option_d,q.option_e,q.option_f,
+                  q.correct,q.is_mcq,q.question_image,q.grade,q.level,q.term,q.difficulty, q.number
+           FROM course_questions q
+           WHERE q.grade=? AND lower(q.level)=lower(?) AND q.term=?
+           ORDER BY q.id LIMIT 200""",
+        (grade, level, term),
+    ).fetchall()
+    conn.close()
+    out = []
+    for r in rows:
+        opts = []
+        for k in ("option_a","option_b","option_c","option_d","option_e","option_f"):
+            v = r[k]
+            if v:
+                opts.append(v)
+        letters = re.findall(r"[A-F]", r["correct"] or "")
+        d = {
+            "id": r["id"],
+            "course_id": r["course_id"],
+            "subtopic_id": r["subtopic_id"],
+            "number": r["number"],
+            "prompt": r["prompt"] or "",
+            "options": opts,
+            "correct": r["correct"] or "",
+            "is_mcq": bool(r["is_mcq"]) or (1 if opts else 0),
+            "multi_select": len(set(letters)) > 1,
+            "question_image": r["question_image"],
+            "difficulty": r["difficulty"] or "medium",
+            "grade": r["grade"], "level": r["level"], "term": r["term"],
+            "type": infer_type(r),
+        }
+        out.append(d)
+    return jsonify(out)
 
 
 @app.route("/api/q-img/<int:qid>")
