@@ -79,6 +79,8 @@ h2{margin:0 0 6px}
 .qmeta{margin-left:auto; display:flex; gap:8px; align-items:center}
 .badge{font-size:12px; padding:3px 9px; border-radius:999px; background:#eef1ff; color:var(--primary); font-weight:700}
 .opts{display:flex; flex-direction:column; gap:10px; margin:16px 0}
+.qprompt{font-size:18px; line-height:1.6; color:var(--ink); margin:6px 0 4px; font-weight:600}
+.qprompt img{max-width:100%}
 .opt{background:#fff; color:var(--ink); border:2px solid var(--border); padding:13px 15px; border-radius:12px;
   cursor:pointer; text-align:left; display:flex; gap:12px; align-items:flex-start; font-size:16px}
 .opt:hover{border-color:#b9c3f5}
@@ -265,8 +267,8 @@ async function startSelected(){
 }
 
 /* ---------- question rendering ---------- */
-function isMc(q){return (q.is_mcq===true)||(q.options&&q.options.length>0)}
-function questionImage(q){if(q.question_image)return '<img src="'+esc(q.question_image)+'" alt="" style="max-width:100%;border-radius:10px;margin:8px 0" onerror="this.style.display=\'none\'">';return ''}
+function isMc(q){return (q.is_mcq===true)||((q.options&&q.options.length>0))}
+function questionImage(q){if(!q.question_image)return '';const src=/^https?:|^\//.test(q.question_image)?q.question_image:('/api/course-q-img/'+q.id);return '<img src="'+esc(src)+'" alt="" style="max-width:100%;border-radius:10px;margin:8px 0" onerror="this.style.display=\'none\'">'}
 function messageText(q){
   const mc=isMc(q);
   let opts='';
@@ -278,7 +280,7 @@ function messageText(q){
   }else{
     opts='<input class="finput" placeholder="Type your answer (fractions like 3/4 or decimals like 0.75)">';
   }
-  return questionImage(q)+opts;
+  return '<div class="qprompt">'+esc(q.prompt||'')+'</div>'+questionImage(q)+opts;
 }
 function readAnswer(wrap,q){
   if(isMc(q)){const s=[];wrap.querySelectorAll('.opt.selected').forEach(b=>s.push(b.dataset.k));if(s.length)return s.sort().join('');const inp=wrap.querySelector('.finput');return inp?inp.value:''}

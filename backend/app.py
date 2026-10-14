@@ -1271,7 +1271,7 @@ def grade_questions(grade, level, term):
             "correct": r["correct"] or "",
             "is_mcq": bool(r["is_mcq"]) or (1 if opts else 0),
             "multi_select": len(set(letters)) > 1,
-            "question_image": r["question_image"],
+            "question_image": ("/api/course-q-img/%d" % r["id"]) if r["question_image"] else None,
             "difficulty": r["difficulty"] or "medium",
             "grade": r["grade"], "level": r["level"], "term": r["term"],
             "type": infer_type(r),
