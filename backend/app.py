@@ -8,6 +8,9 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import db
+def _db():
+    return db.DB()
+
 
 from flask import Flask, jsonify, request, send_from_directory, abort, session
 
