@@ -1319,6 +1319,85 @@ def index():
 
 db.init_db()
 
+@app.route("/api/ai/explain", methods=["POST"])
+def ai_explain():
+    try:
+        data = request.get_json(force=True,silent=True) or {}
+        gem_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        q = data.get("question") or {}
+        ans = data.get("answer") or ""
+        prompt = f"""Explain step by step how to solve this math problem. Be clear for Grades 9-12/SAT level.
+Question: {q.get('prompt','')}
+Answer given: {ans}
+Return ONLY valid JSON: {{"explanation": "markdown or plain text stepwise explanation"}}"""
+        if gem_key:
+            import urllib.request as ureq, json as j, re as _re
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gem_key}"
+            body = {"contents": [{"parts": [{"text": prompt}]}]}
+            req = ureq.Request(url, data=j.dumps(body).encode("utf-8"), headers={"Content-Type":"application/json"})
+            with ureq.urlopen(req, timeout=60) as resp:
+                res = j.loads(resp.read().decode("utf-8"))
+                txt = res.get("candidates",[{}])[0].get("content",{}).get("parts",[{}])[0].get("text","{}")
+                m=_re.search(r"\{.*\}", txt, _re.S)
+                if m: txt=m.group(0)
+                out=j.loads(txt)
+                return jsonify({"configured":True, **out}), 200
+        return jsonify({"configured":False,"explanation":"Set GEMINI_API_KEY"}), 200
+    except Exception:
+        return jsonify({"error":"bad_request"}), 400
+
+@app.route("/api/ai/hint", methods=["POST"])
+def ai_hint():
+    try:
+        data = request.get_json(force=True,silent=True) or {}
+        gem_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        q = data.get("question") or {}
+        prompt = f"""Give a helpful hint for this math problem without giving the full answer. Be concise.
+Question: {q.get('prompt','')}
+Return ONLY valid JSON: {{"hint": "one or two short hints"}}"""
+        if gem_key:
+            import urllib.request as ureq, json as j, re as _re
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gem_key}"
+            body = {"contents": [{"parts": [{"text": prompt}]}]}
+            req = ureq.Request(url, data=j.dumps(body).encode("utf-8"), headers={"Content-Type":"application/json"})
+            with ureq.urlopen(req, timeout=45) as resp:
+                res = j.loads(resp.read().decode("utf-8"))
+                txt = res.get("candidates",[{}])[0].get("content",{}).get("parts",[{}])[0].get("text","{}")
+                m=_re.search(r"\{.*\}", txt, _re.S)
+                if m: txt=m.group(0)
+                out=j.loads(txt)
+                return jsonify({"configured":True, **out}), 200
+        return jsonify({"configured":False,"hint":"Set GEMINI_API_KEY"}), 200
+    except Exception:
+        return jsonify({"error":"bad_request"}), 400
+
+@app.route("/api/ai/generate-similar", methods=["POST"])
+def ai_generate_similar():
+    try:
+        data = request.get_json(force=True,silent=True) or {}
+        gem_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        q = data.get("question") or {}
+        n = int(data.get("n") or 2)
+        prompt = f"""Generate {n} similar math questions with same structure but different numbers. 
+Question: {q.get('prompt','')}
+Options: A) {q.get('option_a','')} B) {q.get('option_b','')} C) {q.get('option_c','')} D) {q.get('option_d','')} E) {q.get('option_e','')} F) {q.get('option_f','')}
+Return ONLY valid JSON array: [{{"prompt": "...", "option_a": "...", "option_b": "...", "option_c": "...", "option_d": "...", "option_e": "...", "option_f": "...", "correct": "A|B|C|D|E|F or text", "is_mcq": true/false}}]"""
+        if gem_key:
+            import urllib.request as ureq, json as j, re as _re
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gem_key}"
+            body = {"contents": [{"parts": [{"text": prompt}]}]}
+            req = ureq.Request(url, data=j.dumps(body).encode("utf-8"), headers={"Content-Type":"application/json"})
+            with ureq.urlopen(req, timeout=90) as resp:
+                res = j.loads(resp.read().decode("utf-8"))
+                txt = res.get("candidates",[{}])[0].get("content",{}).get("parts",[{}])[0].get("text","[]")
+                m=_re.search(r"\[.*\]", txt, _re.S)
+                if m: txt=m.group(0)
+                out=j.loads(txt)
+                return jsonify({"configured":True, "questions": out}), 200
+        return jsonify({"configured":False,"questions":[]}), 200
+    except Exception:
+        return jsonify({"error":"bad_request"}), 400
+
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "5000"))
@@ -1327,46 +1406,36 @@ if __name__ == "__main__":
 def ai_check():
     try:
         data = request.get_json(force=True, silent=True) or {}
-        api_key = os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("OPENAI_API_KEY")
-        if not api_key:
-            return jsonify({"error": "AI not configured", "configured": False, "is_correct": None, "explanation": "AI checking not configured yet."}), 200
+        gem_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
         qid = data.get("question_id")
         source = data.get("source") or "sat"
         student_answer = data.get("student_answer") or ""
-        # build question context
         q = data.get("question") or {}
-        prompt = f"""You are an expert math grader. Grade the student's answer.
+        prompt = f"""You are an expert math grader. Grade the student's answer strictly.
 Question: {q.get('prompt','')}
 Options: A) {q.get('option_a','')} B) {q.get('option_b','')} C) {q.get('option_c','')} D) {q.get('option_d','')} E) {q.get('option_e','')} F) {q.get('option_f','')}
 Student answer: {student_answer}
-Return JSON only: {{"is_correct": true|false|null, "explanation": "brief", "confidence": 0-1}}"""
-        # try to call Claude if ANTHROPIC key style? but keep simple stub-safe
-        # minimal: attempt Claude API via urllib if ANTHROPIC key present
-        if os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY"):
+Return ONLY valid JSON: {{"is_correct": true|false|null, "explanation": "concise stepwise explanation", "confidence": 0-1}}"""
+        if gem_key:
             try:
-                import urllib.request as ureq
-                import json as j
-                key = os.environ.get("CLAUDE_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
-                body = {
-                    "model": "claude-3-5-sonnet-20240620",
-                    "max_tokens": 300,
-                    "messages": [{"role": "user", "content": prompt}]
-                }
-                req = ureq.Request("https://api.anthropic.com/v1/messages",
-                                  data=j.dumps(body).encode("utf-8"),
-                                  headers={"Content-Type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-07"})
-                with ureq.urlopen(req, timeout=30) as resp:
+                import urllib.request as ureq, json as j
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gem_key}"
+                body = {"contents": [{"parts": [{"text": prompt}]}]}
+                req = ureq.Request(url, data=j.dumps(body).encode("utf-8"), headers={"Content-Type":"application/json"})
+                with ureq.urlopen(req, timeout=45) as resp:
                     res = j.loads(resp.read().decode("utf-8"))
-                    # parse simple
-                    txt = res.get("content", [{}])[0].get("text", "{}")
-                    try:
-                        out = j.loads(txt)
-                    except:
-                        out = {"is_correct": None, "explanation": txt[:200], "confidence": 0.5}
-                    return jsonify({"configured": True, **out}), 200
+                    txt = res.get("candidates",[{}])[0].get("content",{}).get("parts",[{}])[0].get("text","{}")
+                    # extract json
+                    import re as _re
+                    m=_re.search(r"\{.*\}", txt, _re.S)
+                    if m: txt=m.group(0)
+                    out=j.loads(txt)
+                    return jsonify({"configured":True, **out}), 200
             except Exception as e:
-                return jsonify({"error": "ai_call_failed", "configured": True, "is_correct": None, "explanation": "AI check failed."}), 200
-        return jsonify({"configured": False, "is_correct": None, "explanation": "AI not configured yet."}), 200
+                return jsonify({"error":"ai_failed","configured":True,"is_correct":None,"explanation":"AI check failed."}), 200
+        return jsonify({"configured":False,"error":"AI not configured","explanation":"Set GEMINI_API_KEY","is_correct":None}), 200
     except Exception as e:
-        return jsonify({"error": "bad_request", "is_correct": None}), 400
+        return jsonify({"error":"bad_request","is_correct":None}), 400
+
+
 
