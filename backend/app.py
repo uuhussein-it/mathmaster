@@ -1322,23 +1322,56 @@ def index():
 
 db.init_db()
 
-def _gemini(prompt, timeout=60):
-    """Call Gemini (flash) and return parsed JSON, or None if not configured/failed."""
-    import urllib.request as ureq, json as j, re as _re
+def _gemini(prompt, timeout=45):
+    """Call Gemini and return parsed JSON, or None if not configured/failed.
+
+    Uses a fast flash-lite model by default (thinking models are too slow for
+    interactive grading). Override with the GEMINI_MODEL env var.
+    """
+    import urllib.request as ureq, urllib.error as uerr, json as j, re as _re, time as _t
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
         return None
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + key
-    body = {"contents": [{"parts": [{"text": prompt}]}]}
-    req = ureq.Request(url, data=j.dumps(body).encode("utf-8"),
-                       headers={"Content-Type": "application/json"})
-    with ureq.urlopen(req, timeout=timeout) as resp:
-        res = j.loads(resp.read().decode("utf-8"))
-    txt = res.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-    m = _re.search(r"[\{\[].*[\}\]]", txt, _re.S)
-    if m:
-        txt = m.group(0)
-    return j.loads(txt)
+    primary = os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite")
+    models = [primary, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview",
+              "gemini-3.5-flash", "gemini-3.8-flash"]
+    seen = set()
+    body = j.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
+    per_try = max(8, min(timeout, 30))
+    last = None
+    for model in models:
+        if model in seen:
+            continue
+        seen.add(model)
+        url = ("https://generativelanguage.googleapis.com/v1beta/models/"
+               + model + ":generateContent?key=" + key)
+        for attempt in range(2):
+            req = ureq.Request(url, data=body, headers={"Content-Type": "application/json"})
+            try:
+                with ureq.urlopen(req, timeout=per_try) as resp:
+                    res = j.loads(resp.read().decode("utf-8"))
+            except uerr.HTTPError as e:
+                last = "HTTP %s" % e.code
+                if e.code in (429, 500, 503) and attempt == 0:
+                    _t.sleep(1.5)
+                    continue
+                break
+            except Exception as e:
+                last = str(e)
+                break
+            parts = res.get("candidates", [{}])[0].get("content", {}).get("parts", []) or []
+            txt = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
+            m = _re.search(r"[\{\[].*[\}\]]", txt, _re.S)
+            if m:
+                txt = m.group(0)
+            try:
+                return j.loads(txt)
+            except Exception as e:
+                last = "parse: " + str(e)
+                break
+    if last:
+        print("[gemini] failed:", last)
+    return None
 
 
 def _ai_ready():
@@ -1474,7 +1507,7 @@ def ai_grade_batch():
                   '\nReturn ONLY a valid JSON array: [{"index": <int>, "is_correct": true|false, '
                   '"explanation": "brief", "correct": "the correct answer"}]')
         try:
-            out = _gemini(prompt, timeout=120)
+            out = _gemini(prompt, timeout=60)
             if isinstance(out, dict):
                 out = out.get("results") or []
             for r in out:
