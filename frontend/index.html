@@ -4,180 +4,560 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Math with Mr. Hussein</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
 <style>
-:root{--bg:#0f1026;--card:#1a1f36;--text:#e6e7ea;--sub:#a3a8c2;--primary:#4f9deb;--success:#22c55e;--danger:#ef4444;--border:#2a2f4f}
+:root{
+  --bg1:#eef3ff; --bg2:#f7f2ff; --card:#ffffff; --ink:#1c2440; --sub:#5b6584;
+  --primary:#5b6cf9; --primary2:#8b5cf6; --ok:#16a34a; --bad:#ef4444; --info:#0ea5e9;
+  --border:#e4e8f5; --shadow:0 10px 30px rgba(38,53,120,.10);
+}
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:radial-gradient(1200px 800px at 50% 0%,#23284a 0%,#0f1026 60%,#0b0d1f 100%);color:var(--text);line-height:1.6}
-nav{display:flex;justify-content:space-between;align-items:center;padding:12px 20px;background:rgba(26,31,54,.8);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-nav .brand{font-weight:800;font-size:18px}
-nav .navbtn{background:transparent;color:var(--text);border:1px solid var(--border);padding:8px 12px;border-radius:8px;cursor:pointer}
-.container{max-width:1100px;margin:0 auto;padding:24px}
-.hero{text-align:center;margin:40px 0}
-.hero h1{font-size:32px;margin:0 0 8px}
-.hero p{color:var(--sub);margin:0}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:32px 0}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;cursor:pointer;transition:transform .2s,box-shadow .2s;text-align:center}
-.card:hover{transform:translateY(-4px);box-shadow:0 8px 24px rgba(79,157,235,.25)}
-.card h2{margin:8px 0 0;font-size:20px}
-.card .icon{font-size:40px}
-.hidden{display:none}
-.panel{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;margin:16px 0}
-.row{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0}
-.btn{background:var(--primary);color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-weight:600}
-.btn.secondary{background:transparent;border:1px solid var(--border);color:var(--text)}
-.btn.danger{background:var(--danger)}
-.small{color:var(--sub);font-size:14px}
-.qcard{max-width:800px;margin:0 auto}
-.opts{display:flex;flex-direction:column;gap:10px;margin:16px 0}
-.opt{background:transparent;color:var(--text);border:1px solid var(--border);padding:12px;border-radius:10px;cursor:pointer;text-align:left;display:flex;gap:10px;align-items:flex-start}
-.opt.selected{border-color:var(--primary);background:rgba(79,157,235,.15)}
-.opt.correct{border-color:var(--success);background:rgba(34,197,94,.15)}
-.opt.wrong{border-color:var(--danger);background:rgba(239,68,68,.15)}
-.feedback{padding:12px;border-radius:10px;margin:12px 0}
-.feedback.ok{background:rgba(34,197,94,.15);border:1px solid var(--success)}
-.feedback.bad{background:rgba(239,68,68,.15);border:1px solid var(--danger)}
-.feedback.info{background:rgba(79,157,235,.15);border:1px solid var(--primary)}
-.finput{width:100%;padding:10px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--text)}
+html,body{margin:0}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  color:var(--ink); line-height:1.6; min-height:100vh;
+  background:
+    radial-gradient(900px 500px at 15% -10%, #dbe4ff 0%, transparent 60%),
+    radial-gradient(900px 500px at 90% 0%, #f3e3ff 0%, transparent 55%),
+    linear-gradient(160deg,var(--bg1),var(--bg2));
+  background-attachment:fixed;
+}
+nav{
+  position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:12px;
+  padding:12px 20px; background:rgba(255,255,255,.75); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+nav .brand{font-weight:800; font-size:18px; background:linear-gradient(90deg,var(--primary),var(--primary2));
+  -webkit-background-clip:text; background-clip:text; color:transparent}
+nav .spacer{flex:1}
+.navbtn{background:#fff; border:1px solid var(--border); color:var(--ink); padding:8px 14px;
+  border-radius:10px; cursor:pointer; font-weight:600; font-size:14px}
+.navbtn:hover{border-color:var(--primary); color:var(--primary)}
+.container{max-width:1080px; margin:0 auto; padding:26px 20px 60px}
+.hero{text-align:center; margin:34px 0 8px}
+.hero h1{font-size:clamp(24px,3.4vw,38px); margin:0 0 10px; line-height:1.25}
+.hero h1 span{background:linear-gradient(90deg,var(--primary),var(--primary2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+.hero p{color:var(--sub); margin:0; font-size:17px}
+.grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:18px; margin:32px 0}
+.grade{
+  position:relative; border:none; border-radius:18px; padding:26px 18px; cursor:pointer; color:#fff;
+  text-align:center; box-shadow:var(--shadow); transition:transform .18s ease, box-shadow .18s ease;
+  overflow:hidden;
+}
+.grade:hover{transform:translateY(-6px); box-shadow:0 16px 40px rgba(38,53,120,.22)}
+.grade .icon{font-size:44px; line-height:1}
+.grade h2{margin:12px 0 2px; font-size:21px}
+.grade .s{font-size:13px; opacity:.9}
+.g1{background:linear-gradient(135deg,#5b6cf9,#7c8cff)}
+.g2{background:linear-gradient(135deg,#8b5cf6,#b17cff)}
+.g3{background:linear-gradient(135deg,#0ea5e9,#38bdf8)}
+.g4{background:linear-gradient(135deg,#10b981,#34d399)}
+.gSAT{background:linear-gradient(135deg,#f59e0b,#fbbf24)}
+.card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:var(--shadow); margin:16px 0}
+.panel{background:#fbfcff; border:1px solid var(--border); border-radius:14px; padding:16px; margin:12px 0}
+.hidden{display:none !important}
+h2{margin:0 0 6px}
+.small{color:var(--sub); font-size:14px}
+.row{display:flex; flex-wrap:wrap; gap:10px; margin:12px 0; align-items:center}
+.btn{background:linear-gradient(135deg,var(--primary),var(--primary2)); color:#fff; border:none; padding:11px 18px;
+  border-radius:11px; cursor:pointer; font-weight:700; font-size:15px; box-shadow:0 6px 16px rgba(91,108,249,.28)}
+.btn:hover{filter:brightness(1.05)}
+.btn:disabled{opacity:.5; cursor:not-allowed; box-shadow:none}
+.btn.secondary{background:#fff; color:var(--ink); border:1px solid var(--border); box-shadow:none}
+.btn.secondary:hover{border-color:var(--primary); color:var(--primary)}
+.btn.ghost{background:transparent; color:var(--primary); border:1px dashed var(--primary); box-shadow:none}
+.chooser{display:flex; flex-wrap:wrap; gap:10px}
+.choose{background:#fff; border:2px solid var(--border); color:var(--ink); padding:12px 20px; border-radius:12px;
+  cursor:pointer; font-weight:700; font-size:15px}
+.choose:hover{border-color:var(--primary)}
+.choose.active{border-color:var(--primary); background:#eef1ff; color:var(--primary)}
+.qcard{max-width:820px; margin:0 auto}
+.qhead{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+.qnum{font-weight:800; color:var(--primary)}
+.qmeta{margin-left:auto; display:flex; gap:8px; align-items:center}
+.badge{font-size:12px; padding:3px 9px; border-radius:999px; background:#eef1ff; color:var(--primary); font-weight:700}
+.opts{display:flex; flex-direction:column; gap:10px; margin:16px 0}
+.opt{background:#fff; color:var(--ink); border:2px solid var(--border); padding:13px 15px; border-radius:12px;
+  cursor:pointer; text-align:left; display:flex; gap:12px; align-items:flex-start; font-size:16px}
+.opt:hover{border-color:#b9c3f5}
+.opt .key{font-weight:800; color:var(--primary); min-width:18px}
+.opt.selected{border-color:var(--primary); background:#eef1ff}
+.opt.correct{border-color:var(--ok); background:#eafaf0}
+.opt.wrong{border-color:var(--bad); background:#fdeeee}
+.finput{width:100%; padding:12px 14px; border-radius:12px; border:2px solid var(--border); font-size:16px; color:var(--ink); background:#fff}
+.finput:focus{outline:none; border-color:var(--primary)}
+.feedback{padding:13px 15px; border-radius:12px; margin:12px 0; font-size:15px; border:1px solid var(--border); background:#fbfcff}
+.feedback.ok{background:#eafaf0; border-color:#bfe9cd}
+.feedback.bad{background:#fdeeee; border-color:#f6c6c6}
+.feedback.info{background:#eef6ff; border-color:#c7ddf7}
+.stats{display:flex; gap:22px; flex-wrap:wrap; justify-content:center; margin-top:14px}
+.stat .n{font-size:26px; font-weight:800; color:var(--primary)}
+.stat .l{font-size:12px; color:var(--sub); text-transform:uppercase; letter-spacing:.5px}
+.score{font-size:54px; font-weight:800; background:linear-gradient(90deg,var(--primary),var(--primary2));
+  -webkit-background-clip:text; background-clip:text; color:transparent; text-align:center}
+.list label{display:flex; gap:10px; align-items:center; padding:10px 12px; border:1px solid var(--border);
+  border-radius:10px; margin:8px 0; background:#fff; cursor:pointer}
+.list input{width:18px; height:18px}
+.timer{font-weight:800; color:var(--bad); font-size:18px; margin-left:auto}
+.bar{height:8px; border-radius:999px; background:#e4e8f5; overflow:hidden; margin:10px 0 18px}
+.bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--primary),var(--primary2))}
+a.back{cursor:pointer; color:var(--primary); font-weight:600; text-decoration:none}
+.foot{text-align:center; color:var(--sub); font-size:13px; margin-top:40px}
 </style>
 </head>
 <body>
 <nav>
   <div class="brand">Math with Mr. Hussein</div>
-  <div>
-    <button class="navbtn" onclick="
-
-
-  goHome()">Home</button>
-    <button class="navbtn" id="adm-nav" class="hidden">🔐 Teacher</button>
-  </div>
+  <div class="spacer"></div>
+  <span class="small" id="whoami"></span>
+  <button class="navbtn" onclick="goHome()">Home</button>
 </nav>
+
+<!-- HOME -->
 <div class="container" id="home">
   <div class="hero">
-    <h1>Math with Mr. Hussein — Practice Smart. Learn Better. Achieve More.</h1>
-    <p class="small">Grades 9–12 & SAT Mathematics</p>
+    <h1><span>Math with Mr. Hussein</span><br>Practice Smart. Learn Better. Achieve More.</h1>
+    <p>Grades 9–12 &nbsp;·&nbsp; SAT Mathematics preparation</p>
   </div>
   <div class="grid">
-    <div class="card" onclick="openGrade(9)"><div class="icon">📚</div><h2>Grade 9</h2></div>
-    <div class="card" onclick="openGrade(10)"><div class="icon">🧮</div><h2>Grade 10</h2></div>
-    <div class="card" onclick="openGrade(11)"><div class="icon">📐</div><h2>Grade 11</h2></div>
-    <div class="card" onclick="openGrade(12)"><div class="icon">🎯</div><h2>Grade 12</h2></div>
-    <div class="card" onclick="openSAT()"><div class="icon">SAT</div><h2>Math SAT</h2></div>
+    <button class="grade g1" onclick="openGrade(9)"><div class="icon">📘</div><h2>Grade 9</h2><div class="s">Algebra foundations</div></button>
+    <button class="grade g2" onclick="openGrade(10)"><div class="icon">📗</div><h2>Grade 10</h2><div class="s">Functions & geometry</div></button>
+    <button class="grade g3" onclick="openGrade(11)"><div class="icon">📙</div><h2>Grade 11</h2><div class="s">Advanced topics</div></button>
+    <button class="grade g4" onclick="openGrade(12)"><div class="icon">📕</div><h2>Grade 12</h2><div class="s">Pre-calculus & more</div></button>
+    <button class="grade gSAT" onclick="openSAT()"><div class="icon">🎯</div><h2>Math SAT</h2><div class="s">Practice & timed exam</div></button>
   </div>
+  <div class="foot">Original practice questions · AI-powered feedback</div>
 </div>
 
+<!-- GRADE SETUP -->
 <div class="container hidden" id="grade">
-  <button class="btn secondary" onclick="
-
-
-  goHome()">← Home</button>
-  <div class="panel">
+  <a class="back" onclick="goHome()">← Home</a>
+  <div class="card">
     <h2 id="gtitle">Grade</h2>
-    <div class="row"><button class="btn secondary" data-lvl="Advanced">Advanced</button><button class="btn secondary" data-lvl="General">General</button><button class="btn secondary" data-lvl="ASP">ASP</button></div>
-    <div class="row"><button class="btn secondary" data-term="Term 1">Term 1</button><button class="btn secondary" data-term="Term 2">Term 2</button><button class="btn secondary" data-term="Term 3">Term 3</button></div>
-    <div class="row"><button class="btn" onclick="gradePractice()">Practice</button><button class="btn" onclick="gradeQuiz()">Quiz</button></div>
-    <div class="small" id="gsel">Select level and term to continue</div>
+    <p class="small">Step 1 — Choose your level</p>
+    <div class="chooser">
+      <button class="choose" data-lvl="Advanced">Advanced</button>
+      <button class="choose" data-lvl="General">General</button>
+      <button class="choose" data-lvl="ASP">ASP</button>
+    </div>
+    <p class="small" style="margin-top:18px">Step 2 — Choose your term</p>
+    <div class="chooser">
+      <button class="choose" data-term="1">Term 1</button>
+      <button class="choose" data-term="2">Term 2</button>
+      <button class="choose" data-term="3">Term 3</button>
+    </div>
+    <p class="small" style="margin-top:18px">Step 3 — Choose your learning mode</p>
+    <div class="row">
+      <button class="btn" onclick="gradeStart('practice')">Practice</button>
+      <button class="btn secondary" onclick="gradeStart('quiz')">Quiz</button>
+    </div>
+    <div class="small" id="gsel" style="margin-top:12px"></div>
   </div>
 </div>
 
+<!-- LESSON PICKER -->
+<div class="container hidden" id="subs">
+  <a class="back" onclick="backGrade()">← Back</a>
+  <div class="card">
+    <h2>Select lessons</h2>
+    <p class="small">Choose one or more lessons, then start.</p>
+    <div class="list" id="slist"></div>
+    <div class="row">
+      <button class="btn" onclick="startSelected()">Start</button>
+      <button class="btn secondary" onclick="toggleAllSubs(true)">Select all</button>
+      <button class="btn secondary" onclick="toggleAllSubs(false)">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- WORK -->
 <div class="container hidden" id="work">
-  <button class="btn secondary" onclick="
-
-
-  goHome()">← Home</button>
-  <div class="qcard" id="qwrap"></div>
+  <a class="back" onclick="goHome()">← Home</a>
+  <div id="qwrap"></div>
 </div>
 
+<!-- SAT -->
 <div class="container hidden" id="sat">
-  <button class="btn secondary" onclick="
-
-
-  goHome()">← Home</button>
-  <div class="panel">
+  <a class="back" onclick="goHome()">← Home</a>
+  <div class="card">
     <h2>Math SAT</h2>
-    <div class="row"><button class="btn" onclick="satPractice()">SAT Practice</button><button class="btn" onclick="satExam()">SAT Exam</button></div>
+    <p class="small">Independent SAT preparation — no grade or term needed.</p>
+    <div id="satSkills"></div>
+    <div class="row">
+      <button class="btn" onclick="satStart('practice')">SAT Practice</button>
+      <button class="btn secondary" onclick="satStart('exam')">SAT Exam (timed)</button>
+    </div>
+    <div class="small" id="satsel" style="margin-top:10px">Pick one or more skills above.</div>
   </div>
 </div>
-<script>document.addEventListener("DOMContentLoaded",function(){setupGradeSelectors();});
-function esc(s){if(s===null||s===undefined)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
+<script>
+/* ---------- helpers ---------- */
 function $(id){return document.getElementById(id)}
-async function go(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error('HTTP '+r.status);return await r.json();}
 function show(id){$(id).classList.remove('hidden')}
 function hide(id){$(id).classList.add('hidden')}
-function 
-
-
-  goHome(){show('home');hide('grade');hide('work');hide('sat')}
-let G={grade:0,lvl:'',term:''}
-function openGrade(g){G={grade:g,lvl:'',term:''};$('gtitle').textContent='Grade '+g;show('grade');hide('home');hide('work');hide('sat')}
-function openSAT(){show('sat');hide('home');hide('grade');hide('work')}
-async function gradePractice(){
-  G.mode='practice';
-  try{
-    const subs = await go('/api/grades/'+G.grade+'/'+encodeURIComponent(G.lvl)+'/'+G.term+'/subtopics');
-    G.subs = subs;
-    show('subs'); hide('grade'); renderSubs();
-  }catch(e){alert(e.message)}
+function esc(s){if(s===null||s===undefined)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+async function api(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+function typeset(el){
+  if(!el||!window.renderMathInElement)return;
+  try{renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}],throwOnError:false})}catch(e){}
 }
-async function gradeQuiz(){
-  G.mode='quiz';
-  try{
-    const subs = await go('/api/grades/'+G.grade+'/'+encodeURIComponent(G.lvl)+'/'+G.term+'/subtopics');
-    G.subs=subs; show('subs'); hide('grade'); renderSubs();
-  }catch(e){alert(e.message)}
+const NAME_KEY='mh_name';
+function getName(){return localStorage.getItem(NAME_KEY)||''}
+function currentName(){return getName()||'Student'}
+
+/* ---------- home ---------- */
+function goHome(){['grade','subs','work','sat'].forEach(hide);show('home');refresWho()}
+function refresWho(){$('whoami').textContent=getName()?('👋 '+getName()):''}
+
+/* ---------- grade flow ---------- */
+let G={grade:0,level:'',term:'',mode:'',subs:[],qs:[],i:0,answers:{},graded:null};
+
+function openGrade(g){
+  G={grade:g,level:'',term:'',mode:'',subs:[],qs:[],i:0,answers:{},graded:null};
+  $('gtitle').textContent='Grade '+g;
+  ['home','work','sat','subs'].forEach(hide);show('grade');
+  document.querySelectorAll('.choose').forEach(b=>b.classList.remove('active'));
+  $('gsel').textContent='Select a level and a term to continue.';
 }
-function satPractice(){show('work');hide('sat')}
-function satExam(){show('work');hide('sat')}
+function selectLevel(l){G.level=l;markActive('[data-lvl]',l,'lvl');updateGsel()}
+function selectTerm(t){G.term=t;markActive('[data-term]',t,'term');updateGsel()}
+function markActive(sel,val,attr){document.querySelectorAll(sel).forEach(b=>{b.classList.toggle('active',String(b.dataset[attr])===String(val))})}
+function updateGsel(){
+  if(G.level&&G.term){$('gsel').textContent='Ready: Grade '+G.grade+' · '+G.level+' · Term '+G.term+'. Choose Practice or Quiz.';}
+  else{$('gsel').textContent='Select a level and a term to continue.';}
+}
+document.querySelectorAll('[data-lvl]').forEach(b=>b.addEventListener('click',()=>selectLevel(b.dataset.lvl)));
+document.querySelectorAll('[data-term]').forEach(b=>b.addEventListener('click',()=>selectTerm(b.dataset.term)));
 
+async function gradeStart(mode){
+  if(!G.level||!G.term){alert('Please select a level and a term first.');return}
+  G.mode=mode;
+  try{
+    const subs=await api('/api/grades/'+G.grade+'/'+encodeURIComponent(G.level)+'/'+G.term+'/subtopics');
+    if(!subs.length){alert('No questions available for this selection yet. Try another level or term.');return}
+    G.subs=subs;renderSubs();['grade','home'].forEach(hide);show('subs');
+  }catch(e){alert('Error loading lessons: '+e.message)}
+}
+function backGrade(){hide('subs');show('grade')}
+function renderSubs(){
+  const el=$('slist');el.innerHTML='';
+  G.subs.forEach(su=>{
+    const lab=document.createElement('label');
+    lab.innerHTML='<input type="checkbox" data-sid="'+su.id+'"><span>'+(su.ref?esc(su.ref)+' ':'')+esc(su.name)+'</span> <span class="small" style="margin-left:auto">'+su.count+' Qs</span>';
+    el.appendChild(lab);
+  });
+}
+function toggleAllSubs(on){document.querySelectorAll('#slist input').forEach(x=>x.checked=on)}
+async function startSelected(){
+  const ids=[];document.querySelectorAll('#slist input:checked').forEach(x=>ids.push(parseInt(x.dataset.sid)));
+  if(!ids.length){alert('Select at least one lesson.');return}
+  try{
+    const all=await api('/api/grades/'+G.grade+'/'+encodeURIComponent(G.level)+'/'+G.term+'/questions');
+    let qs=all.filter(q=>ids.includes(q.subtopic_id));
+    if(!qs.length){alert('No questions found in the selected lessons.');return}
+    G.qs=qs;G.i=0;G.answers={};G.graded=null;
+    hide('subs');show('work');
+    if(G.mode==='practice'){renderPractice()}else{renderQuiz()}
+  }catch(e){alert('Error: '+e.message)}
+}
 
-
-  goHome()
-
-function renderGQuiz(){
-  const q=G.qs[G.i]; if(!q){ submitGQuiz(); return; }
-  const isMc=q.is_mcq && q.options.length>0;
+/* ---------- question rendering ---------- */
+function isMc(q){return (q.is_mcq===true)||(q.options&&q.options.length>0)}
+function questionImage(q){if(q.question_image)return '<img src="'+esc(q.question_image)+'" alt="" style="max-width:100%;border-radius:10px;margin:8px 0" onerror="this.style.display=\'none\'">';return ''}
+function messageText(q){
+  const mc=isMc(q);
   let opts='';
-  if(isMc){
-    const multi=q.multi_select;
-    opts=q.options.map((txt,ki)=>{
-      const k='ABCDEF'[ki]; const sel=(G.answers[q.id]||'').includes(k)?' selected':'';
-      return '<button class="opt'+sel+'" data-k="'+k+'"><span class="key">'+k+'</span>'+esc(txt)+'</button>';
-    }).join('');
-  }else{ opts='<input class="finput" id="qzfr" value="'+esc(G.answers[q.id]||'')+'">'; }
-  $('qwrap').innerHTML='<div class="card qcard"><div class="qhead"><span class="qnum">Q '+(G.i+1)+'/'+G.qs.length+'</span></div>'+bodyHTML(q,isMc)+opts+'<div class="row-actions"><button class="btn secondary" onclick="if(G.i>0){G.i--;renderGQuiz()}">← Prev</button><button class="btn secondary" onclick="if(G.i<G.qs.length-1){G.i++;renderGQuiz()}">Next →</button><span class="spacer"></span><button class="btn" onclick="submitGQuiz()">Submit All</button></div></div>';
-  renderKatex($('qwrap'));
-  if(isMc){
-    $('qwrap').querySelectorAll('.opt').forEach(b=>b.onclick=()=>{
-      const k=b.dataset.k; const multi=q.multi_select;
-      if(!multi){ G.answers[q.id]=k; $('qwrap').querySelectorAll('.opt').forEach(x=>x.classList.remove('selected')); b.classList.add('selected'); return; }
-      let cur=(G.answers[q.id]||'').split(''); const idx=cur.indexOf(k); if(idx>=0)cur.splice(idx,1); else cur.push(k); G.answers[q.id]=cur.join(''); b.classList.toggle('selected');
-    });
+  if(mc){
+    opts='<div class="opts">'+q.options.map((txt,ki)=>{
+      const k='ABCDEF'[ki];
+      return '<button class="opt" data-k="'+k+'"><span class="key">'+k+'</span><span>'+esc(txt)+'</span></button>';
+    }).join('')+'</div>';
   }else{
-    const inp=$('qzfr'); if(inp){ inp.oninput=()=>{G.answers[q.id]=inp.value;}; }
+    opts='<input class="finput" placeholder="Type your answer (fractions like 3/4 or decimals like 0.75)">';
   }
+  return questionImage(q)+opts;
 }
-async function submitGQuiz(){
-  let correct=0; const results=[]; for(let i=0;i<G.qs.length;i++){ const q=G.qs[i]; const ans=G.answers[q.id]||''; let ok=false; if(q.is_mcq){ ok=(ans.toUpperCase()===String(q.correct||'').toUpperCase()); } else { ok=(String(ans).trim().toLowerCase()===String(q.correct||'').trim().toLowerCase()); } if(ok) correct++; results.push({q:q,ans:ans,ok:ok}); }
-  const pct=Math.round(correct*100/G.qs.length); let html='<div class="card"><h2>Results</h2><div class="small">'+correct+'/'+G.qs.length+' correct ('+pct+'%)</div>';
-  for(let i=0;i<results.length;i++){ const r=results[i]; html+='<div class="panel"><div class="small">Q'+(i+1)+'</div><div>'+esc(r.q.prompt)+'</div><div class="small">Your answer: '+esc(r.ans||'-')+' · '+(r.ok?'Correct':'Incorrect')+'</div><div class="small">Answer: '+esc(r.q.correct||'-')+'</div></div>'; }
-  html+='<div class="row"><button class="btn" onclick="remediateG()">Practice My Mistakes</button></div></div>';
-  $('qwrap').innerHTML=html; renderKatex($('qwrap'));
+function readAnswer(wrap,q){
+  if(isMc(q)){const s=[];wrap.querySelectorAll('.opt.selected').forEach(b=>s.push(b.dataset.k));if(s.length)return s.sort().join('');const inp=wrap.querySelector('.finput');return inp?inp.value:''}
+  const inp=wrap.querySelector('.finput');return inp?inp.value:'';
 }
-async function remediateG(){
-  const wrong=[]; G.qs.forEach(q=>{ if(!(G.answers[q.id]&&G.answers[q.id].toUpperCase()===String(q.correct||'').toUpperCase())) wrong.push(q); });
-  if(wrong.length==0){ $('qwrap').innerHTML='<div class="card">All correct! Try more lessons.</div>'; return; }
-  G.qs=wrong; G.i=0; G.answers={}; renderGQuiz();
+function bindOpts(wrap,q,multi){
+  wrap.querySelectorAll('.opt').forEach(b=>{
+    b.onclick=()=>{
+      if(!multi){wrap.querySelectorAll('.opt').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');}
+      else b.classList.toggle('selected');
+    };
+  });
 }
-</script>
 
-<div class="container hidden" id="subs">
-  <button class="btn secondary" onclick="goHome()">← Home</button>
-  <div class="panel">
-    <h2>Select lessons</h2>
-    <p class="small">Choose one or more lessons to practice</p>
-    <div id="slist"></div>
-    <div class="row" style="margin-top:16px"><button class="btn" onclick="startSelected()">Start</button></div>
-  </div>
-</div>
+/* ---------- PRACTICE ---------- */
+function renderPractice(){
+  const q=G.qs[G.i];
+  const wrap=$('qwrap');
+  wrap.innerHTML='<div class="card qcard">'+
+    '<div class="qhead"><span class="qnum">Question '+(G.i+1)+' of '+G.qs.length+'</span>'+
+    '<span class="qmeta"><span class="badge">'+esc(q.difficulty||'practice')+'</span></span></div>'+
+    '<div class="bar"><i style="width:'+Math.round((G.i)/G.qs.length*100)+'%"></i></div>'+
+    messageText(q)+
+    '<div class="feedback hidden" data-fb></div>'+
+    '<div class="row" style="margin-top:8px">'+
+      '<button class="btn secondary" id="prev"'+(G.i<=0?' disabled':'')+'>← Prev</button>'+
+      '<button class="btn" id="submit">Submit</button>'+
+      '<button class="btn secondary" id="hint">💡 Hint</button>'+
+      '<button class="btn secondary" id="explain">📖 Explain</button>'+
+      '<button class="btn secondary" id="next"'+(G.i>=G.qs.length-1?' disabled':'')+'>Next →</button>'+
+    '</div>'+
+  '</div>';
+  bindOpts(wrap,q,false);
+  $('prev').onclick=()=>{if(G.i>0){G.i--;renderPractice()}};
+  $('next').onclick=()=>{if(G.i<G.qs.length-1){G.i++;renderPractice()}};
+  $('submit').onclick=()=>submitAnswer(q,wrap);
+  $('hint').onclick=()=>aiFeedback('hint',q,wrap);
+  $('explain').onclick=()=>aiFeedback('explain',q,wrap);
+  typeset(wrap);
+}
+async function submitAnswer(q,wrap){
+  const ans=readAnswer(wrap,q);
+  const fb=wrap.querySelector('[data-fb]');
+  fb.className='feedback info';fb.classList.remove('hidden');fb.textContent='Checking…';
+  try{
+    const r=await api('/api/ai/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:G.mode,question_id:q.id,student_answer:ans,question:q})});
+    let cls='info',txt='';
+    if(!r.configured){txt='Answer recorded. (AI feedback is not configured yet.)';}
+    else if(r.is_correct===true){cls='ok';txt='✅ Correct! '+(r.explanation||'')}
+    else if(r.is_correct===false){cls='bad';txt='❌ Not quite. '+(r.explanation||'')}
+    else{cls='info';txt=(r.explanation||'Answer recorded.')}
+    fb.className='feedback '+cls;fb.textContent=txt;
+  }catch(e){fb.className='feedback info';fb.textContent='Could not check answer.'}
+}
+async function aiFeedback(kind,q,wrap){
+  const fb=wrap.querySelector('[data-fb]');
+  fb.className='feedback info';fb.classList.remove('hidden');fb.textContent=(kind==='hint'?'Getting a hint…':'Writing explanation…');
+  try{
+    const r=await api('/api/ai/'+kind,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,answer:readAnswer(wrap,q)})});
+    fb.textContent=r.hint||r.explanation||'No response.';
+  }catch(e){fb.textContent='Could not load AI feedback.'}
+}
+
+/* ---------- QUIZ ---------- */
+function renderQuiz(){
+  const q=G.qs[G.i],wrap=$('qwrap');
+  wrap.innerHTML='<div class="card qcard">'+
+    '<div class="qhead"><span class="qnum">Question '+(G.i+1)+' of '+G.qs.length+'</span>'+
+    '<span class="qmeta"><span class="badge">'+esc(q.difficulty||'quiz')+'</span></span></div>'+
+    '<div class="bar"><i style="width:'+Math.round((G.i)/G.qs.length*100)+'%"></i></div>'+
+    messageText(q)+
+    '<div class="row" style="margin-top:8px">'+
+      '<button class="btn secondary" id="prev"'+(G.i<=0?' disabled':'')+'>← Prev</button>'+
+      '<button class="btn secondary" id="next"'+(G.i>=G.qs.length-1?' disabled':'')+'>Next →</button>'+
+      '<span style="flex:1"></span>'+
+      '<button class="btn" id="finish">Submit Quiz</button>'+
+    '</div>'+
+    '<div class="small" style="margin-top:8px">'+Object.keys(G.answers).length+' of '+G.qs.length+' answered</div>'+
+  '</div>';
+  bindOpts(wrap,q,false);
+  $('prev').onclick=()=>{if(G.i>0){G.i--;renderQuiz()}};
+  $('next').onclick=()=>{if(G.i<G.qs.length-1){G.i++;renderQuiz()}};
+  $('finish').onclick=submitQuiz;
+  // restore any selection
+  const saved=G.answers[q.id];
+  if(saved&&isMc(q)){wrap.querySelectorAll('.opt').forEach(b=>{if(saved.includes(b.dataset.k))b.classList.add('selected')})}
+  else if(saved){const inp=wrap.querySelector('.finput');if(inp)inp.value=saved}
+  // capture changes
+  wrap.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>{G.answers[q.id]=readAnswer(wrap,q)}));
+  const inp=wrap.querySelector('.finput');if(inp)inp.addEventListener('input',()=>{G.answers[q.id]=inp.value});
+  typeset(wrap);
+}
+async function submitQuiz(){
+  const wrap=$('qwrap');
+  wrap.innerHTML='<div class="card"><h2>Marking your quiz…</h2><p class="small">Checking every answer with AI. This may take a few seconds.</p></div>';
+  const items=G.qs.map(q=>({question:q,student_answer:G.answers[q.id]||''}));
+  let results=[];
+  try{
+    const r=await api('/api/ai/grade-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
+    results=r.results||[];
+  }catch(e){}
+  G.graded=results;
+  showResults('Quiz Results',results,()=>remediateGrade());
+}
+function saveProgress(payload){try{api('/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({student_name:currentName(),grade:G.grade,level:G.level,term:G.term,source:G.mode},payload))})}catch(e){}}
+
+function showResults(title,results,onRemediate){
+  let correct=0,known=0;
+  results.forEach(r=>{if(r.is_correct===true)correct++;if(r.is_correct!==null&&r.is_correct!==undefined)known++});
+  const total=G.qs.length;
+  const pct=known?Math.round(correct*100/known):0;
+  let html='<div class="card"><h2>'+esc(title)+'</h2>'+
+    '<div class="score">'+pct+'%</div>'+
+    '<div class="stats"><span class="stat"><div class="n">'+correct+'/'+total+'</div><div class="l">Correct</div></span>'+
+    '<span class="stat"><div class="n">'+currentName()+'</div><div class="l">Student</div></span></div>';
+  // skills breakdown
+  const byTopic={};
+  G.qs.forEach((q,i)=>{const key=q.subtopic||q.domain||('Lesson '+(q.subtopic_id||'?'));byTopic[key]=byTopic[key]||{c:0,t:0};byTopic[key].t++;const r=results[i]||{};if(r.is_correct===true)byTopic[key].c++;});
+  html+='<h2 style="margin-top:22px">Skills</h2>';
+  Object.entries(byTopic).forEach(([k,v])=>{html+='<div class="small">'+esc(k)+': '+v.c+'/'+v.t+'</div>'});
+  html+='<h2 style="margin-top:22px">Review</h2>';
+  G.qs.forEach((q,i)=>{
+    const r=results[i]||{};const ans=G.answers[q.id]||'—';
+    const mark=r.is_correct===true?'✅':r.is_correct===false?'❌':'•';
+    html+='<div class="panel"><div class="small">Q '+(i+1)+' '+mark+'</div><div>'+esc(q.prompt)+'</div>'+
+      '<div class="small" style="margin-top:6px">Your answer: <b>'+esc(ans)+'</b>'+(r.correct?(' · Correct: <b>'+esc(r.correct)+'</b>'):'')+'</div>'+
+      (r.explanation?('<div class="small" style="margin-top:6px">'+esc(r.explanation)+'</div>'):'')+'</div>';
+  });
+  const wrong=results.filter(r=>r.is_correct===false).length;
+  html+='<div class="row"><button class="btn" id="remed">'+(wrong?'Practice My Mistakes':'All correct — try harder set')+'</button> <button class="btn secondary" onclick="goHome()">Home</button></div></div>';
+  $('qwrap').innerHTML=html;
+  $('remed').onclick=onRemediate;
+  saveProgress({correct:correct,total:total,pct:pct,mistakes:JSON.stringify(G.qs.filter((q,i)=>(results[i]||{}).is_correct===false).map(q=>q.id))});
+  typeset($('qwrap'));
+}
+async function remediateGrade(){
+  const wrong=G.qs.filter((q,i)=>((G.graded[i]||{}).is_correct===false));
+  if(!wrong.length){$('qwrap').innerHTML='<div class="card"><h2>🎉 Excellent!</h2><p class="small">You got everything right. Keep it up!</p><button class="btn" onclick="goHome()">Home</button></div>';return}
+  $('qwrap').innerHTML='<div class="card"><h2>Building your remedial set…</h2><p class="small">Creating similar questions with new numbers.</p></div>';
+  const generated=[];
+  for(const q of wrong.slice(0,6)){
+    try{
+      const r=await api('/api/ai/generate-similar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,n:2})});
+      (r.questions||[]).forEach(nq=>{nq.subtopic=q.subtopic;nq.domain=q.domain;generated.push(nq)});
+    }catch(e){}
+  }
+  if(!generated.length){
+    // fall back to re-doing the original wrong ones
+    G.qs=wrong;
+  }else{
+    G.qs=generated;
+  }
+  G.i=0;G.answers={};G.graded=null;G.mode='practice';
+  $('qwrap').innerHTML='<div class="card"><h2>Remedial Practice</h2><p class="small">'+G.qs.length+' questions targeting your weak skills. Immediate feedback provided.</p><button class="btn" onclick="renderPractice()">Start</button></div>';
+}
+
+/* ---------- SAT ---------- */
+let SAT={sel:{},qs:[],i:0,answers:{},mode:'',timer:null,sec:0,graded:null,allSkills:[]};
+
+async function openSAT(){
+  ['home','grade','work','subs'].forEach(hide);show('sat');
+  if(SAT.allSkills.length){renderSatSkills();return}
+  try{
+    const topics=await api('/api/topics');
+    const skills=[];
+    Object.entries(topics).forEach(([domain,subs])=>{subs.forEach(s=>skills.push({domain:domain,id:s.id,name:s.name,count:s.count}))});
+    SAT.allSkills=skills;renderSatSkills();
+  }catch(e){$('satSkills').innerHTML='<p class="small">Could not load skills.</p>'}
+}
+function renderSatSkills(){
+  const el=$('satSkills');el.innerHTML='<p class="small">Choose skills (domains):</p>';
+  const byDomain={};
+  SAT.allSkills.forEach(s=>{(byDomain[s.domain]=byDomain[s.domain]||[]).push(s)});
+  Object.entries(byDomain).forEach(([domain,list])=>{
+    const wrap=document.createElement('div');wrap.className='panel';
+    wrap.innerHTML='<div style="font-weight:800;margin-bottom:6px">'+esc(domain)+'</div>'+
+      '<div class="chooser">'+list.map(s=>'<button class="choose" data-sid="'+s.id+'">'+esc(s.name)+' <span class="small">('+s.count+')</span></button>').join('')+'</div>';
+    el.appendChild(wrap);
+  });
+  el.querySelectorAll('[data-sid]').forEach(b=>b.addEventListener('click',()=>{
+    const id=b.dataset.sid;SAT.sel[id]=!SAT.sel[id];b.classList.toggle('active',SAT.sel[id]);updateSatSel();
+  }));
+}
+function updateSatSel(){const n=Object.values(SAT.sel).filter(Boolean).length;$('satsel').textContent=n?(n+' skill(s) selected.'):'Pick one or more skills above.'}
+async function satStart(mode){
+  const ids=Object.keys(SAT.sel).filter(k=>SAT.sel[k]);
+  if(!ids.length){alert('Pick at least one skill.');return}
+  SAT.mode=mode;SAT.graded=null;
+  $('qwrap').innerHTML='<div class="card"><h2>Loading…</h2></div>';hide('sat');show('work');
+  let qs=[];
+  for(const id of ids){
+    try{const arr=await api('/api/questions?subtopic='+id);qs=qs.concat(arr)}catch(e){}
+  }
+  // shuffle a bit
+  qs=qs.sort(()=>Math.random()-0.5);
+  if(mode==='exam')qs=qs.slice(0,22);
+  SAT.qs=qs;SAT.i=0;SAT.answers={};
+  if(mode==='practice'){renderSatPractice()}else{startSatExam()}
+}
+function renderSatPractice(){
+  const q=SAT.qs[SAT.i],wrap=$('qwrap');
+  wrap.innerHTML='<div class="card qcard">'+
+    '<div class="qhead"><span class="qnum">SAT Practice · '+(SAT.i+1)+' of '+SAT.qs.length+'</span><span class="qmeta"><span class="badge">'+esc(q.domain||'SAT')+'</span></span></div>'+
+    messageText(q)+'<div class="feedback hidden" data-fb></div>'+
+    '<div class="row"><button class="btn secondary" id="prev"'+(SAT.i<=0?' disabled':'')+'>← Prev</button>'+
+    '<button class="btn" id="submit">Submit</button>'+
+    '<button class="btn secondary" id="hint">💡 Hint</button>'+
+    '<button class="btn secondary" id="explain">📖 Explain</button>'+
+    '<button class="btn secondary" id="next"'+(SAT.i>=SAT.qs.length-1?' disabled':'')+'>Next →</button></div></div>';
+  bindOpts(wrap,q,false);
+  $('prev').onclick=()=>{if(SAT.i>0){SAT.i--;renderSatPractice()}};
+  $('next').onclick=()=>{if(SAT.i<SAT.qs.length-1){SAT.i++;renderSatPractice()}};
+  $('submit').onclick=async()=>{
+    const ans=readAnswer(wrap,q),fb=wrap.querySelector('[data-fb]');
+    fb.className='feedback info';fb.classList.remove('hidden');fb.textContent='Checking…';
+    try{const r=await api('/api/ai/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'sat',question_id:q.id,student_answer:ans,question:q})});
+      if(!r.configured){fb.textContent='Answer recorded. (AI feedback not configured.)'}
+      else{const ok=r.is_correct;fb.className='feedback '+(ok===true?'ok':ok===false?'bad':'info');fb.textContent=(ok===true?'✅ Correct! ':ok===false?'❌ Not quite. ':'')+(r.explanation||'')}
+    }catch(e){fb.textContent='Could not check.'}
+  };
+  $('hint').onclick=()=>aiFeedback('hint',q,wrap);
+  $('explain').onclick=()=>aiFeedback('explain',q,wrap);
+  typeset(wrap);
+}
+function startSatExam(){
+  SAT.sec=25*60;
+  if(SAT.timer)clearInterval(SAT.timer);
+  SAT.timer=setInterval(()=>{SAT.sec--;updateTimer();if(SAT.sec<=0){clearInterval(SAT.timer);SAT.timer=null;finishSatExam()}},1000);
+  renderSatExam();
+}
+function updateTimer(){const el=$('satTimer');if(!el)return;const m=Math.floor(SAT.sec/60),s=SAT.sec%60;el.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s}
+function renderSatExam(){
+  const q=SAT.qs[SAT.i],wrap=$('qwrap');
+  wrap.innerHTML='<div class="card qcard">'+
+    '<div class="qhead"><span class="qnum">SAT Exam · '+(SAT.i+1)+' of '+SAT.qs.length+'</span><span class="timer" id="satTimer"></span></div>'+
+    messageText(q)+
+    '<div class="row"><button class="btn secondary" id="prev"'+(SAT.i<=0?' disabled':'')+'>← Prev</button>'+
+    '<button class="btn secondary" id="next"'+(SAT.i>=SAT.qs.length-1?' disabled':'')+'>Next →</button>'+
+    '<span style="flex:1"></span><button class="btn" id="finish">Submit Exam</button></div></div>';
+  bindOpts(wrap,q,false);
+  updateTimer();
+  $('prev').onclick=()=>{if(SAT.i>0){SAT.i--;renderSatExam()}};
+  $('next').onclick=()=>{if(SAT.i<SAT.qs.length-1){SAT.i++;renderSatExam()}};
+  $('finish').onclick=finishSatExam;
+  const saved=SAT.answers[q.id];
+  if(saved&&isMc(q)){wrap.querySelectorAll('.opt').forEach(b=>{if(saved.includes(b.dataset.k))b.classList.add('selected')})}
+  else if(saved){const inp=wrap.querySelector('.finput');if(inp)inp.value=saved}
+  wrap.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>{SAT.answers[q.id]=readAnswer(wrap,q)}));
+  const inp=wrap.querySelector('.finput');if(inp)inp.addEventListener('input',()=>{SAT.answers[q.id]=inp.value});
+  typeset(wrap);
+}
+async function finishSatExam(){
+  if(SAT.timer){clearInterval(SAT.timer);SAT.timer=null}
+  $('qwrap').innerHTML='<div class="card"><h2>Marking your exam…</h2><p class="small">This may take a few seconds.</p></div>';
+  const items=SAT.qs.map(q=>({question:q,student_answer:SAT.answers[q.id]||''}));
+  let results=[];
+  try{const r=await api('/api/ai/grade-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});results=r.results||[]}catch(e){}
+  SAT.graded=results;
+  const saveG=G;G={grade:'',level:'',term:'',mode:'sat-exam',qs:SAT.qs,answers:SAT.answers};
+  showResults('SAT Exam Results',results,()=>remediateSat());
+  G=saveG;
+}
+async function remediateSat(){
+  const wrong=SAT.qs.filter((q,i)=>((SAT.graded[i]||{}).is_correct===false));
+  if(!wrong.length){$('qwrap').innerHTML='<div class="card"><h2>🎉 Great job!</h2><p class="small">Everything correct. Try more skills or the timed exam.</p><button class="btn" onclick="openSAT()">More SAT</button></div>';return}
+  $('qwrap').innerHTML='<div class="card"><h2>Building your SAT revision…</h2><p class="small">Generating targeted SAT questions.</p></div>';
+  const gen=[];
+  for(const q of wrong.slice(0,6)){
+    try{const r=await api('/api/ai/generate-similar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,n:2})});(r.questions||[]).forEach(nq=>{nq.domain=q.domain;gen.push(nq)})}catch(e){}
+  }
+  SAT.qs=gen.length?gen:wrong;SAT.i=0;SAT.answers={};SAT.graded=null;
+  $('qwrap').innerHTML='<div class="card"><h2>SAT Revision</h2><p class="small">'+SAT.qs.length+' targeted questions. Immediate feedback.</p><button class="btn" onclick="renderSatPractice()">Start</button></div>';
+}
+
+/* ---------- name prompt ---------- */
+function ensureName(){if(!getName()){const n=prompt('Welcome! What is your name?');if(n&&n.trim())localStorage.setItem(NAME_KEY,n.trim())}refresWho()}
+
+refresWho();
+document.addEventListener('DOMContentLoaded',()=>{ensureName()});
+</script>
 </body>
 </html>
