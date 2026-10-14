@@ -1398,6 +1398,19 @@ Return ONLY valid JSON array: [{{"prompt": "...", "option_a": "...", "option_b":
     except Exception:
         return jsonify({"error":"bad_request"}), 400
 
+@app.route("/api/progress", methods=["POST"])
+def save_progress():
+    try:
+        data = request.get_json(force=True,silent=True) or {}
+        db.save_progress(data)
+        return jsonify({"ok":True}), 200
+    except Exception as e:
+        return jsonify({"ok":False}), 400
+
+@app.route("/api/progress")
+def list_progress():
+    return jsonify(db.list_progress())
+
 if __name__ == "__main__":
     host = os.environ.get("HOST", "0.0.0.0")
     port = int(os.environ.get("PORT", "5000"))

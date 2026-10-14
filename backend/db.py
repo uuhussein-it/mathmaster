@@ -581,4 +581,17 @@ def course_catalog():
         out.append(co)
     out.sort(key=lambda c: (c["grade"], c["branch"]))
     return out
+    def save_progress(self, d):
+        with self.lock:
+            cur = self.conn.cursor()
+            cur.execute("""INSERT INTO student_progress (student_name, grade, level, term, source, quiz_id, correct, total, pct, mistakes, skill_summary)
+                           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                        (d.get("student_name"), d.get("grade"), d.get("level"), d.get("term"), d.get("source"), d.get("quiz_id"), d.get("correct"), d.get("total"), d.get("pct"), d.get("mistakes"), d.get("skill_summary")))
+            self.conn.commit()
+            return cur.lastrowid
+
+    def list_progress(self, limit=100):
+        cur = self.conn.cursor()
+        rows = cur.execute("""SELECT * FROM student_progress ORDER BY id DESC LIMIT ?""", (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
