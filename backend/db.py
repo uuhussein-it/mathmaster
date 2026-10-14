@@ -171,6 +171,8 @@ def init_db():
     conn.commit()
     _ensure_column(conn, "test_sessions", "student_name", "TEXT")
     _ensure_column(conn, "question_feedback", "student_name", "TEXT")
+    _ensure_column(conn, "course_questions", "widget_json", "TEXT")
+    _ensure_column(conn, "questions", "widget_json", "TEXT")
     conn.commit()
     # Student-reported mistakes, for both the SAT bank and the curriculum.
     # `student_answer`/`was_correct` are captured at report time so the admin can
@@ -600,4 +602,32 @@ def list_progress(limit=100):
     rows = cur.execute("""SELECT * FROM student_progress ORDER BY id DESC LIMIT ?""", (limit,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+
+_WIDGET_TABLES = {"course": "course_questions", "sat": "questions"}
+
+
+def get_widget(kind, qid):
+    """Return the cached interactive-widget JSON for a question, or None."""
+    table = _WIDGET_TABLES.get(kind)
+    if not table:
+        return None
+    conn = get_conn()
+    row = conn.execute(
+        f"SELECT widget_json FROM {table} WHERE id=?", (qid,)
+    ).fetchone()
+    conn.close()
+    return row["widget_json"] if row else None
+
+
+def save_widget(kind, qid, widget_json):
+    table = _WIDGET_TABLES.get(kind)
+    if not table:
+        return
+    conn = get_conn()
+    conn.execute(
+        f"UPDATE {table} SET widget_json=? WHERE id=?", (widget_json, qid)
+    )
+    conn.commit()
+    conn.close()
 

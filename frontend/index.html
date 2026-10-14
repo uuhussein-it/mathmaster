@@ -107,6 +107,41 @@ h2{margin:0 0 6px}
 .bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--primary),var(--primary2))}
 a.back{cursor:pointer; color:var(--primary); font-weight:600; text-decoration:none}
 .foot{text-align:center; color:var(--sub); font-size:13px; margin-top:40px}
+
+/* ---------- image lightbox ---------- */
+.qfig{position:relative; display:inline-block; max-width:100%; cursor:zoom-in; margin:10px 0}
+.qfig img{max-width:100%; border-radius:10px; display:block; border:1px solid var(--border)}
+.qfig .zoomtag{position:absolute; right:8px; bottom:8px; background:rgba(37,51,120,.85); color:#fff;
+  font-size:12px; padding:4px 9px; border-radius:999px; font-weight:700}
+.lightbox{position:fixed; inset:0; background:rgba(12,16,33,.94); z-index:1000; display:flex;
+  align-items:center; justify-content:center; flex-direction:column; overflow:auto; padding:24px}
+.lightbox img{max-width:96vw; max-height:88vh; border-radius:8px; background:#fff}
+.lb-close{position:fixed; top:16px; right:18px; background:#fff; color:var(--ink); border:none;
+  padding:9px 15px; border-radius:999px; font-weight:800; cursor:pointer}
+.lb-hint{color:#cdd4f0; font-size:13px; margin-top:12px}
+
+/* ---------- interactive widgets ---------- */
+.widget{margin:14px 0; padding:14px; border:1px dashed var(--border); border-radius:14px; background:#fbfcff}
+.widget .wtitle{font-weight:800; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:8px}
+.widget .wtip{font-size:12px; color:var(--sub); font-weight:600}
+.plotwrap{display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start}
+.plotwrap svg{background:#fff; border:1px solid var(--border); border-radius:12px; touch-action:none}
+.plotbtn{font-size:13px; padding:6px 11px; border-radius:9px; border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:700}
+.plotbtn:hover{border-color:var(--primary)}
+.wtable{border-collapse:collapse; margin-top:4px}
+.wtable th,.wtable td{border:1px solid var(--border); padding:0}
+.wtable th{background:#eef1ff; color:var(--primary); font-size:13px; padding:7px 12px; text-align:center}
+.wtable td input{width:76px; padding:9px 8px; border:none; font-size:15px; text-align:center; background:transparent; color:var(--ink)}
+.wtable td.given{background:#f2f4fb; color:var(--sub); font-weight:700; padding:9px 8px; text-align:center; min-width:76px}
+.matchwrap{position:relative; display:flex; gap:26px; align-items:flex-start}
+.matchwrap .mcol{flex:1; display:flex; flex-direction:column; gap:10px; z-index:2}
+.mitem{background:#fff; border:2px solid var(--border); border-radius:10px; padding:11px 13px; font-size:14px;
+  cursor:pointer; line-height:1.35}
+.mitem:hover{border-color:#b9c3f5}
+.mitem.sel{border-color:var(--primary); background:#eef1ff}
+.mitem.linked{border-color:var(--ok); background:#eafaf0}
+.mlines{position:absolute; inset:0; pointer-events:none; z-index:1; overflow:visible}
+.mlines line{stroke:var(--primary); stroke-width:3; stroke-linecap:round}
 </style>
 </head>
 <body>
@@ -195,6 +230,13 @@ a.back{cursor:pointer; color:var(--primary); font-weight:600; text-decoration:no
   </div>
 </div>
 
+<!-- IMAGE LIGHTBOX -->
+<div id="lightbox" class="lightbox hidden" onclick="closeLightbox()">
+  <img id="lightboxImg" alt="Question figure">
+  <button class="lb-close" onclick="closeLightbox()">✕ Close</button>
+  <div class="lb-hint">Click anywhere to close · pinch or scroll to zoom</div>
+</div>
+
 <script>
 /* ---------- helpers ---------- */
 function $(id){return document.getElementById(id)}
@@ -209,6 +251,7 @@ function typeset(el){
 const NAME_KEY='mh_name';
 function getName(){return localStorage.getItem(NAME_KEY)||''}
 function currentName(){return getName()||'Student'}
+let _aiReady=true;
 
 /* ---------- home ---------- */
 function goHome(){['grade','subs','work','sat'].forEach(hide);show('home');refresWho()}
@@ -268,7 +311,7 @@ async function startSelected(){
 
 /* ---------- question rendering ---------- */
 function isMc(q){return (q.is_mcq===true)||((q.options&&q.options.length>0))}
-function questionImage(q){if(!q.question_image)return '';const src=/^https?:|^\//.test(q.question_image)?q.question_image:('/api/course-q-img/'+q.id);return '<img src="'+esc(src)+'" alt="" style="max-width:100%;border-radius:10px;margin:8px 0" onerror="this.style.display=\'none\'">'}
+function questionImage(q){if(!q.question_image)return '';const src=/^https?:|^\//.test(q.question_image)?q.question_image:('/api/course-q-img/'+q.id);return '<span class="qfig" onclick="openLightbox(this.querySelector(\'img\').src)"><img src="'+esc(src)+'" alt="Question figure" onerror="this.parentNode.style.display=\'none\'"><span class="zoomtag">🔍 Zoom</span></span>'}
 function messageText(q){
   const mc=isMc(q);
   let opts='';
@@ -295,6 +338,203 @@ function bindOpts(wrap,q,multi){
   });
 }
 
+/* ---------- image lightbox ---------- */
+function openLightbox(src){if(!src)return;$('lightboxImg').src=src;$('lightbox').classList.remove('hidden')}
+function closeLightbox(){$('lightbox').classList.add('hidden');$('lightboxImg').src=''}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLightbox()});
+
+/* ---------- interactive widgets ---------- */
+const WIDGETS={};
+const SVGNS='http://www.w3.org/2000/svg';
+function sourceKind(q){return q&&q.__sat?'sat':'course'}
+async function getWidget(qid,kind){
+  const key=kind+':'+qid;
+  if(WIDGETS[key])return WIDGETS[key];
+  const w=await api('/api/widget/'+kind+'/'+qid);
+  WIDGETS[key]=w;return w;
+}
+function widgetBox(title,hint){
+  const d=document.createElement('div');d.className='widget';
+  d.innerHTML='<div class="wtitle">'+title+(hint?' <span class="wtip">'+hint+'</span>':'')+'</div>';
+  return d;
+}
+
+/* coordinate plane */
+function mountGraph(host,spec,answers,qid){
+  const W=400,H=400,pad=34;
+  let xmin=Number(spec.xmin),xmax=Number(spec.xmax),ymin=Number(spec.ymin),ymax=Number(spec.ymax);
+  if(!isFinite(xmin)||!isFinite(xmax)||xmax<=xmin){xmin=-10;xmax=10}
+  if(!isFinite(ymin)||!isFinite(ymax)||ymax<=ymin){ymin=-10;ymax=10}
+  xmin=Math.min(xmin,-1);xmax=Math.max(xmax,1);ymin=Math.min(ymin,-1);ymax=Math.max(ymax,1);
+  const drawLine=(x)=>spec.mode==='line'||spec.mode==='both';
+  const X=x=>pad+(x-xmin)/(xmax-xmin)*(W-2*pad);
+  const Y=y=>H-pad-(y-ymin)/(ymax-ymin)*(H-2*pad);
+  const invX=px=>xmin+(px-pad)/(W-2*pad)*(xmax-xmin);
+  const invY=py=>ymin+((H-pad)-py)/(H-2*pad)*(ymax-ymin);
+  const state=(answers[qid]&&answers[qid].points)?answers[qid]:{points:[],lines:[]};
+  answers[qid]=state;
+  const el=widgetBox('📐 Plot on the coordinate plane','Click to plot a point · click a point to remove it');
+  el.innerHTML+='<div class="plotwrap"><svg viewBox="0 0 '+W+' '+H+'" width="400" height="400"></svg>'+
+    '<div><div class="small" data-pts></div><div class="row" style="margin-top:10px"><button class="plotbtn" data-clear>Clear</button></div></div></div>';
+  host.appendChild(el);
+  const svg=el.querySelector('svg');
+  function seg(x1,y1,x2,y2,c,w){const l=document.createElementNS(SVGNS,'line');l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);l.setAttribute('stroke',c);l.setAttribute('stroke-width',w);return l}
+  function redraw(){
+    svg.innerHTML='';
+    for(let x=Math.ceil(xmin);x<=xmax;x++)svg.appendChild(seg(X(x),pad,X(x),H-pad,'#e4e8f5',1));
+    for(let y=Math.ceil(ymin);y<=ymax;y++)svg.appendChild(seg(pad,Y(y),W-pad,Y(y),'#e4e8f5',1));
+    svg.appendChild(seg(X(0),pad,X(0),H-pad,'#8892b0',2));
+    svg.appendChild(seg(pad,Y(0),W-pad,Y(0),'#8892b0',2));
+    const pts=state.points.slice().sort((a,b)=>a[0]-b[0]);
+    state.lines=[];
+    if(drawLine()&&pts.length>=2){
+      for(let i=1;i<pts.length;i++)svg.appendChild(seg(X(pts[i-1][0]),Y(pts[i-1][1]),X(pts[i][0]),Y(pts[i][1]),'#2f57d6',2.5));
+      state.lines=[{x1:pts[0][0],y1:pts[0][1],x2:pts[pts.length-1][0],y2:pts[pts.length-1][1]}];
+    }
+    state.points.forEach(p=>{
+      const c=document.createElementNS(SVGNS,'circle');c.setAttribute('cx',X(p[0]));c.setAttribute('cy',Y(p[1]));c.setAttribute('r',6);c.setAttribute('fill','#2f57d6');svg.appendChild(c);
+      const t=document.createElementNS(SVGNS,'text');t.setAttribute('x',X(p[0])+9);t.setAttribute('y',Y(p[1])-9);t.setAttribute('font-size','12');t.setAttribute('fill','#25334b');t.textContent='('+p[0]+', '+p[1]+')';svg.appendChild(t);
+    });
+    const read=el.querySelector('[data-pts]');
+    read.textContent=state.points.length?('Points: '+state.points.map(p=>'('+p[0]+', '+p[1]+')').join(', ')):'No points plotted yet.';
+  }
+  svg.addEventListener('click',e=>{
+    const r=svg.getBoundingClientRect();
+    const px=(e.clientX-r.left)/r.width*W, py=(e.clientY-r.top)/r.height*H;
+    const x=Math.round(invX(px)*2)/2, y=Math.round(invY(py)*2)/2;
+    const i=state.points.findIndex(p=>Math.abs(p[0]-x)<0.26&&Math.abs(p[1]-y)<0.26);
+    if(i>=0)state.points.splice(i,1);else state.points.push([x,y]);
+    redraw();
+  });
+  el.querySelector('[data-clear]').onclick=()=>{state.points=[];state.lines=[];redraw()};
+  redraw();
+}
+
+/* fillable table */
+function mountTable(host,spec,answers,qid){
+  const headers=spec.headers&&spec.headers.length?spec.headers:[];
+  const rows=(spec.rows||[]).map(r=>r.slice());
+  const model=rows.map(r=>r.slice());
+  answers[qid]={rows:model,headers:headers};
+  const el=widgetBox('📋 Fill in the table','Type the missing values');
+  let html='<table class="wtable">';
+  if(headers.length)html+='<thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead>';
+  html+='<tbody>';
+  rows.forEach((r,ri)=>{html+='<tr>';r.forEach((c,ci)=>{
+    if(c!=='' && c!==null && c!==undefined)html+='<td class="given">'+esc(c)+'</td>';
+    else html+='<td><input data-r="'+ri+'" data-c="'+ci+'" inputmode="text" placeholder="?"></td>';
+  });html+='</tr>'});
+  html+='</tbody></table>';
+  el.innerHTML+=html;
+  host.appendChild(el);
+  el.querySelectorAll('input[data-r]').forEach(inp=>{
+    inp.addEventListener('input',()=>{model[+inp.dataset.r][+inp.dataset.c]=inp.value});
+  });
+}
+
+/* two-column matching */
+function mountMatching(host,spec,answers,qid){
+  const left=(spec.left||[]).slice();
+  const right=(spec.right||[]).slice();
+  const order=right.map((_,i)=>i);
+  for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]]}
+  const map={};let sel=null;
+  const el=widgetBox('🔗 Match the columns','Tap an item on the left, then its match on the right');
+  el.innerHTML+='<div class="matchwrap"><svg class="mlines"></svg>'+
+    '<div class="mcol">'+left.map((t,i)=>'<div class="mitem" data-l="'+i+'">'+esc(t)+'</div>').join('')+'</div>'+
+    '<div class="mcol">'+order.map(o=>'<div class="mitem" data-orig="'+o+'">'+esc(right[o])+'</div>').join('')+'</div></div>';
+  host.appendChild(el);
+  const mw=el.querySelector('.matchwrap');
+  const svgEl=el.querySelector('.mlines');
+  function drawLines(){
+    const w=mw.clientWidth,h=mw.clientHeight;
+    svgEl.setAttribute('width',w);svgEl.setAttribute('height',h);svgEl.innerHTML='';
+    const base=mw.getBoundingClientRect();
+    Object.keys(map).forEach(l=>{
+      const le=mw.querySelector('[data-l="'+l+'"]'),re=mw.querySelector('[data-orig="'+map[l]+'"]');
+      if(!le||!re)return;const a=le.getBoundingClientRect(),b=re.getBoundingClientRect();
+      const ln=document.createElementNS(SVGNS,'line');
+      ln.setAttribute('x1',a.right-base.left);ln.setAttribute('y1',a.top+a.height/2-base.top);
+      ln.setAttribute('x2',b.left-base.left);ln.setAttribute('y2',b.top+b.height/2-base.top);
+      svgEl.appendChild(ln);
+    });
+  }
+  function sync(){
+    answers[qid]={pairs:Object.keys(map).map(l=>({left:left[+l],right:right[map[l]]}))};
+    mw.querySelectorAll('[data-l]').forEach(e=>{const l=+e.dataset.l;e.classList.toggle('sel',sel===l);e.classList.toggle('linked',map[l]!==undefined)});
+    mw.querySelectorAll('[data-orig]').forEach(e=>{e.classList.toggle('linked',Object.values(map).includes(+e.dataset.orig))});
+    drawLines();
+  }
+  mw.querySelectorAll('[data-l]').forEach(e=>e.addEventListener('click',()=>{
+    const l=+e.dataset.l;
+    if(sel===l){sel=null}
+    else if(map[l]!==undefined){delete map[l];sel=null}
+    else sel=l;
+    sync();
+  }));
+  mw.querySelectorAll('[data-orig]').forEach(e=>e.addEventListener('click',()=>{
+    if(sel===null)return;const ro=+e.dataset.orig;
+    Object.keys(map).forEach(l=>{if(map[l]===ro)delete map[l]});
+    map[sel]=ro;sel=null;sync();
+  }));
+  window.addEventListener('resize',drawLines);
+  requestAnimationFrame(drawLines);
+  sync();
+}
+
+/* plain options / free response */
+function plainAnswer(host,q,answers,wrap){
+  const multi=!!q.multi_select;
+  if(q.options&&q.options.length){
+    const box=document.createElement('div');box.className='opts';
+    q.options.forEach((txt,ki)=>{
+      const k='ABCDEF'[ki];const b=document.createElement('button');b.className='opt';b.dataset.k=k;
+      b.innerHTML='<span class="key">'+k+'</span><span>'+esc(txt)+'</span>';
+      b.onclick=()=>{if(!multi){box.querySelectorAll('.opt').forEach(x=>x.classList.remove('selected'));b.classList.add('selected')}else b.classList.toggle('selected');answers[q.id]=readAnswer(wrap,q)};
+      box.appendChild(b);
+    });
+    host.appendChild(box);
+    const saved=answers[q.id];
+    if(saved&&typeof saved==='string')box.querySelectorAll('.opt').forEach(b=>{if(saved.includes(b.dataset.k))b.classList.add('selected')});
+  }else{
+    const inp=document.createElement('input');inp.className='finput';
+    inp.placeholder='Type your answer (fractions like 3/4 or decimals like 0.75)';
+    inp.value=(typeof answers[q.id]==='string')?answers[q.id]:'';
+    inp.addEventListener('input',()=>{answers[q.id]=inp.value});
+    host.appendChild(inp);
+  }
+}
+
+/* mount the question body: prompt + figure + the right widget/options */
+async function mountBody(q,wrap,answers,kind){
+  const host=wrap.querySelector('[data-body]');if(!host)return;
+  host.innerHTML='<div class="qprompt">'+esc(q.prompt||'')+'</div>'+questionImage(q)+'<div class="small" data-wload style="margin:10px 0">Preparing interactive question…</div>';
+  let spec={widget:'plain'};
+  if(_aiReady&&q.id){try{spec=await getWidget(q.id,kind)}catch(e){}}
+  q._widget=spec;
+  const wl=host.querySelector('[data-wload]');if(wl)wl.remove();
+  let used=false;
+  if(spec.graph&&spec.graph.mode){mountGraph(host,spec.graph,answers,q.id);used=true}
+  if(spec.table&&spec.table.rows&&spec.table.rows.length){mountTable(host,spec.table,answers,q.id);used=true}
+  if(spec.matching&&(spec.matching.left||[]).length&&(spec.matching.right||[]).length){mountMatching(host,spec.matching,answers,q.id);used=true}
+  if(!used)plainAnswer(host,q,answers,wrap);
+  typeset(host);
+}
+function describeAnswer(q,a){
+  if(a&&typeof a==='object'){
+    if(a.points)return 'Plotted: '+(a.points.length?a.points.map(p=>'('+p[0]+', '+p[1]+')').join(', '):'none');
+    if(a.rows)return 'Table: '+a.rows.map(r=>'['+r.map(c=>c||'_').join(', ')+']').join('  ');
+    if(a.pairs)return a.pairs.map(p=>p.left+' → '+p.right).join('; ');
+  }
+  return esc(a||'—');
+}
+function answerItem(q,answers,kind){
+  const widget=(q._widget||{}).widget||'plain';
+  const a=answers[q.id];
+  const structured=(widget!=='plain')&&a&&typeof a==='object';
+  return {question:q,widget,widget_answer:structured?a:null,student_answer:structured?'':(a||''),source:kind||'course'};
+}
+
 /* ---------- PRACTICE ---------- */
 function renderPractice(){
   const q=G.qs[G.i];
@@ -303,7 +543,7 @@ function renderPractice(){
     '<div class="qhead"><span class="qnum">Question '+(G.i+1)+' of '+G.qs.length+'</span>'+
     '<span class="qmeta"><span class="badge">'+esc(q.difficulty||'practice')+'</span></span></div>'+
     '<div class="bar"><i style="width:'+Math.round((G.i)/G.qs.length*100)+'%"></i></div>'+
-    messageText(q)+
+    '<div data-body></div>'+
     '<div class="feedback hidden" data-fb></div>'+
     '<div class="row" style="margin-top:8px">'+
       '<button class="btn secondary" id="prev"'+(G.i<=0?' disabled':'')+'>← Prev</button>'+
@@ -313,20 +553,22 @@ function renderPractice(){
       '<button class="btn secondary" id="next"'+(G.i>=G.qs.length-1?' disabled':'')+'>Next →</button>'+
     '</div>'+
   '</div>';
-  bindOpts(wrap,q,false);
   $('prev').onclick=()=>{if(G.i>0){G.i--;renderPractice()}};
   $('next').onclick=()=>{if(G.i<G.qs.length-1){G.i++;renderPractice()}};
   $('submit').onclick=()=>submitAnswer(q,wrap);
   $('hint').onclick=()=>aiFeedback('hint',q,wrap);
   $('explain').onclick=()=>aiFeedback('explain',q,wrap);
-  typeset(wrap);
+  mountBody(q,wrap,G.answers,'course');
 }
 async function submitAnswer(q,wrap){
-  const ans=readAnswer(wrap,q);
+  const widget=(q._widget||{}).widget||'plain';
+  const a=G.answers[q.id];
+  const structured=(widget!=='plain')&&a&&typeof a==='object';
+  const ans=structured?'':(a||'');
   const fb=wrap.querySelector('[data-fb]');
   fb.className='feedback info';fb.classList.remove('hidden');fb.textContent='Checking…';
   try{
-    const r=await api('/api/ai/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:G.mode,question_id:q.id,student_answer:ans,question:q})});
+    const r=await api('/api/ai/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'course',question_id:q.id,student_answer:ans,question:q,widget,widget_answer:structured?a:null})});
     let cls='info',txt='';
     if(!r.configured){txt='Answer recorded. (AI feedback is not configured yet.)';}
     else if(r.is_correct===true){cls='ok';txt='✅ Correct! '+(r.explanation||'')}
@@ -351,35 +593,27 @@ function renderQuiz(){
     '<div class="qhead"><span class="qnum">Question '+(G.i+1)+' of '+G.qs.length+'</span>'+
     '<span class="qmeta"><span class="badge">'+esc(q.difficulty||'quiz')+'</span></span></div>'+
     '<div class="bar"><i style="width:'+Math.round((G.i)/G.qs.length*100)+'%"></i></div>'+
-    messageText(q)+
+    '<div data-body></div>'+
     '<div class="row" style="margin-top:8px">'+
       '<button class="btn secondary" id="prev"'+(G.i<=0?' disabled':'')+'>← Prev</button>'+
       '<button class="btn secondary" id="next"'+(G.i>=G.qs.length-1?' disabled':'')+'>Next →</button>'+
       '<span style="flex:1"></span>'+
       '<button class="btn" id="finish">Submit Quiz</button>'+
     '</div>'+
-    '<div class="small" style="margin-top:8px">'+Object.keys(G.answers).length+' of '+G.qs.length+' answered</div>'+
+    '<div class="small" style="margin-top:8px" data-count>'+Object.keys(G.answers).length+' of '+G.qs.length+' answered</div>'+
   '</div>';
-  bindOpts(wrap,q,false);
   $('prev').onclick=()=>{if(G.i>0){G.i--;renderQuiz()}};
   $('next').onclick=()=>{if(G.i<G.qs.length-1){G.i++;renderQuiz()}};
   $('finish').onclick=submitQuiz;
-  // restore any selection
-  const saved=G.answers[q.id];
-  if(saved&&isMc(q)){wrap.querySelectorAll('.opt').forEach(b=>{if(saved.includes(b.dataset.k))b.classList.add('selected')})}
-  else if(saved){const inp=wrap.querySelector('.finput');if(inp)inp.value=saved}
-  // capture changes
-  wrap.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>{G.answers[q.id]=readAnswer(wrap,q)}));
-  const inp=wrap.querySelector('.finput');if(inp)inp.addEventListener('input',()=>{G.answers[q.id]=inp.value});
-  typeset(wrap);
+  mountBody(q,wrap,G.answers,'course');
 }
 async function submitQuiz(){
   const wrap=$('qwrap');
   wrap.innerHTML='<div class="card"><h2>Marking your quiz…</h2><p class="small">Checking every answer with AI. This may take a few seconds.</p></div>';
-  const items=G.qs.map(q=>({question:q,student_answer:G.answers[q.id]||''}));
+  const items=G.qs.map(q=>answerItem(q,G.answers,'course'));
   let results=[];
   try{
-    const r=await api('/api/ai/grade-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});
+    const r=await api('/api/ai/grade-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'course'})});
     results=r.results||[];
   }catch(e){}
   G.graded=results;
@@ -403,10 +637,10 @@ function showResults(title,results,onRemediate){
   Object.entries(byTopic).forEach(([k,v])=>{html+='<div class="small">'+esc(k)+': '+v.c+'/'+v.t+'</div>'});
   html+='<h2 style="margin-top:22px">Review</h2>';
   G.qs.forEach((q,i)=>{
-    const r=results[i]||{};const ans=G.answers[q.id]||'—';
+    const r=results[i]||{};
     const mark=r.is_correct===true?'✅':r.is_correct===false?'❌':'•';
     html+='<div class="panel"><div class="small">Q '+(i+1)+' '+mark+'</div><div>'+esc(q.prompt)+'</div>'+
-      '<div class="small" style="margin-top:6px">Your answer: <b>'+esc(ans)+'</b>'+(r.correct?(' · Correct: <b>'+esc(r.correct)+'</b>'):'')+'</div>'+
+      '<div class="small" style="margin-top:6px">Your answer: <b>'+describeAnswer(q,G.answers[q.id])+'</b>'+(r.correct?(' · Correct: <b>'+esc(r.correct)+'</b>'):'')+'</div>'+
       (r.explanation?('<div class="small" style="margin-top:6px">'+esc(r.explanation)+'</div>'):'')+'</div>';
   });
   const wrong=results.filter(r=>r.is_correct===false).length;
@@ -484,26 +718,29 @@ function renderSatPractice(){
   const q=SAT.qs[SAT.i],wrap=$('qwrap');
   wrap.innerHTML='<div class="card qcard">'+
     '<div class="qhead"><span class="qnum">SAT Practice · '+(SAT.i+1)+' of '+SAT.qs.length+'</span><span class="qmeta"><span class="badge">'+esc(q.domain||'SAT')+'</span></span></div>'+
-    messageText(q)+'<div class="feedback hidden" data-fb></div>'+
+    '<div data-body></div><div class="feedback hidden" data-fb></div>'+
     '<div class="row"><button class="btn secondary" id="prev"'+(SAT.i<=0?' disabled':'')+'>← Prev</button>'+
     '<button class="btn" id="submit">Submit</button>'+
     '<button class="btn secondary" id="hint">💡 Hint</button>'+
     '<button class="btn secondary" id="explain">📖 Explain</button>'+
     '<button class="btn secondary" id="next"'+(SAT.i>=SAT.qs.length-1?' disabled':'')+'>Next →</button></div></div>';
-  bindOpts(wrap,q,false);
   $('prev').onclick=()=>{if(SAT.i>0){SAT.i--;renderSatPractice()}};
   $('next').onclick=()=>{if(SAT.i<SAT.qs.length-1){SAT.i++;renderSatPractice()}};
   $('submit').onclick=async()=>{
-    const ans=readAnswer(wrap,q),fb=wrap.querySelector('[data-fb]');
+    const widget=(q._widget||{}).widget||'plain';
+    const a=SAT.answers[q.id];
+    const structured=(widget!=='plain')&&a&&typeof a==='object';
+    const ans=structured?'':(a||'');
+    const fb=wrap.querySelector('[data-fb]');
     fb.className='feedback info';fb.classList.remove('hidden');fb.textContent='Checking…';
-    try{const r=await api('/api/ai/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'sat',question_id:q.id,student_answer:ans,question:q})});
+    try{const r=await api('/api/ai/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'sat',question_id:q.id,student_answer:ans,question:q,widget,widget_answer:structured?a:null})});
       if(!r.configured){fb.textContent='Answer recorded. (AI feedback not configured.)'}
       else{const ok=r.is_correct;fb.className='feedback '+(ok===true?'ok':ok===false?'bad':'info');fb.textContent=(ok===true?'✅ Correct! ':ok===false?'❌ Not quite. ':'')+(r.explanation||'')}
     }catch(e){fb.textContent='Could not check.'}
   };
   $('hint').onclick=()=>aiFeedback('hint',q,wrap);
   $('explain').onclick=()=>aiFeedback('explain',q,wrap);
-  typeset(wrap);
+  mountBody(q,wrap,SAT.answers,'sat');
 }
 function startSatExam(){
   SAT.sec=25*60;
@@ -516,28 +753,22 @@ function renderSatExam(){
   const q=SAT.qs[SAT.i],wrap=$('qwrap');
   wrap.innerHTML='<div class="card qcard">'+
     '<div class="qhead"><span class="qnum">SAT Exam · '+(SAT.i+1)+' of '+SAT.qs.length+'</span><span class="timer" id="satTimer"></span></div>'+
-    messageText(q)+
+    '<div data-body></div>'+
     '<div class="row"><button class="btn secondary" id="prev"'+(SAT.i<=0?' disabled':'')+'>← Prev</button>'+
     '<button class="btn secondary" id="next"'+(SAT.i>=SAT.qs.length-1?' disabled':'')+'>Next →</button>'+
     '<span style="flex:1"></span><button class="btn" id="finish">Submit Exam</button></div></div>';
-  bindOpts(wrap,q,false);
   updateTimer();
   $('prev').onclick=()=>{if(SAT.i>0){SAT.i--;renderSatExam()}};
   $('next').onclick=()=>{if(SAT.i<SAT.qs.length-1){SAT.i++;renderSatExam()}};
   $('finish').onclick=finishSatExam;
-  const saved=SAT.answers[q.id];
-  if(saved&&isMc(q)){wrap.querySelectorAll('.opt').forEach(b=>{if(saved.includes(b.dataset.k))b.classList.add('selected')})}
-  else if(saved){const inp=wrap.querySelector('.finput');if(inp)inp.value=saved}
-  wrap.querySelectorAll('.opt').forEach(b=>b.addEventListener('click',()=>{SAT.answers[q.id]=readAnswer(wrap,q)}));
-  const inp=wrap.querySelector('.finput');if(inp)inp.addEventListener('input',()=>{SAT.answers[q.id]=inp.value});
-  typeset(wrap);
+  mountBody(q,wrap,SAT.answers,'sat');
 }
 async function finishSatExam(){
   if(SAT.timer){clearInterval(SAT.timer);SAT.timer=null}
   $('qwrap').innerHTML='<div class="card"><h2>Marking your exam…</h2><p class="small">This may take a few seconds.</p></div>';
-  const items=SAT.qs.map(q=>({question:q,student_answer:SAT.answers[q.id]||''}));
+  const items=SAT.qs.map(q=>answerItem(q,SAT.answers,'sat'));
   let results=[];
-  try{const r=await api('/api/ai/grade-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items})});results=r.results||[]}catch(e){}
+  try{const r=await api('/api/ai/grade-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'sat'})});results=r.results||[]}catch(e){}
   SAT.graded=results;
   const saveG=G;G={grade:'',level:'',term:'',mode:'sat-exam',qs:SAT.qs,answers:SAT.answers};
   showResults('SAT Exam Results',results,()=>remediateSat());
@@ -560,6 +791,7 @@ function ensureName(){if(!getName()){const n=prompt('Welcome! What is your name?
 
 refresWho();
 document.addEventListener('DOMContentLoaded',()=>{ensureName()});
+api('/api/ai/status').then(s=>{_aiReady=!!s.configured}).catch(()=>{});
 </script>
 </body>
 </html>

@@ -1322,11 +1322,13 @@ def index():
 
 db.init_db()
 
-def _gemini(prompt, timeout=45):
+def _gemini(prompt, timeout=45, images=None):
     """Call Gemini and return parsed JSON, or None if not configured/failed.
 
     Uses a fast flash-lite model by default (thinking models are too slow for
     interactive grading). Override with the GEMINI_MODEL env var.
+    `images` is an optional list of (mime_type, base64_string) to send inline
+    so the model can see the figure.
     """
     import urllib.request as ureq, urllib.error as uerr, json as j, re as _re, time as _t
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
@@ -1336,8 +1338,11 @@ def _gemini(prompt, timeout=45):
     models = [primary, "gemini-3.5-flash-lite", "gemini-3.1-flash-lite-preview",
               "gemini-3.5-flash", "gemini-3.8-flash"]
     seen = set()
-    body = j.dumps({"contents": [{"parts": [{"text": prompt}]}]}).encode("utf-8")
-    per_try = max(8, min(timeout, 30))
+    parts = [{"text": prompt}]
+    for mime, data in (images or []):
+        parts.append({"inline_data": {"mime_type": mime, "data": data}})
+    body = j.dumps({"contents": [{"parts": parts}]}).encode("utf-8")
+    per_try = max(8, min(timeout, 40))
     last = None
     for model in models:
         if model in seen:
@@ -1389,6 +1394,165 @@ def _qblock(q):
     return f"Question: {q.get('prompt','')}\nOptions:\n{lines}" if lines else f"Question: {q.get('prompt','')}"
 
 
+# --- Interactive widgets (graph / table / matching) -------------------------
+def _course_image_file(qid):
+    conn = db.get_conn()
+    row = conn.execute(
+        "SELECT question_image FROM course_questions WHERE id=?", (qid,)
+    ).fetchone()
+    conn.close()
+    if not row or not row["question_image"]:
+        return None
+    path = os.path.join(COURSE_IMG_DIR, os.path.basename(row["question_image"]))
+    return path if os.path.exists(path) else None
+
+
+def _sat_image_file(qid):
+    conn = db.get_conn()
+    row = conn.execute(
+        """SELECT s.name AS sub, q.number AS number FROM questions q
+           JOIN subtopics s ON s.id=q.subtopic_id WHERE q.id=?""",
+        (qid,),
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    path = os.path.join(Q_IMG_DIR, f"{option_image_slug(row['sub'])}_{row['number']}.png")
+    return path if os.path.exists(path) else None
+
+
+def _question_image_parts(kind, qid):
+    """[(mime, base64)] for a question's figure, so Gemini can see it."""
+    import base64
+    path = _course_image_file(qid) if kind == "course" else _sat_image_file(qid)
+    if not path:
+        return []
+    try:
+        with open(path, "rb") as f:
+            data = base64.b64encode(f.read()).decode("ascii")
+    except Exception:
+        return []
+    return [("image/png", data)]
+
+
+def _load_question_row(kind, qid):
+    conn = db.get_conn()
+    if kind == "course":
+        row = conn.execute(
+            """SELECT prompt, option_a, option_b, option_c, option_d,
+                      option_e, option_f, is_mcq
+               FROM course_questions WHERE id=?""", (qid,),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            """SELECT prompt, option_a, option_b, option_c, option_d, ''
+                      AS option_e, '' AS option_f, 0 AS is_mcq
+               FROM questions WHERE id=?""", (qid,),
+        ).fetchone()
+    conn.close()
+    return row
+
+
+WIDGET_INSTRUCTIONS = (
+    "You are analysing ONE math question from a worksheet. You are given the "
+    "question text and an image of the question. Decide the best interactive "
+    "answer widget so a student can respond on screen, and extract what is "
+    "needed to display it.\n"
+    "Return ONLY valid JSON with exactly this shape:\n"
+    '{"widget":"graph|table|matching|plain","summary":"one short line",'
+    '"graph":{"mode":"points|line|both","xmin":-10,"xmax":10,"ymin":-10,"ymax":10},'
+    '"table":{"headers":["x","y"],"rows":[["-6",""]]},'
+    '"matching":{"left":["..."],"right":["..."]},"options":["..."]}\n'
+    "Rules:\n"
+    "- Use \"graph\" when the task is to plot points or draw a line/curve on a "
+    "coordinate plane (mode \"points\" to plot points, \"line\"/\"both\" if a "
+    "line must also be drawn). Set sensible axis ranges from the figure.\n"
+    "- Use \"table\" when the task is to complete/fill a table of values. Put the "
+    "column headers and one row per row shown. Print ONLY the values actually "
+    "written in the worksheet figure; use an empty string \"\" for every cell the "
+    "student must fill in. NEVER compute or guess the answers.\n"
+    "- Use \"matching\" when items in two columns must be matched/connected. "
+    "List the left items (or prompts) and the right items exactly as shown.\n"
+    "- Use \"plain\" for ordinary multiple-choice/free-response where nothing "
+    "special is needed.\n"
+    "Do NOT reveal or include the correct answers anywhere. For \"graph\", only "
+    "give axis ranges and mode; never include solution points.\n\n"
+)
+
+
+def _widget_spec(kind, qid):
+    cached = db.get_widget(kind, qid)
+    if cached:
+        try:
+            return json.loads(cached)
+        except Exception:
+            pass
+    if not _ai_ready():
+        return {"widget": "plain", "summary": "", "graph": {},
+                "table": {}, "matching": {}, "options": []}
+    row = _load_question_row(kind, qid)
+    if row is None:
+        return {"widget": "plain", "summary": "", "graph": {},
+                "table": {}, "matching": {}, "options": []}
+    letters = "ABCDEF"
+    opts = [row[k] for k in ("option_a", "option_b", "option_c", "option_d",
+                             "option_e", "option_f") if row[k]]
+    qtext = "Question text: " + (row["prompt"] or "") + "\n"
+    if opts:
+        qtext += "Choices:\n" + "\n".join(f"{letters[i]}) {o}" for i, o in enumerate(opts)) + "\n"
+    out = _gemini(WIDGET_INSTRUCTIONS + qtext,
+                  timeout=45, images=_question_image_parts(kind, qid))
+    if not isinstance(out, dict) or "widget" not in out:
+        out = {"widget": "plain", "summary": "", "options": opts,
+               "graph": {}, "table": {}, "matching": {}}
+    out.setdefault("summary", "")
+    out.setdefault("options", opts)
+    out.setdefault("graph", {})
+    out.setdefault("table", {})
+    out.setdefault("matching", {})
+    try:
+        db.save_widget(kind, qid, json.dumps(out))
+    except Exception:
+        pass
+    return out
+
+
+@app.route("/api/widget/<kind>/<int:qid>")
+def widget_spec_route(kind, qid):
+    if kind not in ("course", "sat"):
+        abort(404)
+    return jsonify(_widget_spec(kind, qid))
+
+
+def _widget_answer_text(widget, answer):
+    """Render a student's structured widget answer as text for the grader."""
+    if not isinstance(answer, dict):
+        return str(answer or "")
+    if widget == "graph":
+        pts = answer.get("points") or []
+        lines = answer.get("lines") or []
+        p = ", ".join(f"({x}, {y})" for x, y in pts) if pts else "(none)"
+        s = f"Student plotted these points on a coordinate plane: {p}"
+        for ln in lines:
+            s += f"; drew a line from ({ln.get('x1')},{ln.get('y1')}) to ({ln.get('x2')},{ln.get('y2')})"
+        return s
+    if widget == "table":
+        rows = answer.get("rows") or []
+        headers = answer.get("headers") or []
+        out = []
+        for r in rows:
+            if headers and len(headers) == len(r):
+                out.append(", ".join(f"{headers[i]}={r[i] or '?'}" for i in range(len(r))))
+            else:
+                out.append("[" + ", ".join(str(c) for c in r) + "]")
+        return "Student filled the table with rows: " + "; ".join(out)
+    if widget == "matching":
+        pairs = answer.get("pairs") or []
+        return "Student matched: " + "; ".join(
+            f"'{p.get('left')}' -> '{p.get('right')}'" for p in pairs)
+    return str(answer)
+
+
 @app.route("/api/ai/status")
 def ai_status():
     return jsonify({"configured": _ai_ready()})
@@ -1400,20 +1564,27 @@ def ai_check():
     q = data.get("question") or {}
     ans = data.get("student_answer") or ""
     correct = q.get("correct") or ""
+    widget = data.get("widget") or q.get("widget") or "plain"
+    widget_answer = data.get("widget_answer")
+    kind = "course" if data.get("source") in ("course", "practice", "quiz") else "sat"
+    qid = data.get("question_id") or q.get("id")
     # local check first (fast + free) when we have the key
-    if correct:
+    if correct and not widget_answer:
         if str(ans).strip().upper() == str(correct).strip().upper():
             return jsonify({"configured": True, "is_correct": True,
                             "explanation": "Your answer matches the correct answer.", "source": "key"})
     if not _ai_ready():
         return jsonify({"configured": False, "is_correct": None,
                         "explanation": "AI checking is not configured yet (set GEMINI_API_KEY)."})
-    prompt = ("You are an expert math grader. Grade the student's answer strictly but allow mathematically "
-              "equivalent forms (e.g. 1/2 = 0.5).\n" + _qblock(q) +
-              f"\nCorrect answer (if known): {correct}\nStudent answer: {ans}\n"
+    student_block = _widget_answer_text(widget, widget_answer) if widget_answer else f"Student answer: {ans}"
+    prompt = ("You are an expert math grader. Look at the question image and grade the student's "
+              "response strictly but allow mathematically equivalent forms.\n"
+              + _qblock(q) +
+              f"\nCorrect answer (if known): {correct}\n{student_block}\n"
               'Return ONLY valid JSON: {"is_correct": true|false, "explanation": "concise step-by-step reason", "confidence": 0-1}')
+    images = _question_image_parts(kind, qid) if qid else []
     try:
-        out = _gemini(prompt, timeout=45)
+        out = _gemini(prompt, timeout=45, images=images)
         if out is None:
             return jsonify({"configured": False, "is_correct": None, "explanation": "AI not configured."})
         out.setdefault("is_correct", None)
@@ -1479,9 +1650,14 @@ def ai_generate_similar():
 
 @app.route("/api/ai/grade-batch", methods=["POST"])
 def ai_grade_batch():
-    """Grade a whole quiz/exam in one call. Body: {items:[{question, student_answer}]}"""
+    """Grade a whole quiz/exam in one call.
+
+    Body: {items:[{question, student_answer, widget?, widget_answer?, source?}],
+           source?: "course"|"sat"}
+    """
     data = request.get_json(force=True, silent=True) or {}
     items = data.get("items") or []
+    default_kind = "course" if data.get("source") in ("course", "practice", "quiz") else "sat"
     if not items:
         return jsonify({"configured": _ai_ready(), "results": []})
     # local key-based grading when the answer key exists
@@ -1490,24 +1666,35 @@ def ai_grade_batch():
     for i, it in enumerate(items):
         q = it.get("question") or {}
         ans = it.get("student_answer") or ""
+        widget = it.get("widget") or q.get("widget") or "plain"
+        wans = it.get("widget_answer")
         correct = q.get("correct") or ""
-        if correct:
+        if correct and not wans:
             ok = str(ans).strip().upper() == str(correct).strip().upper()
             results.append({"index": i, "is_correct": ok, "explanation":
                             ("Matches the answer key." if ok else f"Correct answer: {correct}")})
         else:
             results.append({"index": i, "is_correct": None, "explanation": ""})
-            needs_ai.append((i, q, ans))
+            needs_ai.append((i, q, ans, widget, wans, it.get("source") or default_kind))
     if needs_ai and _ai_ready():
         block = ""
-        for i, q, ans in needs_ai:
-            block += f"\n[q{i}] " + _qblock(q) + f"\nStudent answer: {ans}\n"
-        prompt = ("You are an expert math grader. For each question grade the student's answer, allowing "
-                  "mathematically equivalent forms.\n" + block +
+        images = []
+        for i, q, ans, widget, wans, kind in needs_ai:
+            detail = _widget_answer_text(widget, wans) if wans else f"Student answer: {ans}"
+            block += f"\n[q{i}] " + _qblock(q) + f"\n{detail}\n"
+            if len(images) < 16:
+                qid = q.get("id")
+                if qid:
+                    images += _question_image_parts(
+                        "course" if kind in ("course", "practice", "quiz") else "sat", qid)
+        prompt = ("You are an expert math grader. Some images below show the questions. For each [qN] "
+                  "grade the student's response, allowing mathematically equivalent forms. If the student "
+                  "plotted points or filled a table, judge whether it matches what the question (and image) "
+                  "requires.\n" + block +
                   '\nReturn ONLY a valid JSON array: [{"index": <int>, "is_correct": true|false, '
                   '"explanation": "brief", "correct": "the correct answer"}]')
         try:
-            out = _gemini(prompt, timeout=60)
+            out = _gemini(prompt, timeout=75, images=images)
             if isinstance(out, dict):
                 out = out.get("results") or []
             for r in out:
