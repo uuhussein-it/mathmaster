@@ -97,7 +97,8 @@ nav .navbtn{background:transparent;color:var(--text);border:1px solid var(--bord
     <div class="row"><button class="btn" onclick="satPractice()">SAT Practice</button><button class="btn" onclick="satExam()">SAT Exam</button></div>
   </div>
 </div>
-<script>function esc(s){if(s===null||s===undefined)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+<script>document.addEventListener("DOMContentLoaded",function(){setupGradeSelectors();});
+function esc(s){if(s===null||s===undefined)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 function $(id){return document.getElementById(id)}
 function show(id){$(id).classList.remove('hidden')}
