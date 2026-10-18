@@ -1,0 +1,728 @@
+{
+ "sections": {
+  "rw": {
+   "name": "Reading and Writing",
+   "secondsPerQuestion": 71
+  },
+  "math": {
+   "name": "Math",
+   "secondsPerQuestion": 95
+  }
+ },
+ "topics": [
+  {
+   "id": "algebra",
+   "name": "Algebra",
+   "section": "math",
+   "questions": [
+    {
+     "q": "If 3x + 7 = 22, what is the value of 6x?",
+     "options": [
+      "5",
+      "15",
+      "30",
+      "44"
+     ],
+     "answer": 2,
+     "hint": "Solve for x first, or double the equation.",
+     "explanation": "3x = 15, so 6x = 30.",
+     "source": "original",
+     "id": "sat-algebra-1"
+    },
+    {
+     "q": "A line passes through (0, 4) and (2, 10). Which equation describes it?",
+     "options": [
+      "y = 3x + 4",
+      "y = 2x + 4",
+      "y = 4x + 3",
+      "y = 3x + 10"
+     ],
+     "answer": 0,
+     "hint": "The y-intercept is the point where x = 0.",
+     "explanation": "Slope = 6/2 = 3 and intercept 4.",
+     "source": "original",
+     "id": "sat-algebra-2"
+    },
+    {
+     "q": "If x + y = 10 and x − y = 4, what is x?",
+     "options": [
+      "3",
+      "6",
+      "7",
+      "14"
+     ],
+     "answer": 2,
+     "hint": "Add the two equations.",
+     "explanation": "2x = 14, so x = 7.",
+     "source": "original",
+     "id": "sat-algebra-3"
+    },
+    {
+     "q": "A plumber charges $45 plus $30 per hour. A bill was $165. How many hours did the plumber work?",
+     "options": [
+      "3",
+      "4",
+      "5",
+      "5.5"
+     ],
+     "answer": 1,
+     "hint": "Write 45 + 30h = 165.",
+     "explanation": "30h = 120, so h = 4.",
+     "source": "original",
+     "id": "sat-algebra-4"
+    },
+    {
+     "q": "What is the smallest integer x that satisfies 2(x − 3) ≥ 10?",
+     "options": [
+      "5",
+      "7",
+      "8",
+      "9"
+     ],
+     "answer": 2,
+     "hint": "Solve the inequality.",
+     "explanation": "x − 3 ≥ 5, so x ≥ 8.",
+     "source": "original",
+     "id": "sat-algebra-5"
+    },
+    {
+     "q": "Line ℓ is perpendicular to y = (2/3)x + 1. What is the slope of ℓ?",
+     "options": [
+      "2/3",
+      "−2/3",
+      "3/2",
+      "−3/2"
+     ],
+     "answer": 3,
+     "hint": "Negative reciprocal.",
+     "explanation": "The negative reciprocal of 2/3 is −3/2.",
+     "source": "original",
+     "id": "sat-algebra-6"
+    },
+    {
+     "q": "The system 2x + 3y = 12 and 4x + ky = 24 has infinitely many solutions. What is k?",
+     "options": [
+      "3",
+      "4",
+      "6",
+      "12"
+     ],
+     "answer": 2,
+     "hint": "The second equation must be a multiple of the first.",
+     "explanation": "Multiply the first by 2: 4x + 6y = 24, so k = 6.",
+     "source": "original",
+     "id": "sat-algebra-7"
+    },
+    {
+     "q": "The graph of y = −2x + b passes through (3, 1). What is b?",
+     "options": [
+      "−5",
+      "5",
+      "7",
+      "−7"
+     ],
+     "answer": 2,
+     "hint": "Substitute the point.",
+     "explanation": "1 = −6 + b, so b = 7.",
+     "source": "original",
+     "id": "sat-algebra-8"
+    }
+   ]
+  },
+  {
+   "id": "advanced",
+   "name": "Advanced Math",
+   "section": "math",
+   "questions": [
+    {
+     "q": "If f(x) = x² − 3x, what is f(−2)?",
+     "options": [
+      "−2",
+      "2",
+      "10",
+      "−10"
+     ],
+     "answer": 2,
+     "hint": "Square −2 carefully.",
+     "explanation": "(−2)² − 3(−2) = 4 + 6 = 10.",
+     "source": "original",
+     "id": "sat-advanced-1"
+    },
+    {
+     "q": "What are the solutions of x² − 2x − 15 = 0?",
+     "options": [
+      "3 and −5",
+      "−3 and 5",
+      "−3 and −5",
+      "3 and 5"
+     ],
+     "answer": 1,
+     "hint": "Factor the trinomial.",
+     "explanation": "(x − 5)(x + 3) = 0.",
+     "source": "original",
+     "id": "sat-advanced-2"
+    },
+    {
+     "q": "Which expression is equivalent to (x + 3)²?",
+     "options": [
+      "x² + 9",
+      "x² + 3x + 9",
+      "x² + 6x + 9",
+      "2x + 6"
+     ],
+     "answer": 2,
+     "hint": "(a + b)² = a² + 2ab + b².",
+     "explanation": "x² + 2·3x + 9 = x² + 6x + 9.",
+     "source": "original",
+     "id": "sat-advanced-3"
+    },
+    {
+     "q": "A town's population is modeled by p(t) = 500(1.04)ᵗ, where t is years. What does 1.04 represent?",
+     "options": [
+      "The population grows by 4 people each year",
+      "The population grows by 4% each year",
+      "The initial population is 104",
+      "The population grows by 104% each year"
+     ],
+     "answer": 1,
+     "hint": "1.04 = 1 + 0.04.",
+     "explanation": "Each year the population is multiplied by 1.04, a 4% increase.",
+     "source": "original",
+     "id": "sat-advanced-4"
+    },
+    {
+     "q": "If x > 0 and x² = 49, what is x³?",
+     "options": [
+      "21",
+      "147",
+      "343",
+      "2401"
+     ],
+     "answer": 2,
+     "hint": "Find x first.",
+     "explanation": "x = 7, and 7³ = 343.",
+     "source": "original",
+     "id": "sat-advanced-5"
+    },
+    {
+     "q": "Which is the vertex form of y = x² − 8x + 18?",
+     "options": [
+      "(x − 4)² + 2",
+      "(x + 4)² + 2",
+      "(x − 4)² − 2",
+      "(x − 8)² + 18"
+     ],
+     "answer": 0,
+     "hint": "Complete the square: half of −8 is −4.",
+     "explanation": "x² − 8x + 16 + 2 = (x − 4)² + 2.",
+     "source": "original",
+     "id": "sat-advanced-6"
+    },
+    {
+     "q": "What is the solution of √(x + 6) = x?",
+     "options": [
+      "−2",
+      "3",
+      "−2 and 3",
+      "6"
+     ],
+     "answer": 1,
+     "hint": "Square both sides, then check for extraneous roots.",
+     "explanation": "x² − x − 6 = 0 gives 3 or −2; √4 ≠ −2, so only x = 3.",
+     "source": "original",
+     "id": "sat-advanced-7"
+    },
+    {
+     "q": "Which expression is equivalent to (2x³)(3x⁻¹)?",
+     "options": [
+      "6x²",
+      "5x²",
+      "6x⁻³",
+      "6x⁴"
+     ],
+     "answer": 0,
+     "hint": "Multiply coefficients, add exponents.",
+     "explanation": "2 · 3 = 6 and x³⁺⁽⁻¹⁾ = x².",
+     "source": "original",
+     "id": "sat-advanced-8"
+    }
+   ]
+  },
+  {
+   "id": "data",
+   "name": "Problem Solving & Data Analysis",
+   "section": "math",
+   "questions": [
+    {
+     "q": "A $40 shirt is discounted 25%, then 8% sales tax is added. What is the final price?",
+     "options": [
+      "$30.00",
+      "$32.40",
+      "$33.20",
+      "$35.20"
+     ],
+     "answer": 1,
+     "hint": "Apply the discount first, then the tax.",
+     "explanation": "40 × 0.75 = 30, and 30 × 1.08 = 32.40.",
+     "source": "original",
+     "id": "sat-data-1"
+    },
+    {
+     "q": "The mean of 5 numbers is 12. Four of them are 10, 11, 13 and 15. What is the fifth?",
+     "options": [
+      "9",
+      "11",
+      "12",
+      "13"
+     ],
+     "answer": 1,
+     "hint": "Total = mean × count.",
+     "explanation": "5 × 12 = 60, and 60 − 49 = 11.",
+     "source": "original",
+     "id": "sat-data-2"
+    },
+    {
+     "q": "The ratio of boys to girls in a class of 32 is 3 : 5. How many girls are there?",
+     "options": [
+      "12",
+      "15",
+      "20",
+      "24"
+     ],
+     "answer": 2,
+     "hint": "There are 3 + 5 = 8 parts.",
+     "explanation": "Each part is 4 students, so girls = 5 × 4 = 20.",
+     "source": "original",
+     "id": "sat-data-3"
+    },
+    {
+     "q": "A car travels 150 miles in 2.5 hours. What is its average speed?",
+     "options": [
+      "50 mph",
+      "55 mph",
+      "60 mph",
+      "375 mph"
+     ],
+     "answer": 2,
+     "hint": "Speed = distance ÷ time.",
+     "explanation": "150 / 2.5 = 60 mph.",
+     "source": "original",
+     "id": "sat-data-4"
+    },
+    {
+     "q": "What is the median of 2, 4, 4, 5, 7, 9, 12?",
+     "options": [
+      "4",
+      "5",
+      "6.1",
+      "7"
+     ],
+     "answer": 1,
+     "hint": "The data is already ordered.",
+     "explanation": "The middle (4th) value is 5.",
+     "source": "original",
+     "id": "sat-data-5"
+    },
+    {
+     "q": "In a random sample of 200 students from a school of 1,800, 60 bike to school. About how many students at the school bike?",
+     "options": [
+      "60",
+      "360",
+      "540",
+      "600"
+     ],
+     "answer": 2,
+     "hint": "Find the sample proportion, then scale.",
+     "explanation": "60/200 = 30%, and 30% of 1,800 = 540.",
+     "source": "original",
+     "id": "sat-data-6"
+    },
+    {
+     "q": "A price rose from $80 to $100. What was the percent increase?",
+     "options": [
+      "20%",
+      "25%",
+      "80%",
+      "125%"
+     ],
+     "answer": 1,
+     "hint": "Change ÷ original.",
+     "explanation": "20 / 80 = 25%.",
+     "source": "original",
+     "id": "sat-data-7"
+    },
+    {
+     "q": "A bag has 4 red, 6 blue and 10 green marbles. What is the probability of drawing a red marble?",
+     "options": [
+      "1/5",
+      "1/4",
+      "2/5",
+      "1/2"
+     ],
+     "answer": 0,
+     "hint": "Favorable ÷ total.",
+     "explanation": "4 / 20 = 1/5.",
+     "source": "original",
+     "id": "sat-data-8"
+    }
+   ]
+  },
+  {
+   "id": "geometry",
+   "name": "Geometry & Trigonometry",
+   "section": "math",
+   "questions": [
+    {
+     "q": "A circle has area 36π. What is its radius?",
+     "options": [
+      "6",
+      "9",
+      "18",
+      "36"
+     ],
+     "answer": 0,
+     "hint": "A = πr².",
+     "explanation": "r² = 36, so r = 6.",
+     "source": "original",
+     "id": "sat-geometry-1"
+    },
+    {
+     "q": "A right triangle has legs 9 and 12. What is the hypotenuse?",
+     "options": [
+      "13",
+      "15",
+      "17",
+      "21"
+     ],
+     "answer": 1,
+     "hint": "Pythagorean Theorem (or a 3-4-5 multiple).",
+     "explanation": "√(81 + 144) = √225 = 15.",
+     "source": "original",
+     "id": "sat-geometry-2"
+    },
+    {
+     "q": "In a right triangle, sin A = 3/5. What is cos A?",
+     "options": [
+      "3/4",
+      "4/5",
+      "5/3",
+      "5/4"
+     ],
+     "answer": 1,
+     "hint": "Think of a 3-4-5 triangle.",
+     "explanation": "Opposite 3, hypotenuse 5, so adjacent 4: cos A = 4/5.",
+     "source": "original",
+     "id": "sat-geometry-3"
+    },
+    {
+     "q": "What are the center and radius of (x − 2)² + (y + 1)² = 16?",
+     "options": [
+      "(2, −1), 4",
+      "(−2, 1), 4",
+      "(2, −1), 16",
+      "(2, 1), 4"
+     ],
+     "answer": 0,
+     "hint": "(x − h)² + (y − k)² = r².",
+     "explanation": "h = 2, k = −1 and r = √16 = 4.",
+     "source": "original",
+     "id": "sat-geometry-4"
+    },
+    {
+     "q": "What is the volume of a cylinder with radius 3 and height 5?",
+     "options": [
+      "15π",
+      "30π",
+      "45π",
+      "75π"
+     ],
+     "answer": 2,
+     "hint": "V = πr²h.",
+     "explanation": "π · 9 · 5 = 45π.",
+     "source": "original",
+     "id": "sat-geometry-5"
+    },
+    {
+     "q": "Two angles are supplementary and one is 3 times the other. What is the smaller angle?",
+     "options": [
+      "30°",
+      "45°",
+      "60°",
+      "135°"
+     ],
+     "answer": 1,
+     "hint": "Supplementary angles add to 180°.",
+     "explanation": "x + 3x = 180, so x = 45°.",
+     "source": "original",
+     "id": "sat-geometry-6"
+    },
+    {
+     "q": "How many radians is 180°?",
+     "options": [
+      "π/2",
+      "π",
+      "2π",
+      "180π"
+     ],
+     "answer": 1,
+     "hint": "A full circle is 2π radians.",
+     "explanation": "180° is half a circle: π radians.",
+     "source": "original",
+     "id": "sat-geometry-7"
+    },
+    {
+     "q": "A rectangle's length is 3 times its width and its perimeter is 48. What is its area?",
+     "options": [
+      "36",
+      "72",
+      "108",
+      "144"
+     ],
+     "answer": 2,
+     "hint": "Write 2(w + 3w) = 48.",
+     "explanation": "w = 6 and l = 18, so area = 108.",
+     "source": "original",
+     "id": "sat-geometry-8"
+    }
+   ]
+  },
+  {
+   "id": "reading",
+   "name": "Reading Comprehension",
+   "section": "rw",
+   "questions": [
+    {
+     "q": "Researchers found that rooftop gardens in three cities supported more native bee species than nearby parks. They suggest that the gardens' variety of flowering plants, rather than their height above the street, explains the difference.\n\nWhich choice best states the main idea of the text?",
+     "options": [
+      "Rooftop gardens are more popular than parks.",
+      "Plant diversity, not elevation, likely explains why rooftop gardens host more native bees.",
+      "Native bees prefer to live high above the street.",
+      "Parks should stop planting flowers."
+     ],
+     "answer": 1,
+     "hint": "Look for the researchers' explanation.",
+     "explanation": "The text credits the variety of flowering plants and explicitly rules out height.",
+     "source": "original",
+     "id": "sat-reading-1"
+    },
+    {
+     "q": "The negotiator's tone was conciliatory; she hoped to ease tensions between the two sides before the vote.\n\nAs used in the text, \"conciliatory\" most nearly means:",
+     "options": [
+      "hostile",
+      "peacemaking",
+      "uncertain",
+      "formal"
+     ],
+     "answer": 1,
+     "hint": "What tone would \"ease tensions\"?",
+     "explanation": "A conciliatory tone aims to calm conflict and win goodwill.",
+     "source": "original",
+     "id": "sat-reading-2"
+    },
+    {
+     "q": "Although the novel sold few copies when it was published in 1923, it is now taught in hundreds of universities. Critics attribute the change largely to a 1960s essay that praised the novel's experimental structure.\n\nWhich choice is best supported by the text?",
+     "options": [
+      "The novel was a best seller in 1923.",
+      "The 1960s essay helped build the novel's later reputation.",
+      "The novel's structure is traditional.",
+      "Universities rejected the essay."
+     ],
+     "answer": 1,
+     "hint": "What do critics credit for the change?",
+     "explanation": "The text says critics attribute the novel's rise largely to the essay.",
+     "source": "original",
+     "id": "sat-reading-3"
+    },
+    {
+     "q": "Coral reefs cover less than 1% of the ocean floor. Yet they support about a quarter of all marine species. This disproportion makes reef conservation a priority for many biologists.\n\nWhat is the function of the first sentence?",
+     "options": [
+      "It states a fact that the text then contrasts with another fact.",
+      "It offers a solution to a problem.",
+      "It questions the biologists' priorities.",
+      "It describes how reefs are formed."
+     ],
+     "answer": 0,
+     "hint": "Notice the word \"Yet\" in the next sentence.",
+     "explanation": "The small area (sentence 1) is contrasted with the large share of species (sentence 2).",
+     "source": "original",
+     "id": "sat-reading-4"
+    },
+    {
+     "q": "A student claims that solar power generation in Country X more than doubled between 2015 and 2020. Data: 2015 = 12 terawatt-hours (TWh); 2020 = 30 TWh.\n\nWhich choice uses the data to support the claim?",
+     "options": [
+      "Generation was 12 TWh in 2015.",
+      "Generation rose from 12 TWh to 30 TWh, more than twice the 2015 level.",
+      "Generation in 2020 was 30 TWh.",
+      "Generation increased by 18 TWh."
+     ],
+     "answer": 1,
+     "hint": "The claim is about \"more than doubled\".",
+     "explanation": "Only choice B compares 30 to twice 12 (24).",
+     "source": "original",
+     "id": "sat-reading-5"
+    },
+    {
+     "q": "The scientist's findings were initially met with skepticism, but later experiments corroborated her results.\n\nAs used in the text, \"corroborated\" most nearly means:",
+     "options": [
+      "challenged",
+      "confirmed",
+      "ignored",
+      "complicated"
+     ],
+     "answer": 1,
+     "hint": "\"But\" signals a shift away from skepticism.",
+     "explanation": "Later experiments supported, or confirmed, her results.",
+     "source": "original",
+     "id": "sat-reading-6"
+    },
+    {
+     "q": "Octopuses can change color within milliseconds, yet most species are believed to be colorblind. Some researchers hypothesize that their skin itself may detect light. If this hypothesis is correct, then ______\n\nWhich choice most logically completes the text?",
+     "options": [
+      "octopuses cannot change color.",
+      "octopuses might match their surroundings without relying on color vision from their eyes.",
+      "octopuses see more colors than humans.",
+      "octopus skin cannot respond to light."
+     ],
+     "answer": 1,
+     "hint": "The hypothesis solves a puzzle: color change without color vision.",
+     "explanation": "Light-sensing skin would let octopuses respond to surroundings without eye-based color vision.",
+     "source": "original",
+     "id": "sat-reading-7"
+    },
+    {
+     "q": "Many people assume that deserts are nearly lifeless. In fact, the Sonoran Desert is home to more than 2,000 plant species and hundreds of animal species.\n\nWhat is the main purpose of the text?",
+     "options": [
+      "To describe how deserts form",
+      "To challenge a common assumption about deserts",
+      "To compare the Sonoran Desert to rainforests",
+      "To argue that deserts should be irrigated"
+     ],
+     "answer": 1,
+     "hint": "\"Many people assume… In fact…\"",
+     "explanation": "The text sets up an assumption and then disproves it.",
+     "source": "original",
+     "id": "sat-reading-8"
+    }
+   ]
+  },
+  {
+   "id": "writing",
+   "name": "Writing & Grammar",
+   "section": "rw",
+   "questions": [
+    {
+     "q": "The team of scientists ______ to publish its findings next month.\n\nWhich choice conforms to the conventions of Standard English?",
+     "options": [
+      "plan",
+      "plans",
+      "are planning",
+      "have planned"
+     ],
+     "answer": 1,
+     "hint": "Find the true subject of the verb.",
+     "explanation": "The subject is \"team\" (singular), matching \"its\", so \"plans\".",
+     "source": "original",
+     "id": "sat-writing-1"
+    },
+    {
+     "q": "The museum's new exhibit features artifacts from three ancient cities______ Ur, Babylon, and Nineveh.\n\nWhich choice completes the text?",
+     "options": [
+      ",",
+      ":",
+      ";",
+      "(no punctuation)"
+     ],
+     "answer": 1,
+     "hint": "A list that explains what came before.",
+     "explanation": "A colon introduces a list after a complete clause.",
+     "source": "original",
+     "id": "sat-writing-2"
+    },
+    {
+     "q": "Solar panels have become far cheaper over the past decade. ______, many homeowners are now installing them.\n\nWhich transition is most logical?",
+     "options": [
+      "However",
+      "As a result",
+      "For example",
+      "Similarly"
+     ],
+     "answer": 1,
+     "hint": "Is the second sentence a contrast, an example, or a consequence?",
+     "explanation": "Lower prices cause more installations: a cause-and-effect transition.",
+     "source": "original",
+     "id": "sat-writing-3"
+    },
+    {
+     "q": "The company announced that ______ profits had increased for the third year in a row.\n\nWhich choice conforms to Standard English?",
+     "options": [
+      "it's",
+      "its",
+      "their",
+      "they're"
+     ],
+     "answer": 1,
+     "hint": "\"It's\" means \"it is\".",
+     "explanation": "\"Its\" is the singular possessive that matches \"company\".",
+     "source": "original",
+     "id": "sat-writing-4"
+    },
+    {
+     "q": "Which choice is punctuated correctly?",
+     "options": [
+      "Maria finished the marathon, she was exhausted but proud.",
+      "Maria finished the marathon; she was exhausted but proud.",
+      "Maria finished the marathon she was exhausted but proud.",
+      "Maria finished the marathon, and, she was exhausted but proud."
+     ],
+     "answer": 1,
+     "hint": "Two independent clauses need more than a comma.",
+     "explanation": "A semicolon correctly joins two independent clauses.",
+     "source": "original",
+     "id": "sat-writing-5"
+    },
+    {
+     "q": "Walking along the beach, ______\n\nWhich choice completes the sentence correctly?",
+     "options": [
+      "a rare shell was found by Sami.",
+      "Sami found a rare shell.",
+      "the shell was rare and Sami found it.",
+      "finding a rare shell was Sami."
+     ],
+     "answer": 1,
+     "hint": "Who was walking?",
+     "explanation": "The modifier must be followed by the person doing the walking: Sami.",
+     "source": "original",
+     "id": "sat-writing-6"
+    },
+    {
+     "q": "By the time the rescue team arrived, the hikers ______ for nearly six hours.\n\nWhich choice completes the text?",
+     "options": [
+      "wait",
+      "have waited",
+      "had been waiting",
+      "will wait"
+     ],
+     "answer": 2,
+     "hint": "The waiting happened before another past event.",
+     "explanation": "Past perfect progressive shows an action continuing up to a past moment.",
+     "source": "original",
+     "id": "sat-writing-7"
+    },
+    {
+     "q": "Which choice is the most concise and effective?",
+     "options": [
+      "The meeting was postponed until later, to a future time on Friday.",
+      "The meeting was postponed until Friday.",
+      "The meeting, which was planned, was postponed and delayed until Friday.",
+      "Postponed until Friday was what happened to the meeting that was planned."
+     ],
+     "answer": 1,
+     "hint": "Remove words that repeat an idea.",
+     "explanation": "\"Postponed until Friday\" says everything without redundancy.",
+     "source": "original",
+     "id": "sat-writing-8"
+    }
+   ]
+  }
+ ]
+}
