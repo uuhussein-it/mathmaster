@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Math with Mr. Hussein</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<style>
+:root{
+  --bg1:#eef3ff; --bg2:#f7f2ff; --card:#ffffff; --ink:#1c2440; --sub:#5b6584;
+  --primary:#5b6cf9; --primary2:#8b5cf6; --ok:#16a34a; --bad:#ef4444; --info:#0ea5e9;
+  --border:#e4e8f5; --shadow:0 10px 30px rgba(38,53,120,.10);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;
+  color:var(--ink); line-height:1.6; min-height:100vh;
+  background:
+    radial-gradient(900px 500px at 15% -10%, #dbe4ff 0%, transparent 60%),
+    radial-gradient(900px 500px at 90% 0%, #f3e3ff 0%, transparent 55%),
+    linear-gradient(160deg,var(--bg1),var(--bg2));
+  background-attachment:fixed;
+}
+nav{
+  position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:12px;
+  padding:12px 20px; background:rgba(255,255,255,.75); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+nav .brand{font-weight:800; font-size:18px; background:linear-gradient(90deg,var(--primary),var(--primary2));
+  -webkit-background-clip:text; background-clip:text; color:transparent}
+nav .spacer{flex:1}
+.navbtn{background:#fff; border:1px solid var(--border); color:var(--ink); padding:8px 14px;
+  border-radius:10px; cursor:pointer; font-weight:600; font-size:14px}
+.navbtn:hover{border-color:var(--primary); color:var(--primary)}
+.container{max-width:1080px; margin:0 auto; padding:26px 20px 60px}
+.hero{text-align:center; margin:34px 0 8px}
+.hero h1{font-size:clamp(24px,3.4vw,38px); margin:0 0 10px; line-height:1.25}
+.hero h1 span{background:linear-gradient(90deg,var(--primary),var(--primary2)); -webkit-background-clip:text; background-clip:text; color:transparent}
+.hero p{color:var(--sub); margin:0; font-size:17px}
+.grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:18px; margin:32px 0}
+.grade{
+  position:relative; border:none; border-radius:18px; padding:26px 18px; cursor:pointer; color:#fff;
+  text-align:center; box-shadow:var(--shadow); transition:transform .18s ease, box-shadow .18s ease;
+  overflow:hidden;
+}
+.grade:hover{transform:translateY(-6px); box-shadow:0 16px 40px rgba(38,53,120,.22)}
+.grade .icon{font-size:44px; line-height:1}
+.grade h2{margin:12px 0 2px; font-size:21px}
+.grade .s{font-size:13px; opacity:.9}
+.g1{background:linear-gradient(135deg,#5b6cf9,#7c8cff)}
+.g2{background:linear-gradient(135deg,#8b5cf6,#b17cff)}
+.g3{background:linear-gradient(135deg,#0ea5e9,#38bdf8)}
+.g4{background:linear-gradient(135deg,#10b981,#34d399)}
+.gSAT{background:linear-gradient(135deg,#f59e0b,#fbbf24)}
+.card{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:22px; box-shadow:var(--shadow); margin:16px 0}
+.panel{background:#fbfcff; border:1px solid var(--border); border-radius:14px; padding:16px; margin:12px 0}
+.hidden{display:none !important}
+h2{margin:0 0 6px}
+.small{color:var(--sub); font-size:14px}
+.row{display:flex; flex-wrap:wrap; gap:10px; margin:12px 0; align-items:center}
+.btn{background:linear-gradient(135deg,var(--primary),var(--primary2)); color:#fff; border:none; padding:11px 18px;
+  border-radius:11px; cursor:pointer; font-weight:700; font-size:15px; box-shadow:0 6px 16px rgba(91,108,249,.28)}
+.btn:hover{filter:brightness(1.05)}
+.btn:disabled{opacity:.5; cursor:not-allowed; box-shadow:none}
+.btn.secondary{background:#fff; color:var(--ink); border:1px solid var(--border); box-shadow:none}
+.btn.secondary:hover{border-color:var(--primary); color:var(--primary)}
+.btn.ghost{background:transparent; color:var(--primary); border:1px dashed var(--primary); box-shadow:none}
+.chooser{display:flex; flex-wrap:wrap; gap:10px}
+.choose{background:#fff; border:2px solid var(--border); color:var(--ink); padding:12px 20px; border-radius:12px;
+  cursor:pointer; font-weight:700; font-size:15px}
+.choose:hover{border-color:var(--primary)}
+.choose.active{border-color:var(--primary); background:#eef1ff; color:var(--primary)}
+.qcard{max-width:820px; margin:0 auto}
+.qhead{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+.qnum{font-weight:800; color:var(--primary)}
+.qmeta{margin-left:auto; display:flex; gap:8px; align-items:center}
+.badge{font-size:12px; padding:3px 9px; border-radius:999px; background:#eef1ff; color:var(--primary); font-weight:700}
+.opts{display:flex; flex-direction:column; gap:10px; margin:16px 0}
+.qprompt{font-size:18px; line-height:1.6; color:var(--ink); margin:6px 0 4px; font-weight:600}
+.qprompt img{max-width:100%}
+.opt{background:#fff; color:var(--ink); border:2px solid var(--border); padding:13px 15px; border-radius:12px;
+  cursor:pointer; text-align:left; display:flex; gap:12px; align-items:flex-start; font-size:16px}
+.opt:hover{border-color:#b9c3f5}
+.opt .key{font-weight:800; color:var(--primary); min-width:18px}
+.opt.selected{border-color:var(--primary); background:#eef1ff}
+.opt.correct{border-color:var(--ok); background:#eafaf0}
+.opt.wrong{border-color:var(--bad); background:#fdeeee}
+.finput{width:100%; padding:12px 14px; border-radius:12px; border:2px solid var(--border); font-size:16px; color:var(--ink); background:#fff}
+.finput:focus{outline:none; border-color:var(--primary)}
+.feedback{padding:13px 15px; border-radius:12px; margin:12px 0; font-size:15px; border:1px solid var(--border); background:#fbfcff}
+.feedback.ok{background:#eafaf0; border-color:#bfe9cd}
+.feedback.bad{background:#fdeeee; border-color:#f6c6c6}
+.feedback.info{background:#eef6ff; border-color:#c7ddf7}
+.stats{display:flex; gap:22px; flex-wrap:wrap; justify-content:center; margin-top:14px}
+.stat .n{font-size:26px; font-weight:800; color:var(--primary)}
+.stat .l{font-size:12px; color:var(--sub); text-transform:uppercase; letter-spacing:.5px}
+.score{font-size:54px; font-weight:800; background:linear-gradient(90deg,var(--primary),var(--primary2));
+  -webkit-background-clip:text; background-clip:text; color:transparent; text-align:center}
+.list label{display:flex; gap:10px; align-items:center; padding:10px 12px; border:1px solid var(--border);
+  border-radius:10px; margin:8px 0; background:#fff; cursor:pointer}
+.list input{width:18px; height:18px}
+.timer{font-weight:800; color:var(--bad); font-size:18px; margin-left:auto}
+.bar{height:8px; border-radius:999px; background:#e4e8f5; overflow:hidden; margin:10px 0 18px}
+.bar > i{display:block; height:100%; background:linear-gradient(90deg,var(--primary),var(--primary2))}
+a.back{cursor:pointer; color:var(--primary); font-weight:600; text-decoration:none}
+.foot{text-align:center; color:var(--sub); font-size:13px; margin-top:40px}
+
+/* ---------- image lightbox ---------- */
+.qfig{position:relative; display:inline-block; max-width:100%; cursor:zoom-in; margin:10px 0}
+.qfig img{max-width:100%; border-radius:10px; display:block; border:1px solid var(--border)}
+.qfig .zoomtag{position:absolute; right:8px; bottom:8px; background:rgba(37,51,120,.85); color:#fff;
+  font-size:12px; padding:4px 9px; border-radius:999px; font-weight:700}
+.lightbox{position:fixed; inset:0; background:rgba(12,16,33,.94); z-index:1000; display:flex;
+  align-items:center; justify-content:center; flex-direction:column; overflow:auto; padding:24px}
+.lightbox img{max-width:96vw; max-height:88vh; border-radius:8px; background:#fff}
+.lb-close{position:fixed; top:16px; right:18px; background:#fff; color:var(--ink); border:none;
+  padding:9px 15px; border-radius:999px; font-weight:800; cursor:pointer}
+.lb-hint{color:#cdd4f0; font-size:13px; margin-top:12px}
+
+/* ---------- interactive widgets ---------- */
+.widget{margin:14px 0; padding:14px; border:1px dashed var(--border); border-radius:14px; background:#fbfcff}
+.widget .wtitle{font-weight:800; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:8px}
+.widget .wtip{font-size:12px; color:var(--sub); font-weight:600}
+.plotwrap{display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start}
+.plotwrap svg{background:#fff; border:1px solid var(--border); border-radius:12px; touch-action:none}
+.plotbtn{font-size:13px; padding:6px 11px; border-radius:9px; border:1px solid var(--border); background:#fff; cursor:pointer; font-weight:700}
+.plotbtn:hover{border-color:var(--primary)}
+.wtable{border-collapse:collapse; margin-top:4px}
+.wtable th,.wtable td{border:1px solid var(--border); padding:0}
+.wtable th{background:#eef1ff; color:var(--primary); font-size:13px; padding:7px 12px; text-align:center}
+.wtable td input{width:76px; padding:9px 8px; border:none; font-size:15px; text-align:center; background:transparent; color:var(--ink)}
+.wtable td.given{background:#f2f4fb; color:var(--sub); font-weight:700; padding:9px 8px; text-align:center; min-width:76px}
+.matchwrap{position:relative; display:flex; gap:26px; align-items:flex-start}
+.matchwrap .mcol{flex:1; display:flex; flex-direction:column; gap:10px; z-index:2}
+.mitem{background:#fff; border:2px solid var(--border); border-radius:10px; padding:11px 13px; font-size:14px;
+  cursor:pointer; line-height:1.35}
+.mitem:hover{border-color:#b9c3f5}
+.mitem.sel{border-color:var(--primary); background:#eef1ff}
+.mitem.linked{border-color:var(--ok); background:#eafaf0}
+.mlines{position:absolute; inset:0; pointer-events:none; z-index:1; overflow:visible}
+.mlines line{stroke:var(--primary); stroke-width:3; stroke-linecap:round}
+</style>
+</head>
+<body>
+<nav>
+  <div class="brand">Math with Mr. Hussein</div>
+  <div class="spacer"></div>
+  <span class="small" id="whoami"></span>
+  <button class="navbtn" onclick="goHome()">Home</button>
+</nav>
+
+<!-- HOME -->
+<div class="container" id="home">
+  <div class="hero">
+    <h1><span>Math with Mr. Hussein</span><br>Practice Smart. Learn Better. Achieve More.</h1>
+    <p>Grades 9–12 &nbsp;·&nbsp; SAT Mathematics preparation</p>
+  </div>
+  <div class="grid">
+    <button class="grade g1" onclick="openGrade(9)"><div class="icon">📘</div><h2>Grade 9</h2><div class="s">Algebra foundations</div></button>
+    <button class="grade g2" onclick="openGrade(10)"><div class="icon">📗</div><h2>Grade 10</h2><div class="s">Functions & geometry</div></button>
+    <button class="grade g3" onclick="openGrade(11)"><div class="icon">📙</div><h2>Grade 11</h2><div class="s">Advanced topics</div></button>
+    <button class="grade g4" onclick="openGrade(12)"><div class="icon">📕</div><h2>Grade 12</h2><div class="s">Pre-calculus & more</div></button>
+    <button class="grade gSAT" onclick="openSAT()"><div class="icon">🎯</div><h2>Math SAT</h2><div class="s">Practice & timed exam</div></button>
+  </div>
+  <div class="foot">Original practice questions · AI-powered feedback</div>
+</div>
+
+<!-- GRADE SETUP -->
+<div class="container hidden" id="grade">
+  <a class="back" onclick="goHome()">← Home</a>
+  <div class="card">
+    <h2 id="gtitle">Grade</h2>
+    <p class="small">Step 1 — Choose your level</p>
+    <div class="chooser">
+      <button class="choose" data-lvl="Advanced">Advanced</button>
+      <button class="choose" data-lvl="General">General</button>
+      <button class="choose" data-lvl="ASP">ASP</button>
+    </div>
+    <p class="small" style="margin-top:18px">Step 2 — Choose your term</p>
+    <div class="chooser">
+      <button class="choose" data-term="1">Term 1</button>
+      <button class="choose" data-term="2">Term 2</button>
+      <button class="choose" data-term="3">Term 3</button>
+    </div>
+    <p class="small" style="margin-top:18px">Step 3 — Choose your learning mode</p>
+    <div class="row">
+      <button class="btn" onclick="gradeStart('practice')">Practice</button>
+      <button class="btn secondary" onclick="gradeStart('quiz')">Quiz</button>
+    </div>
+    <div class="small" id="gsel" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- LESSON PICKER -->
+<div class="container hidden" id="subs">
+  <a class="back" onclick="backGrade()">← Back</a>
+  <div class="card">
+    <h2>Select lessons</h2>
+    <p class="small">Choose one or more lessons, then start.</p>
+    <div class="list" id="slist"></div>
+    <div class="row">
+      <button class="btn" onclick="startSelected()">Start</button>
+      <button class="btn secondary" onclick="toggleAllSubs(true)">Select all</button>
+      <button class="btn secondary" onclick="toggleAllSubs(false)">Clear</button>
+    </div>
+  </div>
+</div>
+
+<!-- WORK -->
+<div class="container hidden" id="work">
+  <a class="back" onclick="goHome()">← Home</a>
+  <div id="qwrap"></div>
+</div>
+
+<!-- SAT -->
+<div class="container hidden" id="sat">
+  <a class="back" onclick="goHome()">← Home</a>
+  <div class="card">
+    <h2>Math SAT</h2>
+    <p class="small">Independent SAT preparation — no grade or term needed.</p>
+    <div id="satSkills"></div>
+    <div class="row">
+      <button class="btn" onclick="satStart('practice')">SAT Practice</button>
+      <button class="btn secondary" onclick="satStart('exam')">SAT Exam (timed)</button>
+    </div>
+    <div class="small" id="satsel" style="margin-top:10px">Pick one or more skills above.</div>
+  </div>
+</div>
+
+<!-- IMAGE LIGHTBOX -->
+<div id="lightbox" class="lightbox hidden" onclick="closeLightbox()">
+  <img id="lightboxImg" alt="Question figure">
+  <button class="lb-close" onclick="closeLightbox()">✕ Close</button>
+  <div class="lb-hint">Click anywhere to close · pinch or scroll to zoom</div>
+</div>
+
+<script>
+/* ---------- helpers ---------- */
+function $(id){return document.getElementById(id)}
+function show(id){$(id).classList.remove('hidden')}
+function hide(id){$(id).classList.add('hidden')}
+function esc(s){if(s===null||s===undefined)return'';return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+async function api(url,opts){const r=await fetch(url,opts);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
+function typeset(el){
+  if(!el||!window.renderMathInElement)return;
+  try{renderMathInElement(el,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false},{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}],throwOnError:false})}catch(e){}
+}
+const NAME_KEY='mh_name';
+function getName(){return localStorage.getItem(NAME_KEY)||''}
+function currentName(){return getName()||'Student'}
+let _aiReady=true;
+
+/* ---------- home ---------- */
+function goHome(){['grade','subs','work','sat'].forEach(hide);show('home');refresWho()}
+function refresWho(){$('whoami').textContent=getName()?('👋 '+getName()):''}
+
+/* ---------- grade flow ---------- */
+let G={grade:0,level:'',term:'',mode:'',subs:[],qs:[],i:0,answers:{},graded:null};
+
+function openGrade(g){
+  G={grade:g,level:'',term:'',mode:'',subs:[],qs:[],i:0,answers:{},graded:null};
+  $('gtitle').textContent='Grade '+g;
+  ['home','work','sat','subs'].forEach(hide);show('grade');
+  document.querySelectorAll('.choose').forEach(b=>b.classList.remove('active'));
+  $('gsel').textContent='Select a level and a term to continue.';
+}
+function selectLevel(l){G.level=l;markActive('[data-lvl]',l,'lvl');updateGsel()}
+function selectTerm(t){G.term=t;markActive('[data-term]',t,'term');updateGsel()}
+function markActive(sel,val,attr){document.querySelectorAll(sel).forEach(b=>{b.classList.toggle('active',String(b.dataset[attr])===String(val))})}
+function updateGsel(){
+  if(G.level&&G.term){$('gsel').textContent='Ready: Grade '+G.grade+' · '+G.level+' · Term '+G.term+'. Choose Practice or Quiz.';}
+  else{$('gsel').textContent='Select a level and a term to continue.';}
+}
+document.querySelectorAll('[data-lvl]').forEach(b=>b.addEventListener('click',()=>selectLevel(b.dataset.lvl)));
+document.querySelectorAll('[data-term]').forEach(b=>b.addEventListener('click',()=>selectTerm(b.dataset.term)));
+
+async function gradeStart(mode){
+  if(!G.level||!G.term){alert('Please select a level and a term first.');return}
+  G.mode=mode;
+  try{
+    const subs=await api('/api/grades/'+G.grade+'/'+encodeURIComponent(G.level)+'/'+G.term+'/subtopics');
+    if(!subs.length){alert('No questions available for this selection yet. Try another level or term.');return}
+    G.subs=subs;renderSubs();['grade','home'].forEach(hide);show('subs');
+  }catch(e){alert('Error loading lessons: '+e.message)}
+}
+function backGrade(){hide('subs');show('grade')}
+function renderSubs(){
+  const el=$('slist');el.innerHTML='';
+  G.subs.forEach(su=>{
+    const lab=document.createElement('label');
+    lab.innerHTML='<input type="checkbox" data-sid="'+su.id+'"><span>'+(su.ref?esc(su.ref)+' ':'')+esc(su.name)+'</span> <span class="small" style="margin-left:auto">'+su.count+' Qs</span>';
+    el.appendChild(lab);
+  });
+}
+function toggleAllSubs(on){document.querySelectorAll('#slist input').forEach(x=>x.checked=on)}
+async function startSelected(){
+  const ids=[];document.querySelectorAll('#slist input:checked').forEach(x=>ids.push(parseInt(x.dataset.sid)));
+  if(!ids.length){alert('Select at least one lesson.');return}
+  try{
+    const all=await api('/api/grades/'+G.grade+'/'+encodeURIComponent(G.level)+'/'+G.term+'/questions');
+    let qs=all.filter(q=>ids.includes(q.subtopic_id));
+    if(!qs.length){alert('No questions found in the selected lessons.');return}
+    G.qs=qs;G.i=0;G.answers={};G.graded=null;
+    hide('subs');show('work');
+    if(G.mode==='practice'){renderPractice()}else{renderQuiz()}
+  }catch(e){alert('Error: '+e.message)}
+}
+
+/* ---------- question rendering ---------- */
+function isMc(q){return (q.is_mcq===true)||((q.options&&q.options.length>0))}
+function questionImage(q){if(!q.question_image)return '';const src=/^https?:|^\//.test(q.question_image)?q.question_image:('/api/course-q-img/'+q.id);return '<span class="qfig" onclick="openLightbox(this.querySelector(\'img\').src)"><img src="'+esc(src)+'" alt="Question figure" onerror="this.parentNode.style.display=\'none\'"><span class="zoomtag">🔍 Zoom</span></span>'}
+function messageText(q){
+  const mc=isMc(q);
+  let opts='';
+  if(mc){
+    opts='<div class="opts">'+q.options.map((txt,ki)=>{
+      const k='ABCDEF'[ki];
+      return '<button class="opt" data-k="'+k+'"><span class="key">'+k+'</span><span>'+esc(txt)+'</span></button>';
+    }).join('')+'</div>';
+  }else{
+    opts='<input class="finput" placeholder="Type your answer (fractions like 3/4 or decimals like 0.75)">';
+  }
+  return '<div class="qprompt">'+esc(q.prompt||'')+'</div>'+questionImage(q)+opts;
+}
+function readAnswer(wrap,q){
+  if(isMc(q)){const s=[];wrap.querySelectorAll('.opt.selected').forEach(b=>s.push(b.dataset.k));if(s.length)return s.sort().join('');const inp=wrap.querySelector('.finput');return inp?inp.value:''}
+  const inp=wrap.querySelector('.finput');return inp?inp.value:'';
+}
+function bindOpts(wrap,q,multi){
+  wrap.querySelectorAll('.opt').forEach(b=>{
+    b.onclick=()=>{
+      if(!multi){wrap.querySelectorAll('.opt').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');}
+      else b.classList.toggle('selected');
+    };
+  });
+}
+
+/* ---------- image lightbox ---------- */
+function openLightbox(src){if(!src)return;$('lightboxImg').src=src;$('lightbox').classList.remove('hidden')}
+function closeLightbox(){$('lightbox').classList.add('hidden');$('lightboxImg').src=''}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLightbox()});
+
+/* ---------- interactive widgets ---------- */
+const WIDGETS={};
+const SVGNS='http://www.w3.org/2000/svg';
+function sourceKind(q){return q&&q.__sat?'sat':'course'}
+async function getWidget(qid,kind){
+  const key=kind+':'+qid;
+  if(WIDGETS[key])return WIDGETS[key];
+  const w=await api('/api/widget/'+kind+'/'+qid);
+  WIDGETS[key]=w;return w;
+}
+function widgetBox(title,hint){
+  const d=document.createElement('div');d.className='widget';
+  d.innerHTML='<div class="wtitle">'+title+(hint?' <span class="wtip">'+hint+'</span>':'')+'</div>';
+  return d;
+}
+
+/* coordinate plane */
+function mountGraph(host,spec,answers,qid){
+  const W=400,H=400,pad=34;
+  let xmin=Number(spec.xmin),xmax=Number(spec.xmax),ymin=Number(spec.ymin),ymax=Number(spec.ymax);
+  if(!isFinite(xmin)||!isFinite(xmax)||xmax<=xmin){xmin=-10;xmax=10}
+  if(!isFinite(ymin)||!isFinite(ymax)||ymax<=ymin){ymin=-10;ymax=10}
+  xmin=Math.min(xmin,-1);xmax=Math.max(xmax,1);ymin=Math.min(ymin,-1);ymax=Math.max(ymax,1);
+  const drawLine=(x)=>spec.mode==='line'||spec.mode==='both';
+  const X=x=>pad+(x-xmin)/(xmax-xmin)*(W-2*pad);
+  const Y=y=>H-pad-(y-ymin)/(ymax-ymin)*(H-2*pad);
+  const invX=px=>xmin+(px-pad)/(W-2*pad)*(xmax-xmin);
+  const invY=py=>ymin+((H-pad)-py)/(H-2*pad)*(ymax-ymin);
+  const state=(answers[qid]&&answers[qid].points)?answers[qid]:{points:[],lines:[]};
+  answers[qid]=state;
+  const el=widgetBox('📐 Plot on the coordinate plane','Click to plot a point · click a point to remove it');
+  el.innerHTML+='<div class="plotwrap"><svg viewBox="0 0 '+W+' '+H+'" width="400" height="400"></svg>'+
+    '<div><div class="small" data-pts></div><div class="row" style="margin-top:10px"><button class="plotbtn" data-clear>Clear</button></div></div></div>';
+  host.appendChild(el);
+  const svg=el.querySelector('svg');
+  function seg(x1,y1,x2,y2,c,w){const l=document.createElementNS(SVGNS,'line');l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);l.setAttribute('stroke',c);l.setAttribute('stroke-width',w);return l}
+  function redraw(){
+    svg.innerHTML='';
+    for(let x=Math.ceil(xmin);x<=xmax;x++)svg.appendChild(seg(X(x),pad,X(x),H-pad,'#e4e8f5',1));
+    for(let y=Math.ceil(ymin);y<=ymax;y++)svg.appendChild(seg(pad,Y(y),W-pad,Y(y),'#e4e8f5',1));
+    svg.appendChild(seg(X(0),pad,X(0),H-pad,'#8892b0',2));
+    svg.appendChild(seg(pad,Y(0),W-pad,Y(0),'#8892b0',2));
+    const pts=state.points.slice().sort((a,b)=>a[0]-b[0]);
+    state.lines=[];
+    if(drawLine()&&pts.length>=2){
+      for(let i=1;i<pts.length;i++)svg.appendChild(seg(X(pts[i-1][0]),Y(pts[i-1][1]),X(pts[i][0]),Y(pts[i][1]),'#2f57d6',2.5));
+      state.lines=[{x1:pts[0][0],y1:pts[0][1],x2:pts[pts.length-1][0],y2:pts[pts.length-1][1]}];
+    }
+    state.points.forEach(p=>{
+      const c=document.createElementNS(SVGNS,'circle');c.setAttribute('cx',X(p[0]));c.setAttribute('cy',Y(p[1]));c.setAttribute('r',6);c.setAttribute('fill','#2f57d6');svg.appendChild(c);
+      const t=document.createElementNS(SVGNS,'text');t.setAttribute('x',X(p[0])+9);t.setAttribute('y',Y(p[1])-9);t.setAttribute('font-size','12');t.setAttribute('fill','#25334b');t.textContent='('+p[0]+', '+p[1]+')';svg.appendChild(t);
+    });
+    const read=el.querySelector('[data-pts]');
+    read.textContent=state.points.length?('Points: '+state.points.map(p=>'('+p[0]+', '+p[1]+')').join(', ')):'No points plotted yet.';
+  }
+  svg.addEventListener('click',e=>{
+    const r=svg.getBoundingClientRect();
+    const px=(e.clientX-r.left)/r.width*W, py=(e.clientY-r.top)/r.height*H;
+    const x=Math.round(invX(px)*2)/2, y=Math.round(invY(py)*2)/2;
+    const i=state.points.findIndex(p=>Math.abs(p[0]-x)<0.26&&Math.abs(p[1]-y)<0.26);
+    if(i>=0)state.points.splice(i,1);else state.points.push([x,y]);
+    redraw();
+  });
+  el.querySelector('[data-clear]').onclick=()=>{state.points=[];state.lines=[];redraw()};
+  redraw();
+}
+
+/* fillable table */
+function mountTable(host,spec,answers,qid){
+  const headers=spec.headers&&spec.headers.length?spec.headers:[];
+  const rows=(spec.rows||[]).map(r=>r.slice());
+  const model=rows.map(r=>r.slice());
+  answers[qid]={rows:model,headers:headers};
+  const el=widgetBox('📋 Fill in the table','Type the missing values');
+  let html='<table class="wtable">';
+  if(headers.length)html+='<thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead>';
+  html+='<tbody>';
+  rows.forEach((r,ri)=>{html+='<tr>';r.forEach((c,ci)=>{
+    if(c!=='' && c!==null && c!==undefined)html+='<td class="given">'+esc(c)+'</td>';
+    else html+='<td><input data-r="'+ri+'" data-c="'+ci+'" inputmode="text" placeholder="?"></td>';
+  });html+='</tr>'});
+  html+='</tbody></table>';
+  el.innerHTML+=html;
+  host.appendChild(el);
+  el.querySelectorAll('input[data-r]').forEach(inp=>{
+    inp.addEventListener('input',()=>{model[+inp.dataset.r][+inp.dataset.c]=inp.value});
+  });
+}
+
+/* two-column matching */
+function mountMatching(host,spec,answers,qid){
+  const left=(spec.left||[]).slice();
+  const right=(spec.right||[]).slice();
+  const order=right.map((_,i)=>i);
+  for(let i=order.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[order[i],order[j]]=[order[j],order[i]]}
+  const map={};let sel=null;
+  const el=widgetBox('🔗 Match the columns','Tap an item on the left, then its match on the right');
+  el.innerHTML+='<div class="matchwrap"><svg class="mlines"></svg>'+
+    '<div class="mcol">'+left.map((t,i)=>'<div class="mitem" data-l="'+i+'">'+esc(t)+'</div>').join('')+'</div>'+
+    '<div class="mcol">'+order.map(o=>'<div class="mitem" data-orig="'+o+'">'+esc(right[o])+'</div>').join('')+'</div></div>';
+  host.appendChild(el);
+  const mw=el.querySelector('.matchwrap');
+  const svgEl=el.querySelector('.mlines');
+  function drawLines(){
+    const w=mw.clientWidth,h=mw.clientHeight;
+    svgEl.setAttribute('width',w);svgEl.setAttribute('height',h);svgEl.innerHTML='';
+    const base=mw.getBoundingClientRect();
+    Object.keys(map).forEach(l=>{
+      const le=mw.querySelector('[data-l="'+l+'"]'),re=mw.querySelector('[data-orig="'+map[l]+'"]');
+      if(!le||!re)return;const a=le.getBoundingClientRect(),b=re.getBoundingClientRect();
+      const ln=document.createElementNS(SVGNS,'line');
+      ln.setAttribute('x1',a.right-base.left);ln.setAttribute('y1',a.top+a.height/2-base.top);
+      ln.setAttribute('x2',b.left-base.left);ln.setAttribute('y2',b.top+b.height/2-base.top);
+      svgEl.appendChild(ln);
+    });
+  }
+  function sync(){
+    answers[qid]={pairs:Object.keys(map).map(l=>({left:left[+l],right:right[map[l]]}))};
+    mw.querySelectorAll('[data-l]').forEach(e=>{const l=+e.dataset.l;e.classList.toggle('sel',sel===l);e.classList.toggle('linked',map[l]!==undefined)});
+    mw.querySelectorAll('[data-orig]').forEach(e=>{e.classList.toggle('linked',Object.values(map).includes(+e.dataset.orig))});
+    drawLines();
+  }
+  mw.querySelectorAll('[data-l]').forEach(e=>e.addEventListener('click',()=>{
+    const l=+e.dataset.l;
+    if(sel===l){sel=null}
+    else if(map[l]!==undefined){delete map[l];sel=null}
+    else sel=l;
+    sync();
+  }));
+  mw.querySelectorAll('[data-orig]').forEach(e=>e.addEventListener('click',()=>{
+    if(sel===null)return;const ro=+e.dataset.orig;
+    Object.keys(map).forEach(l=>{if(map[l]===ro)delete map[l]});
+    map[sel]=ro;sel=null;sync();
+  }));
+  window.addEventListener('resize',drawLines);
+  requestAnimationFrame(drawLines);
+  sync();
+}
+
+/* plain options / free response */
+function plainAnswer(host,q,answers,wrap){
+  const multi=!!q.multi_select;
+  if(q.options&&q.options.length){
+    const box=document.createElement('div');box.className='opts';
+    q.options.forEach((txt,ki)=>{
+      const k='ABCDEF'[ki];const b=document.createElement('button');b.className='opt';b.dataset.k=k;
+      b.innerHTML='<span class="key">'+k+'</span><span>'+esc(txt)+'</span>';
+      b.onclick=()=>{if(!multi){box.querySelectorAll('.opt').forEach(x=>x.classList.remove('selected'));b.classList.add('selected')}else b.classList.toggle('selected');answers[q.id]=readAnswer(wrap,q)};
+      box.appendChild(b);
+    });
+    host.appendChild(box);
+    const saved=answers[q.id];
+    if(saved&&typeof saved==='string')box.querySelectorAll('.opt').forEach(b=>{if(saved.includes(b.dataset.k))b.classList.add('selected')});
+  }else{
+    const inp=document.createElement('input');inp.className='finput';
+    inp.placeholder='Type your answer (fractions like 3/4 or decimals like 0.75)';
+    inp.value=(typeof answers[q.id]==='string')?answers[q.id]:'';
+    inp.addEventListener('input',()=>{answers[q.id]=inp.value});
+    host.appendChild(inp);
+  }
+}
+
+/* mount the question body: prompt + figure + the right widget/options */
+async function mountBody(q,wrap,answers,kind){
+  const host=wrap.querySelector('[data-body]');if(!host)return;
+  host.innerHTML='<div class="qprompt">'+esc(q.prompt||'')+'</div>'+questionImage(q)+'<div class="small" data-wload style="margin:10px 0">Preparing interactive question…</div>';
+  let spec={widget:'plain'};
+  if(_aiReady&&q.id){try{spec=await getWidget(q.id,kind)}catch(e){}}
+  q._widget=spec;
+  const wl=host.querySelector('[data-wload]');if(wl)wl.remove();
+  let used=false;
+  if(spec.graph&&spec.graph.mode){mountGraph(host,spec.graph,answers,q.id);used=true}
+  if(spec.table&&spec.table.rows&&spec.table.rows.length){mountTable(host,spec.table,answers,q.id);used=true}
+  if(spec.matching&&(spec.matching.left||[]).length&&(spec.matching.right||[]).length){mountMatching(host,spec.matching,answers,q.id);used=true}
+  if(!used)plainAnswer(host,q,answers,wrap);
+  typeset(host);
+}
+function describeAnswer(q,a){
+  if(a&&typeof a==='object'){
+    if(a.points)return 'Plotted: '+(a.points.length?a.points.map(p=>'('+p[0]+', '+p[1]+')').join(', '):'none');
+    if(a.rows)return 'Table: '+a.rows.map(r=>'['+r.map(c=>c||'_').join(', ')+']').join('  ');
+    if(a.pairs)return a.pairs.map(p=>p.left+' → '+p.right).join('; ');
+  }
+  return esc(a||'—');
+}
+function answerItem(q,answers,kind){
+  const widget=(q._widget||{}).widget||'plain';
+  const a=answers[q.id];
+  const structured=(widget!=='plain')&&a&&typeof a==='object';
+  return {question:q,widget,widget_answer:structured?a:null,student_answer:structured?'':(a||''),source:kind||'course'};
+}
+
+/* ---------- PRACTICE ---------- */
+function renderPractice(){
+  const q=G.qs[G.i];
+  const wrap=$('qwrap');
+  wrap.innerHTML='<div class="card qcard">'+
+    '<div class="qhead"><span class="qnum">Question '+(G.i+1)+' of '+G.qs.length+'</span>'+
+    '<span class="qmeta"><span class="badge">'+esc(q.difficulty||'practice')+'</span></span></div>'+
+    '<div class="bar"><i style="width:'+Math.round((G.i)/G.qs.length*100)+'%"></i></div>'+
+    '<div data-body></div>'+
+    '<div class="feedback hidden" data-fb></div>'+
+    '<div class="row" style="margin-top:8px">'+
+      '<button class="btn secondary" id="prev"'+(G.i<=0?' disabled':'')+'>← Prev</button>'+
+      '<button class="btn" id="submit">Submit</button>'+
+      '<button class="btn secondary" id="hint">💡 Hint</button>'+
+      '<button class="btn secondary" id="explain">📖 Explain</button>'+
+      '<button class="btn secondary" id="next"'+(G.i>=G.qs.length-1?' disabled':'')+'>Next →</button>'+
+    '</div>'+
+  '</div>';
+  $('prev').onclick=()=>{if(G.i>0){G.i--;renderPractice()}};
+  $('next').onclick=()=>{if(G.i<G.qs.length-1){G.i++;renderPractice()}};
+  $('submit').onclick=()=>submitAnswer(q,wrap);
+  $('hint').onclick=()=>aiFeedback('hint',q,wrap);
+  $('explain').onclick=()=>aiFeedback('explain',q,wrap);
+  mountBody(q,wrap,G.answers,'course');
+}
+async function submitAnswer(q,wrap){
+  const widget=(q._widget||{}).widget||'plain';
+  const a=G.answers[q.id];
+  const structured=(widget!=='plain')&&a&&typeof a==='object';
+  const ans=structured?'':(a||'');
+  const fb=wrap.querySelector('[data-fb]');
+  fb.className='feedback info';fb.classList.remove('hidden');fb.textContent='Checking…';
+  try{
+    const r=await api('/api/ai/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'course',question_id:q.id,student_answer:ans,question:q,widget,widget_answer:structured?a:null})});
+    let cls='info',txt='';
+    if(!r.configured){txt='Answer recorded. (AI feedback is not configured yet.)';}
+    else if(r.is_correct===true){cls='ok';txt='✅ Correct! '+(r.explanation||'')}
+    else if(r.is_correct===false){cls='bad';txt='❌ Not quite. '+(r.explanation||'')}
+    else{cls='info';txt=(r.explanation||'Answer recorded.')}
+    fb.className='feedback '+cls;fb.textContent=txt;
+  }catch(e){fb.className='feedback info';fb.textContent='Could not check answer.'}
+}
+async function aiFeedback(kind,q,wrap){
+  const fb=wrap.querySelector('[data-fb]');
+  fb.className='feedback info';fb.classList.remove('hidden');fb.textContent=(kind==='hint'?'Getting a hint…':'Writing explanation…');
+  try{
+    const r=await api('/api/ai/'+kind,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,answer:readAnswer(wrap,q)})});
+    fb.textContent=r.hint||r.explanation||'No response.';
+  }catch(e){fb.textContent='Could not load AI feedback.'}
+}
+
+/* ---------- QUIZ ---------- */
+function renderQuiz(){
+  const q=G.qs[G.i],wrap=$('qwrap');
+  wrap.innerHTML='<div class="card qcard">'+
+    '<div class="qhead"><span class="qnum">Question '+(G.i+1)+' of '+G.qs.length+'</span>'+
+    '<span class="qmeta"><span class="badge">'+esc(q.difficulty||'quiz')+'</span></span></div>'+
+    '<div class="bar"><i style="width:'+Math.round((G.i)/G.qs.length*100)+'%"></i></div>'+
+    '<div data-body></div>'+
+    '<div class="row" style="margin-top:8px">'+
+      '<button class="btn secondary" id="prev"'+(G.i<=0?' disabled':'')+'>← Prev</button>'+
+      '<button class="btn secondary" id="next"'+(G.i>=G.qs.length-1?' disabled':'')+'>Next →</button>'+
+      '<span style="flex:1"></span>'+
+      '<button class="btn" id="finish">Submit Quiz</button>'+
+    '</div>'+
+    '<div class="small" style="margin-top:8px" data-count>'+Object.keys(G.answers).length+' of '+G.qs.length+' answered</div>'+
+  '</div>';
+  $('prev').onclick=()=>{if(G.i>0){G.i--;renderQuiz()}};
+  $('next').onclick=()=>{if(G.i<G.qs.length-1){G.i++;renderQuiz()}};
+  $('finish').onclick=submitQuiz;
+  mountBody(q,wrap,G.answers,'course');
+}
+async function submitQuiz(){
+  const wrap=$('qwrap');
+  wrap.innerHTML='<div class="card"><h2>Marking your quiz…</h2><p class="small">Checking every answer with AI. This may take a few seconds.</p></div>';
+  const items=G.qs.map(q=>answerItem(q,G.answers,'course'));
+  let results=[];
+  try{
+    const r=await api('/api/ai/grade-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'course'})});
+    results=r.results||[];
+  }catch(e){}
+  G.graded=results;
+  showResults('Quiz Results',results,()=>remediateGrade());
+}
+function saveProgress(payload){try{api('/api/progress',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({student_name:currentName(),grade:G.grade,level:G.level,term:G.term,source:G.mode},payload))})}catch(e){}}
+
+function showResults(title,results,onRemediate){
+  let correct=0,known=0;
+  results.forEach(r=>{if(r.is_correct===true)correct++;if(r.is_correct!==null&&r.is_correct!==undefined)known++});
+  const total=G.qs.length;
+  const pct=known?Math.round(correct*100/known):0;
+  let html='<div class="card"><h2>'+esc(title)+'</h2>'+
+    '<div class="score">'+pct+'%</div>'+
+    '<div class="stats"><span class="stat"><div class="n">'+correct+'/'+total+'</div><div class="l">Correct</div></span>'+
+    '<span class="stat"><div class="n">'+currentName()+'</div><div class="l">Student</div></span></div>';
+  // skills breakdown
+  const byTopic={};
+  G.qs.forEach((q,i)=>{const key=q.subtopic||q.domain||('Lesson '+(q.subtopic_id||'?'));byTopic[key]=byTopic[key]||{c:0,t:0};byTopic[key].t++;const r=results[i]||{};if(r.is_correct===true)byTopic[key].c++;});
+  html+='<h2 style="margin-top:22px">Skills</h2>';
+  Object.entries(byTopic).forEach(([k,v])=>{html+='<div class="small">'+esc(k)+': '+v.c+'/'+v.t+'</div>'});
+  html+='<h2 style="margin-top:22px">Review</h2>';
+  G.qs.forEach((q,i)=>{
+    const r=results[i]||{};
+    const mark=r.is_correct===true?'✅':r.is_correct===false?'❌':'•';
+    html+='<div class="panel"><div class="small">Q '+(i+1)+' '+mark+'</div><div>'+esc(q.prompt)+'</div>'+
+      '<div class="small" style="margin-top:6px">Your answer: <b>'+describeAnswer(q,G.answers[q.id])+'</b>'+(r.correct?(' · Correct: <b>'+esc(r.correct)+'</b>'):'')+'</div>'+
+      (r.explanation?('<div class="small" style="margin-top:6px">'+esc(r.explanation)+'</div>'):'')+'</div>';
+  });
+  const wrong=results.filter(r=>r.is_correct===false).length;
+  html+='<div class="row"><button class="btn" id="remed">'+(wrong?'Practice My Mistakes':'All correct — try harder set')+'</button> <button class="btn secondary" onclick="goHome()">Home</button></div></div>';
+  $('qwrap').innerHTML=html;
+  $('remed').onclick=onRemediate;
+  saveProgress({correct:correct,total:total,pct:pct,mistakes:JSON.stringify(G.qs.filter((q,i)=>(results[i]||{}).is_correct===false).map(q=>q.id))});
+  typeset($('qwrap'));
+}
+async function remediateGrade(){
+  const wrong=G.qs.filter((q,i)=>((G.graded[i]||{}).is_correct===false));
+  if(!wrong.length){$('qwrap').innerHTML='<div class="card"><h2>🎉 Excellent!</h2><p class="small">You got everything right. Keep it up!</p><button class="btn" onclick="goHome()">Home</button></div>';return}
+  $('qwrap').innerHTML='<div class="card"><h2>Building your remedial set…</h2><p class="small">Creating similar questions with new numbers.</p></div>';
+  const generated=[];
+  for(const q of wrong.slice(0,6)){
+    try{
+      const r=await api('/api/ai/generate-similar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,n:2})});
+      (r.questions||[]).forEach(nq=>{nq.subtopic=q.subtopic;nq.domain=q.domain;generated.push(nq)});
+    }catch(e){}
+  }
+  if(!generated.length){
+    // fall back to re-doing the original wrong ones
+    G.qs=wrong;
+  }else{
+    G.qs=generated;
+  }
+  G.i=0;G.answers={};G.graded=null;G.mode='practice';
+  $('qwrap').innerHTML='<div class="card"><h2>Remedial Practice</h2><p class="small">'+G.qs.length+' questions targeting your weak skills. Immediate feedback provided.</p><button class="btn" onclick="renderPractice()">Start</button></div>';
+}
+
+/* ---------- SAT ---------- */
+let SAT={sel:{},qs:[],i:0,answers:{},mode:'',timer:null,sec:0,graded:null,allSkills:[]};
+
+async function openSAT(){
+  ['home','grade','work','subs'].forEach(hide);show('sat');
+  if(SAT.allSkills.length){renderSatSkills();return}
+  try{
+    const topics=await api('/api/topics');
+    const skills=[];
+    Object.entries(topics).forEach(([domain,subs])=>{subs.forEach(s=>skills.push({domain:domain,id:s.id,name:s.name,count:s.count}))});
+    SAT.allSkills=skills;renderSatSkills();
+  }catch(e){$('satSkills').innerHTML='<p class="small">Could not load skills.</p>'}
+}
+function renderSatSkills(){
+  const el=$('satSkills');el.innerHTML='<p class="small">Choose skills (domains):</p>';
+  const byDomain={};
+  SAT.allSkills.forEach(s=>{(byDomain[s.domain]=byDomain[s.domain]||[]).push(s)});
+  Object.entries(byDomain).forEach(([domain,list])=>{
+    const wrap=document.createElement('div');wrap.className='panel';
+    wrap.innerHTML='<div style="font-weight:800;margin-bottom:6px">'+esc(domain)+'</div>'+
+      '<div class="chooser">'+list.map(s=>'<button class="choose" data-sid="'+s.id+'">'+esc(s.name)+' <span class="small">('+s.count+')</span></button>').join('')+'</div>';
+    el.appendChild(wrap);
+  });
+  el.querySelectorAll('[data-sid]').forEach(b=>b.addEventListener('click',()=>{
+    const id=b.dataset.sid;SAT.sel[id]=!SAT.sel[id];b.classList.toggle('active',SAT.sel[id]);updateSatSel();
+  }));
+}
+function updateSatSel(){const n=Object.values(SAT.sel).filter(Boolean).length;$('satsel').textContent=n?(n+' skill(s) selected.'):'Pick one or more skills above.'}
+async function satStart(mode){
+  const ids=Object.keys(SAT.sel).filter(k=>SAT.sel[k]);
+  if(!ids.length){alert('Pick at least one skill.');return}
+  SAT.mode=mode;SAT.graded=null;
+  $('qwrap').innerHTML='<div class="card"><h2>Loading…</h2></div>';hide('sat');show('work');
+  let qs=[];
+  for(const id of ids){
+    try{const arr=await api('/api/questions?subtopic='+id);qs=qs.concat(arr)}catch(e){}
+  }
+  // shuffle a bit
+  qs=qs.sort(()=>Math.random()-0.5);
+  if(mode==='exam')qs=qs.slice(0,22);
+  SAT.qs=qs;SAT.i=0;SAT.answers={};
+  if(mode==='practice'){renderSatPractice()}else{startSatExam()}
+}
+function renderSatPractice(){
+  const q=SAT.qs[SAT.i],wrap=$('qwrap');
+  wrap.innerHTML='<div class="card qcard">'+
+    '<div class="qhead"><span class="qnum">SAT Practice · '+(SAT.i+1)+' of '+SAT.qs.length+'</span><span class="qmeta"><span class="badge">'+esc(q.domain||'SAT')+'</span></span></div>'+
+    '<div data-body></div><div class="feedback hidden" data-fb></div>'+
+    '<div class="row"><button class="btn secondary" id="prev"'+(SAT.i<=0?' disabled':'')+'>← Prev</button>'+
+    '<button class="btn" id="submit">Submit</button>'+
+    '<button class="btn secondary" id="hint">💡 Hint</button>'+
+    '<button class="btn secondary" id="explain">📖 Explain</button>'+
+    '<button class="btn secondary" id="next"'+(SAT.i>=SAT.qs.length-1?' disabled':'')+'>Next →</button></div></div>';
+  $('prev').onclick=()=>{if(SAT.i>0){SAT.i--;renderSatPractice()}};
+  $('next').onclick=()=>{if(SAT.i<SAT.qs.length-1){SAT.i++;renderSatPractice()}};
+  $('submit').onclick=async()=>{
+    const widget=(q._widget||{}).widget||'plain';
+    const a=SAT.answers[q.id];
+    const structured=(widget!=='plain')&&a&&typeof a==='object';
+    const ans=structured?'':(a||'');
+    const fb=wrap.querySelector('[data-fb]');
+    fb.className='feedback info';fb.classList.remove('hidden');fb.textContent='Checking…';
+    try{const r=await api('/api/ai/check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'sat',question_id:q.id,student_answer:ans,question:q,widget,widget_answer:structured?a:null})});
+      if(!r.configured){fb.textContent='Answer recorded. (AI feedback not configured.)'}
+      else{const ok=r.is_correct;fb.className='feedback '+(ok===true?'ok':ok===false?'bad':'info');fb.textContent=(ok===true?'✅ Correct! ':ok===false?'❌ Not quite. ':'')+(r.explanation||'')}
+    }catch(e){fb.textContent='Could not check.'}
+  };
+  $('hint').onclick=()=>aiFeedback('hint',q,wrap);
+  $('explain').onclick=()=>aiFeedback('explain',q,wrap);
+  mountBody(q,wrap,SAT.answers,'sat');
+}
+function startSatExam(){
+  SAT.sec=25*60;
+  if(SAT.timer)clearInterval(SAT.timer);
+  SAT.timer=setInterval(()=>{SAT.sec--;updateTimer();if(SAT.sec<=0){clearInterval(SAT.timer);SAT.timer=null;finishSatExam()}},1000);
+  renderSatExam();
+}
+function updateTimer(){const el=$('satTimer');if(!el)return;const m=Math.floor(SAT.sec/60),s=SAT.sec%60;el.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s}
+function renderSatExam(){
+  const q=SAT.qs[SAT.i],wrap=$('qwrap');
+  wrap.innerHTML='<div class="card qcard">'+
+    '<div class="qhead"><span class="qnum">SAT Exam · '+(SAT.i+1)+' of '+SAT.qs.length+'</span><span class="timer" id="satTimer"></span></div>'+
+    '<div data-body></div>'+
+    '<div class="row"><button class="btn secondary" id="prev"'+(SAT.i<=0?' disabled':'')+'>← Prev</button>'+
+    '<button class="btn secondary" id="next"'+(SAT.i>=SAT.qs.length-1?' disabled':'')+'>Next →</button>'+
+    '<span style="flex:1"></span><button class="btn" id="finish">Submit Exam</button></div></div>';
+  updateTimer();
+  $('prev').onclick=()=>{if(SAT.i>0){SAT.i--;renderSatExam()}};
+  $('next').onclick=()=>{if(SAT.i<SAT.qs.length-1){SAT.i++;renderSatExam()}};
+  $('finish').onclick=finishSatExam;
+  mountBody(q,wrap,SAT.answers,'sat');
+}
+async function finishSatExam(){
+  if(SAT.timer){clearInterval(SAT.timer);SAT.timer=null}
+  $('qwrap').innerHTML='<div class="card"><h2>Marking your exam…</h2><p class="small">This may take a few seconds.</p></div>';
+  const items=SAT.qs.map(q=>answerItem(q,SAT.answers,'sat'));
+  let results=[];
+  try{const r=await api('/api/ai/grade-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items,source:'sat'})});results=r.results||[]}catch(e){}
+  SAT.graded=results;
+  const saveG=G;G={grade:'',level:'',term:'',mode:'sat-exam',qs:SAT.qs,answers:SAT.answers};
+  showResults('SAT Exam Results',results,()=>remediateSat());
+  G=saveG;
+}
+async function remediateSat(){
+  const wrong=SAT.qs.filter((q,i)=>((SAT.graded[i]||{}).is_correct===false));
+  if(!wrong.length){$('qwrap').innerHTML='<div class="card"><h2>🎉 Great job!</h2><p class="small">Everything correct. Try more skills or the timed exam.</p><button class="btn" onclick="openSAT()">More SAT</button></div>';return}
+  $('qwrap').innerHTML='<div class="card"><h2>Building your SAT revision…</h2><p class="small">Generating targeted SAT questions.</p></div>';
+  const gen=[];
+  for(const q of wrong.slice(0,6)){
+    try{const r=await api('/api/ai/generate-similar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({question:q,n:2})});(r.questions||[]).forEach(nq=>{nq.domain=q.domain;gen.push(nq)})}catch(e){}
+  }
+  SAT.qs=gen.length?gen:wrong;SAT.i=0;SAT.answers={};SAT.graded=null;
+  $('qwrap').innerHTML='<div class="card"><h2>SAT Revision</h2><p class="small">'+SAT.qs.length+' targeted questions. Immediate feedback.</p><button class="btn" onclick="renderSatPractice()">Start</button></div>';
+}
+
+/* ---------- name prompt ---------- */
+function ensureName(){if(!getName()){const n=prompt('Welcome! What is your name?');if(n&&n.trim())localStorage.setItem(NAME_KEY,n.trim())}refresWho()}
+
+refresWho();
+document.addEventListener('DOMContentLoaded',()=>{ensureName()});
+api('/api/ai/status').then(s=>{_aiReady=!!s.configured}).catch(()=>{});
+</script>
+</body>
+</html>

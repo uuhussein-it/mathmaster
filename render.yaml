@@ -20,6 +20,11 @@ services:
       # (openssl rand -hex 32), otherwise you are logged out on every restart.
       - key: SECRET_KEY
         generateValue: true
+      # Gemini powers answer checking, hints/explanations and "3 more like this"
+      # in QuestLearn. Paste your key from https://aistudio.google.com/apikey in
+      # the Render dashboard. Without it, only questions with an answer key play.
+      - key: GEMINI_API_KEY
+        sync: false
     # NOTE (persistent results, paid tier only):
     # To keep student results -- AND your admin answer fixes -- across
     # restarts, attach a disk and set the DB path to it, e.g. mount at /data:

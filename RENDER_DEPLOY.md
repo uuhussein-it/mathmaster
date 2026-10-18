@@ -7,7 +7,13 @@ included `Procfile` + `wsgi.py`).
 ## What ships in the repo
 - `wsgi.py` — production entrypoint (gunicorn target)
 - `backend/app.py`, `backend/db.py` — the Flask app and SQLite helpers
-- `frontend/index.html` — the whole UI (single static file)
+- `frontend/` — QuestLearn, the gamified student site served at `/`
+  (heroes, XP, Practice/Quiz, SAT Simulator; plain ES modules, no build step)
+- `frontend/classic/index.html` — the original MathMaster UI, served at `/classic`
+- `backend/questlearn.py` — QuestLearn's API (`/api/ql/*`): question banks,
+  Gemini answer checking, hints/explanations and similar-question generation
+- `data/answer_keys.json` — official MCQ keys from the answer-key PDFs, copied
+  into blank `correct` cells at startup (never overwrites a teacher's fix)
 - `data/sat.db` — pre-seeded database (SAT + Grades 9–12 curriculum questions)
 - `data/question_imgs/`, `data/course_imgs/`, `data/option_imgs/` — the screenshots
 - `Procfile`, `requirements.txt`, `render.yaml` — deployment config
@@ -76,3 +82,23 @@ pip install -r requirements.txt
 PORT=5000 gunicorn --chdir . wsgi:application
 # open http://127.0.0.1:5000
 ```
+
+
+## Gemini (answer checking + similar questions)
+
+Set `GEMINI_API_KEY` in Render → your service → Environment (optional:
+`GEMINI_MODEL`, default `gemini-3.1-flash-lite`). With it on, QuestLearn:
+
+- checks every answer that has no stored key, and every typed (free-response)
+  answer, by sending Gemini the question screenshot;
+- writes hints and step-by-step explanations on demand;
+- offers **"3 more like this"** after each practice question, which adds new
+  Gemini-written questions on the same skill straight into the run.
+
+Gemini's solutions are cached in the `ql_keys` table and generated questions in
+`ql_generated`, so each bank question is solved once. On the free plan the
+database resets on every deploy/restart, so attach a disk (see `render.yaml`)
+to keep that cache, student results and admin fixes.
+
+Without a key the site still works: only questions with an answer key are
+served (about 480 course MCQs plus QuestLearn's original SAT set).
