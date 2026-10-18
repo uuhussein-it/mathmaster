@@ -87,7 +87,7 @@ PORT=5000 gunicorn --chdir . wsgi:application
 ## Gemini (answer checking + similar questions)
 
 Set `GEMINI_API_KEY` in Render → your service → Environment (optional:
-`GEMINI_MODEL`, default `gemini-3.1-flash-lite`). With it on, QuestLearn:
+`GEMINI_MODEL`, default `gemini-3.5-flash-lite`). With it on, QuestLearn:
 
 - checks every answer that has no stored key, and every typed (free-response)
   answer, by sending Gemini the question screenshot;
@@ -95,8 +95,11 @@ Set `GEMINI_API_KEY` in Render → your service → Environment (optional:
 - offers **"3 more like this"** after each practice question, which adds new
   Gemini-written questions on the same skill straight into the run.
 
-Gemini's solutions are cached in the `ql_keys` table and generated questions in
-`ql_generated`, so each bank question is solved once. On the free plan the
+Everything Gemini produces is saved and reused, so the same question never
+goes to Gemini twice: solutions/hints/explanations in `ql_keys`, verdicts on
+typed answers in `ql_checks` (per question + answer), and "more like this"
+questions in `ql_generated` (pressing it again on the same question serves the
+saved ones). On the free plan the
 database resets on every deploy/restart, so attach a disk (see `render.yaml`)
 to keep that cache, student results and admin fixes.
 

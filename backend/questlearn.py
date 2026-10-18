@@ -10,6 +10,7 @@ startup), then a cached Gemini solution (table ql_keys).
 """
 import json
 import os
+import random
 import re
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -53,6 +54,11 @@ def init(app, gemini, images, ai_ready):
         CREATE TABLE IF NOT EXISTS ql_generated (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kind TEXT, qid TEXT, payload TEXT, created_at REAL);
+        CREATE INDEX IF NOT EXISTS ql_generated_qid ON ql_generated (kind, qid);
+        CREATE TABLE IF NOT EXISTS ql_checks (
+            kind TEXT NOT NULL, qid INTEGER NOT NULL, answer TEXT NOT NULL,
+            correct INTEGER, answer_text TEXT, explanation TEXT, created_at REAL,
+            PRIMARY KEY (kind, qid, answer));
     """)
     _fill_answer_keys(conn)
     conn.commit()
@@ -300,6 +306,14 @@ def check_route():
                         "hint": s.get("hint"),
                         "correct": None if answer is None else data.get("choice") == answer})
     text = str(data.get("text") or "").strip()[:300]
+    # Same typed answer to the same question -> reuse Gemini's earlier verdict.
+    norm = re.sub(r"\s+", "", text).lower()
+    conn = db.get_conn()
+    hit = conn.execute("SELECT * FROM ql_checks WHERE kind=? AND qid=? AND answer=?", (kind, qid, norm)).fetchone()
+    conn.close()
+    if hit:
+        return jsonify({"ai": _ai_ready(), "correct": bool(hit["correct"]), "answer_text": hit["answer_text"],
+                        "explanation": hit["explanation"], "saved": True})
     if not _ai_ready():
         return jsonify({"ai": False, "correct": None, "explanation": "Answer checking needs Gemini to be switched on."})
     s = solve(kind, qid)
@@ -312,8 +326,14 @@ def check_route():
     out = _gemini(prompt, timeout=45, images=_images(kind, qid))
     if not isinstance(out, dict) or not isinstance(out.get("correct"), bool):
         return jsonify({"ai": True, "correct": None, "explanation": "Gemini couldn't check this one. Try again."})
-    return jsonify({"ai": True, "correct": out["correct"], "answer_text": out.get("answer") or s.get("answer"),
-                    "explanation": out.get("explanation") or s.get("explanation")})
+    result = {"ai": True, "correct": out["correct"], "answer_text": out.get("answer") or s.get("answer"),
+              "explanation": out.get("explanation") or s.get("explanation")}
+    conn = db.get_conn()
+    conn.execute("INSERT OR REPLACE INTO ql_checks VALUES (?,?,?,?,?,?,?)",
+                 (kind, qid, norm, int(result["correct"]), result["answer_text"], result["explanation"], time.time()))
+    conn.commit()
+    conn.close()
+    return jsonify(result)
 
 
 @bp.route("/api/ql/keys", methods=["POST"])
@@ -327,22 +347,34 @@ def keys_route():
 
 
 # ----------------------------------------------------------- similar items
+def _saved_similar(tag):
+    conn = db.get_conn()
+    rows = conn.execute("SELECT id, payload FROM ql_generated WHERE kind='similar' AND qid=?", (tag,)).fetchall()
+    conn.close()
+    return [{**json.loads(r["payload"]), "id": f"ai-{r['id']}"} for r in rows]
+
+
 @bp.route("/api/ql/similar", methods=["POST"])
 def similar_route():
     """Generate new practice questions like the given one.
     Body: {ref} for a bank question, or {question: {q, options, answer}} for a text one."""
     data = request.get_json(silent=True) or {}
     n = max(1, min(int(data.get("n") or 3), 5))
+    q = data.get("question") or {}
+    tag = data.get("ref") or str(q.get("id") or "text")
+    # Questions already written for this one are reused instead of asking Gemini again.
+    saved = _saved_similar(tag)
+    if len(saved) >= n:
+        return jsonify({"ai": _ai_ready(), "questions": random.sample(saved, n), "saved": True})
     if not _ai_ready():
-        return jsonify({"ai": False, "questions": []})
+        return jsonify({"ai": False, "questions": saved})
     if data.get("ref"):
         kind, qid = _parse_ref(data["ref"])
-        source, images, tag = "the question in the image\n" + _text_block(_row(kind, qid)), _images(kind, qid), data["ref"]
+        source, images = "the question in the image\n" + _text_block(_row(kind, qid)), _images(kind, qid)
     else:
-        q = data.get("question") or {}
         opts = q.get("options") or []
         source = f"this question:\n{q.get('q', '')}\n" + "\n".join(f"{LETTERS[i]}) {o}" for i, o in enumerate(opts[:6]))
-        images, tag = [], str(q.get("id") or "text")
+        images = []
     prompt = (f"Write {n} new multiple-choice practice questions that test the same skill as {source}\n"
               "Change the numbers and context, keep the difficulty. Each must be fully self-contained "
               "text (no figures), have exactly 4 distinct options and exactly one correct option. "
