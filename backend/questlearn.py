@@ -61,6 +61,7 @@ def init(app, gemini, images, ai_ready):
             PRIMARY KEY (kind, qid, answer));
     """)
     _fill_answer_keys(conn)
+    _load_ai_seed(conn)
     conn.commit()
     conn.close()
     app.register_blueprint(bp)
@@ -80,6 +81,18 @@ def _fill_answer_keys(conn):
         key = m and keys.get(f"{m.group(1)}_s{m.group(2)}_{m.group(3)}")
         if key:
             conn.execute("UPDATE course_questions SET correct=? WHERE id=?", (key, r["id"]))
+
+
+def _load_ai_seed(conn):
+    """Load pre-computed Gemini solutions (data/ai_seed.json) so a fresh or
+    reset database never has to ask Gemini about the bank again."""
+    path = os.path.join(ROOT, "data", "ai_seed.json")
+    if not os.path.exists(path):
+        return
+    rows = json.load(open(path))
+    conn.executemany(
+        "INSERT OR IGNORE INTO ql_keys (kind, qid, answer, hint, explanation, created_at) VALUES (?,?,?,?,?,?)",
+        [(r["kind"], r["qid"], r["answer"], r.get("hint"), r.get("explanation"), r.get("at", 0)) for r in rows])
 
 
 # --------------------------------------------------------------------- bank
