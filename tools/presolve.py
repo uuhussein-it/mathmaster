@@ -1,6 +1,10 @@
-"""Run questlearn.solve() over every playable bank question into a scratch DB."""
+"""Pre-solve every playable bank question with Gemini (resumable).
+
+Usage: SAT_DB_PATH=/tmp/copy.db GEMINI_API_KEY=... W=6 MAX=1500 python3 tools/presolve.py
+Then export ql_keys rows with an explanation to data/ai_seed.json.
+"""
 import os, sys, time, json
-sys.path.insert(0, '/home/claude/mathmaster/backend')
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'backend'))
 import app, questlearn, db
 from concurrent.futures import ThreadPoolExecutor
 conn = db.get_conn()
