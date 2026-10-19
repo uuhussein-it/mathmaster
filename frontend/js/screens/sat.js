@@ -35,7 +35,7 @@ export function renderSat(app) {
     .filter((t) => t.section === section)
     .map((t) => ({ ...t, key: `sat:${t.id}`, count: t.questions.length }));
   const simCount = (section) => Math.min(SIM_SIZE[section],
-    sectionTopics(section).reduce((n, t) => n + t.questions.filter((q) => q.type !== 'free').length, 0));
+    sectionTopics(section).reduce((n, t) => n + t.questions.filter((q) => (q.type ?? 'mcq') === 'mcq').length, 0));
   const sectionSeconds = (section, count = simCount(section)) =>
     timedSeconds(count, bank.sections[section].secondsPerQuestion, profile.character);
 

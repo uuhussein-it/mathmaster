@@ -34,7 +34,8 @@ SAT_TOPICS = {  # DB topic name -> QuestLearn SAT topic id
     "Geometry and Trigonometry": "geometry",
 }
 # Free-response prompts that need drawing/plotting/tables can't be typed as a
-# short answer; they stay in the classic site's interactive widgets.
+# short answer. They're served only when data/widgets.json gives them an
+# interactive widget (table, matching, graph, parts) with its answer key.
 NEEDS_WIDGET = re.compile(
     r"\b(graph|plot|sketch|draw|table|match|shade|number line|complete|fill|label|construct|circle the|mark)\w*", re.I)
 
@@ -114,11 +115,36 @@ def _is_mcq(kind, row):
     return bool(row["is_mcq"]) if kind == "course" else bool((row["option_a"] or "").strip())
 
 
+_WIDGETS = None
+
+
+def _widgets():
+    """qid -> widget spec for course questions answered with a table, matching,
+    graph or several parts (data/widgets.json). Specs carry their own answers."""
+    global _WIDGETS
+    if _WIDGETS is None:
+        path = os.path.join(ROOT, "data", "widgets.json")
+        raw = json.load(open(path)) if os.path.exists(path) else {}
+        _WIDGETS = {int(k): v for k, v in raw.items() if v.get("widget")}
+    return _WIDGETS
+
+
 def _item(kind, row, ai, cached):
     """DB row -> QuestLearn question, or None when it can't be played here."""
+    spec = _widgets().get(row["id"]) if kind == "course" else None
+    if spec and spec["widget"] != "none":
+        body = {k: v for k, v in spec.items() if k not in ("hint", "explanation")}
+        return {"id": f"{kind}-{row['id']}", "ref": f"{kind}:{row['id']}", "type": "widget",
+                "image": _image_url(kind, row["id"]), "q": "", "options": [], "answer": None,
+                "widget": body, "hint": spec.get("hint"), "explanation": spec.get("explanation"),
+                "source": kind}
     if not _is_mcq(kind, row):
-        if not ai or (kind == "course" and NEEDS_WIDGET.search(row["prompt"] or "")):
+        # "none" + answer: checked by hand and a typed short answer fits after all.
+        typed_ok = spec and spec.get("answer")
+        if kind == "course" and NEEDS_WIDGET.search(row["prompt"] or "") and not typed_ok:
             return None
+        if not ai and not _short_answer(cached.get(row["id"])):
+            return None  # nothing can grade it
         return {"id": f"{kind}-{row['id']}", "ref": f"{kind}:{row['id']}", "type": "free",
                 "image": _image_url(kind, row["id"]), "q": "", "options": [], "answer": None,
                 "hint": None, "explanation": None, "source": kind}
@@ -176,7 +202,7 @@ def curriculum_index():
     for c in _course_meta(conn):
         topics = _course_topics(conn, c.pop("dbid"), c["code"], ai, cached)
         c["topics"] = [{"id": t["id"], "name": t["name"], "count": len(t["questions"]),
-                        "mcq": sum(q["type"] == "mcq" for q in t["questions"])} for t in topics]
+                        "mcq": sum(q["type"] != "free" for q in t["questions"])} for t in topics]
         if c["topics"]:
             courses.append(c)
     conn.close()
@@ -293,6 +319,50 @@ def solve(kind, qid):
     return result
 
 
+def _short_answer(answer):
+    """A stored free-response answer simple enough to compare typed answers against."""
+    return bool(answer) and len(answer) <= 40 and not re.search(
+        r"[;\n]|\b[a-d]\)|\([a-d]\)|,\s*\w+\s*=|\b(and|or)\b", answer)
+
+
+_SUPERS = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹", "0123456789")
+
+
+def _norm(text):
+    """Same canonical form as normalize() in frontend/js/widgets.js."""
+    t = str(text or "").lower()
+    t = re.sub(r"[−–—]", "-", t)
+    t = re.sub(r"[×·]", "*", t)
+    t = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+", lambda m: "^" + m.group(0).translate(_SUPERS), t)
+    t = re.sub(r"\s+", "", t)
+    t = re.sub(r"^([a-z]|f\([a-z]\)|y)=(?=.)", "", t)
+    return re.sub(r"\.$", "", t)
+
+
+def _number(text):
+    t = _norm(text).replace(",", "").replace("$", "")
+    m = re.match(r"^(-?)(\d+)\s+(\d+)/(\d+)$", re.sub(r"[−–]", "-", str(text or "").strip()))
+    if m:
+        return (-1 if m.group(1) else 1) * (int(m.group(2)) + int(m.group(3)) / int(m.group(4)))
+    try:
+        if re.fullmatch(r"-?\d*\.?\d+/-?\d*\.?\d+", t):
+            a, b = t.split("/")
+            return float(a) / float(b)
+        if t.endswith("%"):
+            return float(t[:-1]) / 100
+        return float(t) if re.fullmatch(r"-?\d*\.?\d+", t) else None
+    except (ValueError, ZeroDivisionError):
+        return None
+
+
+def same_answer(given, expected):
+    """True when a typed answer means the same as the stored one."""
+    a, b = _number(given), _number(expected)
+    if a is not None and b is not None:
+        return abs(a - b) <= 1e-6 * max(1, abs(b))
+    return _norm(given) != "" and _norm(given) == _norm(expected)
+
+
 def _letter_index(answer):
     return LETTERS.index(answer) if answer and answer in LETTERS else None
 
@@ -327,9 +397,13 @@ def check_route():
     if hit:
         return jsonify({"ai": _ai_ready(), "correct": bool(hit["correct"]), "answer_text": hit["answer_text"],
                         "explanation": hit["explanation"], "saved": True})
+    s = solve(kind, qid)
+    # A stored answer settles matching answers (and, without Gemini, wrong ones) with no AI call.
+    if s.get("answer") and (same_answer(text, s["answer"]) or (not _ai_ready() and _short_answer(s["answer"]))):
+        return jsonify({"ai": _ai_ready(), "correct": same_answer(text, s["answer"]), "answer_text": s["answer"],
+                        "explanation": s.get("explanation"), "saved": True})
     if not _ai_ready():
         return jsonify({"ai": False, "correct": None, "explanation": "Answer checking needs Gemini to be switched on."})
-    s = solve(kind, qid)
     prompt = (f"Grade a student's answer to the math question in the image. Accept mathematically "
               f"equivalent forms (fractions vs decimals, rearranged expressions, missing units).\n"
               f"{_text_block(_row(kind, qid))}\nReference answer (may be wrong; check it): {s.get('answer') or 'unknown'}\n"
