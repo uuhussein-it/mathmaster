@@ -485,6 +485,68 @@ kbd {
 @keyframes pulse { 50% { opacity: 0.6; } }
 @keyframes flicker { 50% { box-shadow: 0 0 26px -2px #ff7a1a; } }
 
+/* ---------- answer widgets (table / matching / graph / parts) ---------- */
+.widget-box { display: grid; gap: 16px; }
+.w-multi { display: grid; gap: 18px; }
+.w-step { display: grid; gap: 8px; }
+.w-step-num { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--gold); }
+.w-prompt { margin: 0 0 10px; font-weight: 600; }
+.w-check { justify-self: start; }
+.w-cell {
+  width: 100%; min-width: 64px; min-height: 44px; padding: 8px 10px; border-radius: 10px; font: inherit; text-align: center;
+  color: var(--text); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line-soft);
+}
+.w-cell:focus { outline: 2px solid var(--gold); outline-offset: 1px; }
+.w-cell.good { border-color: var(--good); background: rgba(95, 211, 138, 0.14); }
+.w-cell.bad { border-color: var(--bad); background: rgba(255, 107, 107, 0.12); }
+.w-table-wrap { overflow-x: auto; }
+.w-table { border-collapse: separate; border-spacing: 6px; margin: -6px; }
+.w-table th { padding: 8px 12px; border-radius: 10px; background: rgba(230, 192, 106, 0.16); color: var(--gold); font-weight: 700; }
+.w-table td { padding: 0; text-align: center; }
+.w-table td.given { padding: 8px 12px; border-radius: 10px; background: rgba(255, 255, 255, 0.04); font-weight: 600; }
+.w-table td.given.empty { background: none; }
+.w-match { display: grid; gap: 14px; }
+.w-match ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.w-right li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); }
+.w-right li.used { opacity: 0.55; }
+.w-left li {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-soft);
+}
+.w-left li.good { border-color: var(--good); }
+.w-left li.bad { border-color: var(--bad); }
+.w-left-text { flex: 1 1 220px; font-weight: 600; }
+.w-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.w-chip {
+  width: 44px; height: 44px; border-radius: 10px; font-weight: 800; cursor: pointer; color: var(--text);
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line-soft);
+}
+.w-chip:hover:not(:disabled) { border-color: var(--gold); }
+.w-chip.on { background: var(--gold); color: #1b1405; border-color: var(--gold); }
+.w-chip.on.good { background: var(--good); border-color: var(--good); color: #062612; }
+.w-chip.on.bad { background: var(--bad); border-color: var(--bad); color: #2a0606; }
+.w-chip.key { border: 2px dashed var(--good); }
+.w-chip:disabled { cursor: default; }
+.w-graph-wrap { display: grid; gap: 8px; justify-items: start; }
+.w-graph { width: min(100%, 420px); height: auto; border-radius: 14px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line-soft); cursor: crosshair; touch-action: manipulation; }
+.w-graph .grid { stroke: rgba(255, 255, 255, 0.1); stroke-width: 1; }
+.w-graph .axis { stroke: var(--muted); stroke-width: 2; }
+.w-graph .tick { fill: var(--muted); font-size: 10px; text-anchor: middle; }
+.w-graph .tick.end { text-anchor: end; }
+.w-graph .pt { fill: var(--gold); stroke: #1b1405; stroke-width: 2; }
+.w-graph .pt.good { fill: var(--good); }
+.w-graph .pt.bad { fill: var(--bad); }
+.w-graph .pt.missed { fill: none; stroke: var(--good); stroke-width: 2.5; stroke-dasharray: 3 2; }
+.w-graph .w-line { fill: none; stroke: var(--gold); stroke-width: 2.5; }
+.w-graph .w-key { stroke: var(--good); stroke-width: 2; stroke-dasharray: 6 4; }
+.w-graph-help, .w-graph-points { margin: 0; font-size: 14px; }
+.w-parts { display: grid; gap: 10px; }
+.w-part { display: grid; grid-template-columns: minmax(0, 1fr) minmax(120px, 220px); align-items: center; gap: 10px; }
+.w-part-label { font-weight: 600; }
+@media (max-width: 680px) {
+  .w-part { grid-template-columns: 1fr; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

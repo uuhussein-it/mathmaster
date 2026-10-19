@@ -7,6 +7,10 @@ import { profile, recordSession } from '../state.js';
 import { evaluate } from '../scoring.js';
 import { go } from '../router.js';
 import { reportSession } from '../data.js';
+import { answerSummary } from '../widgets.js';
+
+const correctText = (q) => (q.type === 'widget' ? answerSummary(q.widget)
+  : q.type === 'free' ? q.answerText : q.answer != null && answerLabel(q, q.answer));
 
 export function renderResults(app, r) {
   const hero = CHARACTERS[profile.character];
@@ -79,8 +83,7 @@ export function renderResults(app, r) {
           h('li.review-item', { class: q.correct ? 'good' : 'bad' },
             questionBody(q, { small: true }),
             h('p', {}, h('span.muted', {}, 'Your answer: '), q.text || (q.chosen >= 0 ? answerLabel(q, q.chosen) : '—'), ' ', h('b', {}, q.correct ? '✓' : '✗')),
-            !q.correct && (q.type === 'free' ? q.answerText : q.answer != null)
-              && h('p', {}, h('span.muted', {}, 'Correct: '), q.type === 'free' ? q.answerText : answerLabel(q, q.answer)),
+            !q.correct && correctText(q) && h('p', {}, h('span.muted', {}, 'Correct: '), correctText(q)),
             q.explanation && h('p.explanation', {}, q.explanation)))))));
 }
 

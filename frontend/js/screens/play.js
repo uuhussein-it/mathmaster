@@ -11,6 +11,7 @@ import { profile, topicMastery } from '../state.js';
 import { createScorer } from '../scoring.js';
 import { go } from '../router.js';
 import { checkAnswer, ensureSolved, fetchKeys, fetchSimilar } from '../data.js';
+import { renderWidget, emptyValue, gradeWidget, isAnswered, answerSummary, valueSummary } from '../widgets.js';
 
 export function renderPlay(app, config) {
   const { mode, questions } = config;
@@ -25,7 +26,7 @@ export function renderPlay(app, config) {
   let finished = false;
 
   // Per-question state, reset in show()
-  let q, locked, usedHint, doubleXp, eliminated, notes, checking, draft, addedSimilar;
+  let q, locked, usedHint, doubleXp, eliminated, notes, checking, draft, addedSimilar, widgetValue, widgetResult;
 
   if (deadline && hero.id === 'explorer') {
     setTimeout(() => toast(hero.passive.name, hero.passive.text, { portrait: hero.portrait }), 300);
@@ -41,6 +42,8 @@ export function renderPlay(app, config) {
     checking = false;
     draft = '';
     addedSimilar = false;
+    widgetValue = q.type === 'widget' ? emptyValue(q.widget) : null;
+    widgetResult = null;
     draw();
   }
 
@@ -51,8 +54,8 @@ export function renderPlay(app, config) {
         h('span.q-topic', {}, q.topicName),
         sourceTag(q)),
       questionBody(q),
-      q.type === 'free'
-        ? freeAnswer()
+      q.type === 'widget' ? widgetArea()
+      : q.type === 'free' ? freeAnswer()
         : h('div.options', { class: q.image ? 'letters' : '', role: 'group', 'aria-labelledby': 'q-text' }, q.options.map((opt, i) => optionButton(opt, i))),
       notes.map((n) => h(`div.note.${n.tone || 'insight'}`, {}, h('b', {}, n.title), h('p', {}, n.text))),
       checking && h('div.checking', { role: 'status' }, h('span.spinner', { 'aria-hidden': 'true' }), 'Gemini is checking your answer…'),
@@ -106,6 +109,34 @@ export function renderPlay(app, config) {
       h('button.btn.primary', { type: 'submit', disabled: locked }, 'Check')));
   }
 
+  /** Table / matching / graph / multi-part answer, graded locally from its spec. */
+  function widgetArea() {
+    const box = h('div.widget-box');
+    const fill = () => box.replaceChildren(...[
+      renderWidget(q.widget, { locked, value: widgetValue, result: widgetResult, onChange: (redraw) => redraw && fill() }),
+      !locked && h('button.btn.primary.w-check', { type: 'button', onclick: submitWidget }, 'Check answer'),
+    ].filter(Boolean));
+    fill();
+    return box;
+  }
+
+  function submitWidget() {
+    if (locked || finished) return;
+    if (!isAnswered(q.widget, widgetValue)) {
+      toast('Answer first', 'Fill in or plot your answer, then check it.', { icon: '✏️', tone: 'danger' });
+      return;
+    }
+    locked = true;
+    widgetResult = gradeWidget(q.widget, widgetValue);
+    const record = {
+      chosen: -1, text: valueSummary(q.widget, widgetValue), correct: widgetResult.correct,
+      usedHint, doubleXp, topicKey: q.topicKey, topicName: q.topicName,
+    };
+    answers[index] = record;
+    if (!practice) { next(); return; }
+    reveal(record);
+  }
+
   function optionButton(text, i) {
     let state = '';
     if (eliminated.has(i)) state = 'eliminated';
@@ -122,7 +153,8 @@ export function renderPlay(app, config) {
 
   function feedback() {
     const a = answers[index];
-    const correctLabel = q.type === 'free' ? q.answerText : q.answer != null && answerLabel(q, q.answer);
+    const correctLabel = q.type === 'widget' ? answerSummary(q.widget)
+      : q.type === 'free' ? q.answerText : q.answer != null && answerLabel(q, q.answer);
     return h('div.feedback', { class: a.correct ? 'good' : 'bad', role: 'status' },
       h('div.feedback-head', {},
         h('b', {}, a.correct ? 'Correct!' : 'Not quite'),
@@ -320,7 +352,7 @@ export function renderPlay(app, config) {
     const k = e.key.toUpperCase();
     const n = q.options.length;
     const pick = k.length === 1 && '123456'.slice(0, n).includes(k) ? Number(k) - 1 : LETTERS.slice(0, n).indexOf(k);
-    if (!locked && q.type !== 'free' && pick >= 0 && !eliminated.has(pick)) {
+    if (!locked && q.type !== 'free' && q.type !== 'widget' && pick >= 0 && !eliminated.has(pick)) {
       choose(pick, app.querySelectorAll('.option')[pick]);
     } else if (k === 'ENTER' && locked && practice) {
       e.preventDefault();
@@ -356,7 +388,7 @@ export function renderPlay(app, config) {
  * timed run is scored. Shows a short "grading" screen while it waits.
  */
 export async function resolveKeys(app, questions) {
-  const missing = questions.filter((q) => q.answer == null && q.ref && q.type !== 'free');
+  const missing = questions.filter((q) => q.answer == null && q.ref && (q.type ?? 'mcq') === 'mcq');
   if (!missing.length) return;
   mount(app, h('section.loading', {}, h('span.spinner', { 'aria-hidden': 'true' }), ' Gemini is grading your answers…'));
   try {

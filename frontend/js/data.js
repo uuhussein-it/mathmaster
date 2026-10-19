@@ -47,7 +47,7 @@ export async function fetchSimilar(q, n = 3) {
  */
 const solving = new Map();
 export function ensureSolved(q) {
-  if (!q.ref || (q.hint && q.explanation && (q.answer != null || q.type === 'free'))) return Promise.resolve(q);
+  if (!q.ref || q.type === 'widget' || (q.hint && q.explanation && (q.answer != null || q.type === 'free'))) return Promise.resolve(q);
   if (!solving.has(q.id)) {
     solving.set(q.id, post('api/ql/solve', { ref: q.ref }).then((r) => {
       if (q.answer == null && r.answer != null) q.answer = r.answer;
@@ -80,5 +80,6 @@ export function prepareQuestions(topics, { limit = Infinity, mcqOnly = false } =
       topicName: topic.name,
     };
   }));
+  // Timed quizzes can't wait on a typed-answer check, so they take MCQ and widget items only.
   return shuffle(mcqOnly ? items.filter((q) => q.type !== 'free') : items).slice(0, limit);
 }
