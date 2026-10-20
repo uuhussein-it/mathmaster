@@ -1,9 +1,16 @@
 import os
 import sqlite3
 
-DB_PATH = os.environ.get("SAT_DB_PATH") or os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "sat.db"
-)
+BUNDLED_DB = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "sat.db")
+DB_PATH = os.environ.get("SAT_DB_PATH") or BUNDLED_DB
+
+# A persistent disk (SAT_DB_PATH=/data/sat.db on Render) starts empty: copy the
+# bundled question bank there once. After that the disk copy is kept, so student
+# accounts, progress and admin edits survive redeploys.
+if DB_PATH != BUNDLED_DB and not os.path.exists(DB_PATH) and os.path.exists(BUNDLED_DB):
+    import shutil
+    os.makedirs(os.path.dirname(DB_PATH) or ".", exist_ok=True)
+    shutil.copyfile(BUNDLED_DB, DB_PATH)
 
 
 def get_conn():

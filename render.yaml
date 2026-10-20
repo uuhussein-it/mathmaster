@@ -2,7 +2,9 @@ services:
   - type: web
     name: sat-mathmaster
     runtime: python
-    plan: free
+    # Starter (not free) so the disk below can keep student accounts and
+    # progress across redeploys. Free works too, but its database resets.
+    plan: starter
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --workers 2 --threads 4 --timeout 120 --chdir . wsgi:application
     healthCheckPath: /api/courses
@@ -25,13 +27,12 @@ services:
       # the Render dashboard. Without it, only questions with an answer key play.
       - key: GEMINI_API_KEY
         sync: false
-    # NOTE (persistent results, paid tier only):
-    # To keep student results -- AND your admin answer fixes -- across
-    # restarts, attach a disk and set the DB path to it, e.g. mount at /data:
-    #   disk:
-    #     name: data
-    #     mountPath: /data
-    #     sizeGB: 1
-    #   - key: SAT_DB_PATH
-    #     value: /data/sat.db
-    # backend/db.py already reads SAT_DB_PATH.
+      # The database lives on the disk below, so accounts, progress, feedback
+      # and admin edits survive redeploys. The first boot copies the bundled
+      # question bank onto the disk.
+      - key: SAT_DB_PATH
+        value: /data/sat.db
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 1
