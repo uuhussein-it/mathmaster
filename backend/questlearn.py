@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Blueprint, abort, g, jsonify, request
 
 import db
+import userdb
 
 bp = Blueprint("questlearn", __name__)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -56,6 +57,16 @@ def init(app, gemini, images, ai_ready, is_admin):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kind TEXT, qid TEXT, payload TEXT, created_at REAL);
         CREATE INDEX IF NOT EXISTS ql_generated_qid ON ql_generated (kind, qid);
+        CREATE TABLE IF NOT EXISTS ql_checks (
+            kind TEXT NOT NULL, qid INTEGER NOT NULL, answer TEXT NOT NULL,
+            correct INTEGER, answer_text TEXT, explanation TEXT, created_at REAL,
+            PRIMARY KEY (kind, qid, answer));
+    """)
+    _fill_answer_keys(conn)
+    _load_ai_seed(conn)
+    conn.commit()
+    # Teacher-made data lives in the user database (Neon when DATABASE_URL is set).
+    userdb.create_tables("""
         CREATE TABLE IF NOT EXISTS ql_hidden (
             kind TEXT NOT NULL, qid INTEGER NOT NULL, PRIMARY KEY (kind, qid));
         CREATE TABLE IF NOT EXISTS ql_widget_edits (
@@ -68,13 +79,11 @@ def init(app, gemini, images, ai_ready, is_admin):
         CREATE TABLE IF NOT EXISTS ql_rechecks (
             ref TEXT NOT NULL, answer TEXT NOT NULL, verdict TEXT, created_at REAL,
             PRIMARY KEY (ref, answer));
-        CREATE TABLE IF NOT EXISTS ql_checks (
-            kind TEXT NOT NULL, qid INTEGER NOT NULL, answer TEXT NOT NULL,
-            correct INTEGER, answer_text TEXT, explanation TEXT, created_at REAL,
-            PRIMARY KEY (kind, qid, answer));
+        CREATE TABLE IF NOT EXISTS ql_answer_edits (
+            kind TEXT NOT NULL, qid INTEGER NOT NULL, field TEXT NOT NULL, value TEXT,
+            PRIMARY KEY (kind, qid, field));
     """)
-    _fill_answer_keys(conn)
-    _load_ai_seed(conn)
+    _apply_answer_edits(conn)
     conn.commit()
     conn.close()
     app.register_blueprint(bp)
@@ -94,6 +103,33 @@ def _fill_answer_keys(conn):
         key = m and keys.get(f"{m.group(1)}_s{m.group(2)}_{m.group(3)}")
         if key:
             conn.execute("UPDATE course_questions SET correct=? WHERE id=?", (key, r["id"]))
+
+
+ANSWER_FIELDS = ("answer", "answer_text", "hint", "explanation")
+
+
+def _write_answer_edit(conn, kind, qid, field, value):
+    """Apply a teacher's answer edit to the bundled bank (SQLite)."""
+    table = "course_questions" if kind == "course" else "questions"
+    if field == "answer":
+        conn.execute(f"UPDATE {table} SET correct=? WHERE id=?", (value, qid))
+        conn.execute("UPDATE ql_keys SET answer=? WHERE kind=? AND qid=?", (value, kind, qid))
+    elif field == "answer_text":
+        conn.execute("INSERT INTO ql_keys (kind, qid, answer, created_at) VALUES (?,?,?,?) "
+                     "ON CONFLICT(kind, qid) DO UPDATE SET answer=excluded.answer", (kind, qid, value, time.time()))
+        conn.execute("DELETE FROM ql_checks WHERE kind=? AND qid=?", (kind, qid))  # old verdicts are stale
+    else:
+        conn.execute(f"UPDATE ql_keys SET {field}=? WHERE kind=? AND qid=?", (value, kind, qid))
+
+
+def _apply_answer_edits(conn):
+    """A deploy brings a fresh copy of the bank: replay the saved answer edits onto it."""
+    users = userdb.connect()
+    edits = users.execute("SELECT kind, qid, field, value FROM ql_answer_edits").fetchall()
+    users.close()
+    for e in edits:
+        if e["field"] in ANSWER_FIELDS:
+            _write_answer_edit(conn, e["kind"], e["qid"], e["field"], e["value"])
 
 
 def _load_ai_seed(conn):
@@ -144,7 +180,7 @@ def _widgets():
 def _admin_state():
     """Hidden questions and admin-edited widget specs, read once per request."""
     if "ql_admin" not in g:
-        conn = db.get_conn()
+        conn = userdb.connect()
         hidden = {(r["kind"], r["qid"]) for r in conn.execute("SELECT kind, qid FROM ql_hidden")}
         edits = {r["qid"]: json.loads(r["spec"]) for r in conn.execute("SELECT qid, spec FROM ql_widget_edits")}
         conn.close()
@@ -281,7 +317,7 @@ def _custom_item(r):
 
 def custom_items(cid, admin=False):
     """topic id -> teacher questions for one course (admins also get typed-answer keys)."""
-    conn = db.get_conn()
+    conn = userdb.connect()
     rows = conn.execute("SELECT * FROM ql_custom WHERE course=? ORDER BY id", (cid,)).fetchall()
     conn.close()
     out = {}
@@ -294,7 +330,7 @@ def custom_items(cid, admin=False):
 
 
 def custom_row(cid):
-    conn = db.get_conn()
+    conn = userdb.connect()
     row = conn.execute("SELECT * FROM ql_custom WHERE id=?", (cid,)).fetchone()
     conn.close()
     if not row:
@@ -601,7 +637,7 @@ def recheck(ref, answer, argument):
     (with their reasoning). The verdict is saved per (question, answer)."""
     kind, qid = _parse_ref(ref)
     norm = re.sub(r"\s+", "", str(answer)).lower()[:300]
-    conn = db.get_conn()
+    conn = userdb.connect()
     hit = conn.execute("SELECT verdict FROM ql_rechecks WHERE ref=? AND answer=?", (ref, norm)).fetchone()
     conn.close()
     if hit:
@@ -631,8 +667,9 @@ def recheck(ref, answer, argument):
         return {"ai": True, "correct": None, "explanation": "AI couldn't check this one, so your teacher will review it."}
     verdict = {"ai": True, "correct": out["correct"], "answer": out.get("answer"),
                "key_wrong": bool(out.get("key_wrong")), "explanation": out.get("explanation")}
-    conn = db.get_conn()
-    conn.execute("INSERT OR REPLACE INTO ql_rechecks VALUES (?,?,?,?)", (ref, norm, json.dumps(verdict), time.time()))
+    conn = userdb.connect()
+    conn.execute("INSERT INTO ql_rechecks VALUES (?,?,?,?) ON CONFLICT (ref, answer) DO UPDATE SET "
+                 "verdict=excluded.verdict, created_at=excluded.created_at", (ref, norm, json.dumps(verdict), time.time()))
     conn.commit()
     conn.close()
     return verdict
@@ -654,40 +691,48 @@ def admin_item(ref):
     kind, qid = _parse_ref(ref.replace("-", ":"))
     if kind == "custom":
         abort(400, "use /api/admin/ql/custom")
-    row = _row(kind, qid)
-    table = "course_questions" if kind == "course" else "questions"
-    conn = db.get_conn()
+    _row(kind, qid)  # 404 for an unknown question
+    users = userdb.connect()
     if request.method == "DELETE":
-        conn.execute("INSERT OR IGNORE INTO ql_hidden VALUES (?,?)", (kind, qid))
+        users.execute("INSERT INTO ql_hidden VALUES (?,?) ON CONFLICT DO NOTHING", (kind, qid))
     elif request.method == "PUT":
         data = request.get_json(silent=True) or {}
         if data.get("restore"):
-            conn.execute("DELETE FROM ql_hidden WHERE kind=? AND qid=?", (kind, qid))
+            users.execute("DELETE FROM ql_hidden WHERE kind=? AND qid=?", (kind, qid))
+        edits = {}
         if data.get("answer"):
-            letter = str(data["answer"]).strip().upper()[:1]
-            if letter not in LETTERS:
-                conn.close()
+            edits["answer"] = str(data["answer"]).strip().upper()[:1]
+            if edits["answer"] not in LETTERS:
+                users.close()
                 abort(400, "answer must be a letter A-F")
-            conn.execute(f"UPDATE {table} SET correct=? WHERE id=?", (letter, qid))
-            conn.execute("UPDATE ql_keys SET answer=? WHERE kind=? AND qid=?", (letter, kind, qid))
         if data.get("answer_text"):
-            conn.execute("INSERT INTO ql_keys (kind, qid, answer, created_at) VALUES (?,?,?,?) "
-                         "ON CONFLICT(kind, qid) DO UPDATE SET answer=excluded.answer",
-                         (kind, qid, str(data["answer_text"]).strip()[:300], time.time()))
-            conn.execute("DELETE FROM ql_checks WHERE kind=? AND qid=?", (kind, qid))  # old verdicts are stale
+            edits["answer_text"] = str(data["answer_text"]).strip()[:300]
         if isinstance(data.get("widget"), dict) and kind == "course":
             spec = data["widget"]
             if spec.get("widget") not in ("table", "matching", "graph", "parts", "multi"):
-                conn.close()
+                users.close()
                 abort(400, "unknown widget type")
-            conn.execute("INSERT OR REPLACE INTO ql_widget_edits VALUES (?,?)", (qid, json.dumps(spec)))
+            users.execute("INSERT INTO ql_widget_edits VALUES (?,?) ON CONFLICT (qid) DO UPDATE SET spec=excluded.spec",
+                          (qid, json.dumps(spec)))
         for field in ("hint", "explanation"):
             if field in data:
-                conn.execute(f"UPDATE ql_keys SET {field}=? WHERE kind=? AND qid=?", (data[field] or None, kind, qid))
-        conn.execute("DELETE FROM ql_rechecks WHERE ref=?", (f"{kind}:{qid}",))
-    conn.commit()
+                edits[field] = data[field] or None
+        # Saved in the user database (so they outlive a deploy), then applied to the bank.
+        for field, value in edits.items():
+            users.execute("INSERT INTO ql_answer_edits VALUES (?,?,?,?) ON CONFLICT (kind, qid, field) "
+                          "DO UPDATE SET value=excluded.value", (kind, qid, field, value))
+        users.execute("DELETE FROM ql_rechecks WHERE ref=?", (f"{kind}:{qid}",))
+        users.commit()  # before touching the bank: without Postgres both are the same SQLite file
+        bank = db.get_conn()
+        for field, value in edits.items():
+            _write_answer_edit(bank, kind, qid, field, value)
+        bank.commit()
+        bank.close()
+    users.commit()
+    hidden = users.execute("SELECT 1 FROM ql_hidden WHERE kind=? AND qid=?", (kind, qid)).fetchone() is not None
+    users.close()
+    conn = db.get_conn()
     key = conn.execute("SELECT * FROM ql_keys WHERE kind=? AND qid=?", (kind, qid)).fetchone()
-    hidden = conn.execute("SELECT 1 FROM ql_hidden WHERE kind=? AND qid=?", (kind, qid)).fetchone() is not None
     conn.close()
     g.pop("ql_admin", None)
     row = _row(kind, qid)
@@ -747,20 +792,20 @@ def admin_custom_create():
     course, topic = str(data.get("course") or ""), str(data.get("topic") or "")
     if not re.fullmatch(r"c\d+", course) or not re.fullmatch(r"t\d+", topic):
         abort(400, "choose a course and topic")
-    conn = db.get_conn()
-    cur = conn.execute("INSERT INTO ql_custom (course, topic, type, prompt, image, options, answer, widget, hint, "
+    conn = userdb.connect()
+    new_id = userdb.insert(conn, "INSERT INTO ql_custom (course, topic, type, prompt, image, options, answer, widget, hint, "
                        "explanation, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                        (course, topic, *_custom_fields(data), time.time()))
     conn.commit()
     conn.close()
-    return jsonify({"ok": True, "item": _custom_item(custom_row(cur.lastrowid))})
+    return jsonify({"ok": True, "item": _custom_item(custom_row(new_id))})
 
 
 @bp.route("/api/admin/ql/custom/<int:cid>", methods=["GET", "PUT", "DELETE"])
 def admin_custom(cid):
     _require_admin()
     row = custom_row(cid)
-    conn = db.get_conn()
+    conn = userdb.connect()
     if request.method == "DELETE":
         conn.execute("DELETE FROM ql_custom WHERE id=?", (cid,))
         conn.commit()

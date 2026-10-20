@@ -2,9 +2,7 @@ services:
   - type: web
     name: sat-mathmaster
     runtime: python
-    # Starter (not free) so the disk below can keep student accounts and
-    # progress across redeploys. Free works too, but its database resets.
-    plan: starter
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn --workers 2 --threads 4 --timeout 120 --chdir . wsgi:application
     healthCheckPath: /api/courses
@@ -27,12 +25,9 @@ services:
       # the Render dashboard. Without it, only questions with an answer key play.
       - key: GEMINI_API_KEY
         sync: false
-      # The database lives on the disk below, so accounts, progress, feedback
-      # and admin edits survive redeploys. The first boot copies the bundled
-      # question bank onto the disk.
-      - key: SAT_DB_PATH
-        value: /data/sat.db
-    disk:
-      name: data
-      mountPath: /data
-      sizeGB: 1
+      # Student accounts, progress, the school list, feedback and admin edits
+      # are saved in this Postgres database so they survive redeploys. Paste the
+      # connection string of a free Neon database (https://neon.tech). Without
+      # it they are kept in SQLite, which the free plan resets on every deploy.
+      - key: DATABASE_URL
+        sync: false

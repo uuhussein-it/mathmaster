@@ -16,7 +16,7 @@ import time
 from flask import Blueprint, abort, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
-import db
+import userdb
 
 bp = Blueprint("accounts", __name__)
 TRACK_NAMES = {"asp": "ASP", "advanced": "Advanced", "general": "General"}
@@ -35,8 +35,7 @@ _is_admin = _recheck = None
 def init(app, is_admin, recheck):
     global _is_admin, _recheck
     _is_admin, _recheck = is_admin, recheck
-    conn = db.get_conn()
-    conn.executescript("""
+    userdb.create_tables("""
         CREATE TABLE IF NOT EXISTS ql_students (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT NOT NULL UNIQUE COLLATE NOCASE,
@@ -59,8 +58,6 @@ def init(app, is_admin, recheck):
             answer TEXT, ai_verdict TEXT,
             created_at REAL, resolved INTEGER NOT NULL DEFAULT 0);
     """)
-    conn.commit()
-    conn.close()
     app.register_blueprint(bp)
 
 
@@ -88,7 +85,7 @@ def current_student():
     sid = session.get("student_id")
     if not sid:
         return None
-    conn = db.get_conn()
+    conn = userdb.connect()
     row = conn.execute("SELECT * FROM ql_students WHERE id=?", (sid,)).fetchone()
     if row:
         conn.execute("UPDATE ql_students SET last_seen=? WHERE id=?", (time.time(), sid))
@@ -135,7 +132,7 @@ def check_email():
     email = str(_body().get("email") or "").strip().lower()
     if not EMAIL.match(email):
         abort(400, "Enter a valid email address.")
-    conn = db.get_conn()
+    conn = userdb.connect()
     exists = conn.execute("SELECT 1 FROM ql_students WHERE email=?", (email,)).fetchone() is not None
     used, entry = _roster_entry(conn, email)
     conn.close()
@@ -160,7 +157,7 @@ def signup():
     m = EMAIL.match(email)
     if not m:
         abort(400, "Enter a valid email address.")
-    conn = db.get_conn()
+    conn = userdb.connect()
     used, entry = _roster_entry(conn, email)
     if used and not entry:
         conn.close()
@@ -180,11 +177,10 @@ def signup():
         abort(409, "This email already has an account. Log in instead.")
     now = time.time()
     # The roster's grade is only a starting point: students still choose their own level.
-    cur = conn.execute(
-        "INSERT INTO ql_students (email, name, pw_hash, grade, profile, created_at, last_seen) VALUES (?,?,?,?,?,?,?)",
+    sid = userdb.insert(
+        conn, "INSERT INTO ql_students (email, name, pw_hash, grade, profile, created_at, last_seen) VALUES (?,?,?,?,?,?,?)",
         (email, name, generate_password_hash(password), entry["grade"] if entry else None, "{}", now, now))
     conn.commit()
-    sid = cur.lastrowid
     row = conn.execute("SELECT * FROM ql_students WHERE id=?", (sid,)).fetchone()
     conn.close()
     session["student_id"] = sid
@@ -196,7 +192,7 @@ def signup():
 def login():
     data = _body()
     email = str(data.get("email") or "").strip().lower()
-    conn = db.get_conn()
+    conn = userdb.connect()
     row = conn.execute("SELECT * FROM ql_students WHERE email=?", (email,)).fetchone()
     conn.close()
     if not row or not check_password_hash(row["pw_hash"], str(data.get("password") or "")):
@@ -231,7 +227,7 @@ def update_me():
     name = re.sub(r"\s+", " ", str(data.get("name") or row["name"])).strip()[:40] or row["name"]
     score = max(0, int(profile.get("score") or 0))
     level = max(1, int(profile.get("level") or 1))
-    conn = db.get_conn()
+    conn = userdb.connect()
     conn.execute("UPDATE ql_students SET name=?, grade=?, track=?, profile=?, score=?, level=? WHERE id=?",
                  (name, grade, track, json.dumps(profile)[:200_000], score, level, row["id"]))
     conn.commit()
@@ -244,7 +240,7 @@ def update_me():
 @bp.route("/api/groups")
 def groups():
     """Every group with how many students are in it and online now."""
-    conn = db.get_conn()
+    conn = userdb.connect()
     rows = conn.execute("SELECT grade, track, last_seen FROM ql_students WHERE grade IS NOT NULL").fetchall()
     conn.close()
     now, out = time.time(), {}
@@ -267,7 +263,7 @@ def group(gid):
     if not info:
         abort(404)
     current_student()  # counts as activity
-    conn = db.get_conn()
+    conn = userdb.connect()
     rows = conn.execute("SELECT * FROM ql_students WHERE grade=? AND track=? ORDER BY score DESC, name",
                         (info["grade"], info["track"])).fetchall()
     conn.close()
@@ -294,22 +290,22 @@ def feedback():
     if not message and not data.get("recheck"):
         abort(400, "Write a short message.")
     verdict = _recheck(ref, answer, message) if data.get("recheck") and ref and answer else None
-    conn = db.get_conn()
-    cur = conn.execute(
-        "INSERT INTO ql_feedback (student_id, student_name, ref, category, message, answer, ai_verdict, created_at)"
+    conn = userdb.connect()
+    fid = userdb.insert(
+        conn, "INSERT INTO ql_feedback (student_id, student_name, ref, category, message, answer, ai_verdict, created_at)"
         " VALUES (?,?,?,?,?,?,?,?)",
         (row["id"] if row else None, row["name"] if row else (str(data.get("name") or "")[:40] or None),
          ref, category, message, answer, json.dumps(verdict) if verdict else None, time.time()))
     conn.commit()
     conn.close()
-    return jsonify({"ok": True, "id": cur.lastrowid, "verdict": verdict})
+    return jsonify({"ok": True, "id": fid, "verdict": verdict})
 
 
 # ----------------------------------------------------------------------- admin
 @bp.route("/api/admin/students")
 def admin_students():
     _require_admin()
-    conn = db.get_conn()
+    conn = userdb.connect()
     rows = conn.execute("SELECT * FROM ql_students ORDER BY grade, track, score DESC").fetchall()
     conn.close()
     out = []
@@ -325,7 +321,7 @@ def admin_student(sid):
     """PUT {hidden} hides/shows on the leaderboard, {password} resets it,
     {grade, track} moves groups. DELETE removes the account."""
     _require_admin()
-    conn = db.get_conn()
+    conn = userdb.connect()
     if not conn.execute("SELECT 1 FROM ql_students WHERE id=?", (sid,)).fetchone():
         conn.close()
         abort(404)
@@ -360,7 +356,7 @@ def admin_roster():
     header name (Email, Full Name English, Section, Cluster, Students ID); the
     grade comes from a Grade column or a sheet named like G09."""
     _require_admin()
-    conn = db.get_conn()
+    conn = userdb.connect()
     if request.method == "POST":
         f = request.files.get("file")
         if not f:
@@ -375,7 +371,11 @@ def admin_roster():
             conn.close()
             abort(400, "No students with an email column were found.")
         conn.execute("DELETE FROM ql_roster")
-        conn.executemany("INSERT OR REPLACE INTO ql_roster VALUES (?,?,?,?,?,?,?,?)", rows)
+        conn.executemany(
+            "INSERT INTO ql_roster (email, student_no, name, name_ar, grade, section, cluster, track) "
+            "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT (email) DO UPDATE SET student_no=excluded.student_no, "
+            "name=excluded.name, name_ar=excluded.name_ar, grade=excluded.grade, section=excluded.section, "
+            "cluster=excluded.cluster, track=excluded.track", rows)
         conn.commit()
     counts = {r["grade"]: r["n"] for r in conn.execute("SELECT grade, COUNT(*) AS n FROM ql_roster GROUP BY grade")}
     total = sum(counts.values())
@@ -418,7 +418,7 @@ def _parse_roster(filename, data):
 @bp.route("/api/admin/feedback")
 def admin_feedback():
     _require_admin()
-    conn = db.get_conn()
+    conn = userdb.connect()
     rows = conn.execute("SELECT * FROM ql_feedback ORDER BY resolved, id DESC LIMIT 500").fetchall()
     conn.close()
     return jsonify({"feedback": [{**dict(r), "ai_verdict": json.loads(r["ai_verdict"]) if r["ai_verdict"] else None}
@@ -428,7 +428,7 @@ def admin_feedback():
 @bp.route("/api/admin/feedback/<int:fid>", methods=["PUT"])
 def admin_feedback_resolve(fid):
     _require_admin()
-    conn = db.get_conn()
+    conn = userdb.connect()
     conn.execute("UPDATE ql_feedback SET resolved=? WHERE id=?", (int(bool(_body().get("resolved", True))), fid))
     conn.commit()
     conn.close()
