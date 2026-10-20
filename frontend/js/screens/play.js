@@ -11,6 +11,7 @@ import { profile, topicMastery } from '../state.js';
 import { createScorer } from '../scoring.js';
 import { go } from '../router.js';
 import { checkAnswer, ensureSolved, fetchKeys, fetchSimilar } from '../data.js';
+import { openFeedback } from '../feedback.js';
 import { renderWidget, emptyValue, gradeWidget, isAnswered, answerSummary, valueSummary } from '../widgets.js';
 
 export function renderPlay(app, config) {
@@ -166,6 +167,9 @@ export function renderPlay(app, config) {
       h('div.feedback-actions', {},
         config.ai && h('button.btn.ghost.similar-btn', { onclick: addSimilar, disabled: addedSimilar },
           addedSimilar ? '✨ Added to this run' : '✨ 3 more like this'),
+        q.ref && h('button.btn.ghost.report-btn', {
+          onclick: () => openFeedback({ q, answer: a.text || (a.chosen >= 0 ? answerLabel(q, a.chosen) : ''), wrong: !a.correct }),
+        }, a.correct ? '⚑ Report a problem' : '⚑ I think I’m right'),
         h('span.spacer'),
         h('button.btn.primary.next-btn', { onclick: next }, index + 1 < questions.length ? 'Next question →' : 'See results →')));
   }

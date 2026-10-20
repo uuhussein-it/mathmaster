@@ -5,16 +5,17 @@ import { h, mount } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
 import { profile, chooseHero } from '../state.js';
 import { go } from '../router.js';
+import { account } from '../account.js';
 
 export function renderSelect(app) {
   let chosen = profile.character || null;
-  const nameInput = h('input#hero-name', { type: 'text', maxlength: 20, placeholder: 'Your name', autocomplete: 'nickname', value: profile.name || '' });
+  const nameInput = h('input#hero-name', { type: 'text', maxlength: 20, placeholder: 'Your name', autocomplete: 'nickname', value: profile.name || account.student?.name || '' });
   const startBtn = h('button.btn.primary.lg', { disabled: !chosen, onclick: start }, 'Begin your quest');
 
   function start() {
     if (!chosen) return;
     chooseHero(chosen, nameInput.value);
-    go('hub');
+    go(account.student?.group ? 'hub' : 'level');
   }
 
   const cards = Object.values(CHARACTERS).map((c) => {

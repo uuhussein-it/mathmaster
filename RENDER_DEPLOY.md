@@ -105,3 +105,11 @@ to keep that cache, student results and admin fixes.
 
 Without a key the site still works: only questions with an answer key are
 served (about 480 course MCQs plus QuestLearn's original SAT set).
+
+## Student accounts, groups and the admin page
+
+- Students sign in at `/` with their school email and create a password on their first visit, then pick a hero and their level (grade + track). That puts them in a group such as "Grade 11 · Advanced", whose play area and leaderboard open first.
+- Teachers sign in at `/#/admin` with `TEACHER_USERNAME` / `ADMIN_PASSWORD`. The admin page can fix answers, remove questions, add questions of any type (multiple choice, short answer, table, matching, graph, multi-part), remove students from the leaderboard, reset passwords, read feedback and upload the school's student list.
+- **School student list:** upload the Excel file on the admin page (School list tab). After that, only emails on the list can create an account. It is not stored in the repository because it holds students' personal data.
+- Optional `SCHOOL_EMAIL_DOMAIN` (e.g. `actvet.gov.ae`): restricts sign-ups to that domain while no list is uploaded.
+- **Keep the data:** accounts, uploaded lists, feedback and admin edits live in the SQLite database. On the free plan it is wiped on every deploy or restart, so attach a disk and set `SAT_DB_PATH` (see the note in render.yaml).

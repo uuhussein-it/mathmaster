@@ -15,7 +15,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Blueprint, abort, jsonify, request
+from flask import Blueprint, abort, g, jsonify, request
 
 import db
 
@@ -40,12 +40,12 @@ NEEDS_WIDGET = re.compile(
     r"\b(graph|plot|sketch|draw|table|match|shade|number line|complete|fill|label|construct|circle the|mark)\w*", re.I)
 
 # Hooks provided by app.py (avoids a circular import).
-_gemini = _images = _ai_ready = None
+_gemini = _images = _ai_ready = _is_admin = None
 
 
-def init(app, gemini, images, ai_ready):
-    global _gemini, _images, _ai_ready
-    _gemini, _images, _ai_ready = gemini, images, ai_ready
+def init(app, gemini, images, ai_ready, is_admin):
+    global _gemini, _images, _ai_ready, _is_admin
+    _gemini, _images, _ai_ready, _is_admin = gemini, images, ai_ready, is_admin
     conn = db.get_conn()
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS ql_keys (
@@ -56,6 +56,18 @@ def init(app, gemini, images, ai_ready):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kind TEXT, qid TEXT, payload TEXT, created_at REAL);
         CREATE INDEX IF NOT EXISTS ql_generated_qid ON ql_generated (kind, qid);
+        CREATE TABLE IF NOT EXISTS ql_hidden (
+            kind TEXT NOT NULL, qid INTEGER NOT NULL, PRIMARY KEY (kind, qid));
+        CREATE TABLE IF NOT EXISTS ql_widget_edits (
+            qid INTEGER PRIMARY KEY, spec TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS ql_custom (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            course TEXT NOT NULL, topic TEXT NOT NULL, type TEXT NOT NULL,
+            prompt TEXT, image TEXT, options TEXT, answer TEXT, widget TEXT,
+            hint TEXT, explanation TEXT, created_at REAL);
+        CREATE TABLE IF NOT EXISTS ql_rechecks (
+            ref TEXT NOT NULL, answer TEXT NOT NULL, verdict TEXT, created_at REAL,
+            PRIMARY KEY (ref, answer));
         CREATE TABLE IF NOT EXISTS ql_checks (
             kind TEXT NOT NULL, qid INTEGER NOT NULL, answer TEXT NOT NULL,
             correct INTEGER, answer_text TEXT, explanation TEXT, created_at REAL,
@@ -129,9 +141,36 @@ def _widgets():
     return _WIDGETS
 
 
-def _item(kind, row, ai, cached):
-    """DB row -> QuestLearn question, or None when it can't be played here."""
-    spec = _widgets().get(row["id"]) if kind == "course" else None
+def _admin_state():
+    """Hidden questions and admin-edited widget specs, read once per request."""
+    if "ql_admin" not in g:
+        conn = db.get_conn()
+        hidden = {(r["kind"], r["qid"]) for r in conn.execute("SELECT kind, qid FROM ql_hidden")}
+        edits = {r["qid"]: json.loads(r["spec"]) for r in conn.execute("SELECT qid, spec FROM ql_widget_edits")}
+        conn.close()
+        g.ql_admin = (hidden, edits)
+    return g.ql_admin
+
+
+def widget_spec(qid):
+    """The widget spec for a course question: an admin's edit wins over widgets.json."""
+    return _admin_state()[1].get(qid) or _widgets().get(qid)
+
+
+def _item(kind, row, ai, cached, admin=False):
+    """DB row -> QuestLearn question, or None when it can't be played here.
+    With admin=True, hidden questions are returned too (flagged `hidden`)."""
+    hidden = (kind, row["id"]) in _admin_state()[0]
+    if hidden and not admin:
+        return None
+    item = _build_item(kind, row, ai, cached)
+    if item and admin:
+        item["hidden"] = hidden
+    return item
+
+
+def _build_item(kind, row, ai, cached):
+    spec = widget_spec(row["id"]) if kind == "course" else None
     if spec and spec["widget"] != "none":
         body = {k: v for k, v in spec.items() if k not in ("hint", "explanation")}
         return {"id": f"{kind}-{row['id']}", "ref": f"{kind}:{row['id']}", "type": "widget",
@@ -179,16 +218,18 @@ def _topic_names():
     return json.load(open(path)) if os.path.exists(path) else {}
 
 
-def _course_topics(conn, course_id, code, ai, cached):
+def _course_topics(conn, course_id, code, ai, cached, admin=False, cid=None):
     names = _topic_names()
+    custom = custom_items(cid, admin) if cid else {}
     topics = []
     for t in conn.execute("SELECT id, topic_no, name FROM course_topics WHERE course_id=? ORDER BY topic_no",
                           (course_id,)).fetchall():
         rows = conn.execute(
             """SELECT q.* FROM course_questions q JOIN course_subtopics s ON s.id=q.subtopic_id
                WHERE s.topic_id=? ORDER BY s.ref, q.number""", (t["id"],)).fetchall()
-        qs = [i for i in (_item("course", r, ai, cached) for r in rows) if i]
-        if qs:
+        qs = [i for i in (_item("course", r, ai, cached, admin) for r in rows) if i]
+        qs += custom.get(f"t{t['topic_no']}", [])
+        if qs or admin:
             name = names.get(f"{code}_t{t['topic_no']}") or t["name"]
             topics.append({"id": f"t{t['topic_no']}", "name": name, "questions": qs})
     return topics
@@ -200,7 +241,7 @@ def curriculum_index():
     conn = db.get_conn()
     courses = []
     for c in _course_meta(conn):
-        topics = _course_topics(conn, c.pop("dbid"), c["code"], ai, cached)
+        topics = _course_topics(conn, c.pop("dbid"), c["code"], ai, cached, cid=c["id"])
         c["topics"] = [{"id": t["id"], "name": t["name"], "count": len(t["questions"]),
                         "mcq": sum(q["type"] != "free" for q in t["questions"])} for t in topics]
         if c["topics"]:
@@ -217,9 +258,57 @@ def curriculum_course(cid):
     if not meta:
         conn.close()
         abort(404)
-    meta["topics"] = _course_topics(conn, meta.pop("dbid"), meta["code"], _ai_ready(), _cached_keys("course"))
+    admin = request.args.get("admin") == "1" and _is_admin()
+    meta["topics"] = _course_topics(conn, meta.pop("dbid"), meta["code"], _ai_ready(), _cached_keys("course"),
+                                    admin=admin, cid=cid)
     conn.close()
     return jsonify(meta)
+
+
+# --------------------------------------------------------- teacher questions
+def _custom_item(r):
+    """A teacher-written question (table ql_custom) in QuestLearn's format."""
+    item = {"id": f"custom-{r['id']}", "ref": f"custom:{r['id']}", "type": r["type"], "q": r["prompt"] or "",
+            "image": f"api/ql/custom-img/{r['id']}" if r["image"] else None,
+            "options": json.loads(r["options"] or "[]"), "answer": None,
+            "hint": r["hint"], "explanation": r["explanation"], "source": "teacher"}
+    if r["type"] == "mcq":
+        item["answer"] = int(r["answer"]) if str(r["answer"] or "").isdigit() else None
+    elif r["type"] == "widget":
+        item["widget"] = json.loads(r["widget"] or "{}")
+    return item
+
+
+def custom_items(cid, admin=False):
+    """topic id -> teacher questions for one course (admins also get typed-answer keys)."""
+    conn = db.get_conn()
+    rows = conn.execute("SELECT * FROM ql_custom WHERE course=? ORDER BY id", (cid,)).fetchall()
+    conn.close()
+    out = {}
+    for r in rows:
+        item = _custom_item(r)
+        if admin and r["type"] == "free":
+            item["answer_text"] = r["answer"]
+        out.setdefault(r["topic"], []).append(item)
+    return out
+
+
+def custom_row(cid):
+    conn = db.get_conn()
+    row = conn.execute("SELECT * FROM ql_custom WHERE id=?", (cid,)).fetchone()
+    conn.close()
+    if not row:
+        abort(404)
+    return row
+
+
+@bp.route("/api/ql/custom-img/<int:cid>")
+def custom_image(cid):
+    import base64
+    m = re.match(r"data:(image/[\w+.-]+);base64,(.+)$", custom_row(cid)["image"] or "", re.S)
+    if not m:
+        abort(404)
+    return base64.b64decode(m.group(2)), 200, {"Content-Type": m.group(1), "Cache-Control": "public, max-age=86400"}
 
 
 @bp.route("/api/ql/sat")
@@ -250,7 +339,7 @@ def status():
 
 # ----------------------------------------------------------------- answers
 def _parse_ref(ref):
-    m = re.fullmatch(r"(course|sat):(\d+)", str(ref or ""))
+    m = re.fullmatch(r"(course|sat|custom):(\d+)", str(ref or ""))
     if not m:
         abort(400)
     return m.group(1), int(m.group(2))
@@ -371,6 +460,10 @@ def _letter_index(answer):
 def solve_route():
     """Hint + explanation (and the key for MCQ, used by the Sage's skill)."""
     kind, qid = _parse_ref((request.get_json(silent=True) or {}).get("ref"))
+    if kind == "custom":
+        r = custom_row(qid)
+        return jsonify({"ai": _ai_ready(), "hint": r["hint"], "explanation": r["explanation"],
+                        "answer": int(r["answer"]) if r["type"] == "mcq" and str(r["answer"]).isdigit() else None})
     s = solve(kind, qid)
     mcq = _is_mcq(kind, _row(kind, qid))
     return jsonify({"ai": _ai_ready(), "hint": s.get("hint"), "explanation": s.get("explanation"),
@@ -382,6 +475,15 @@ def check_route():
     """Grade one answer. MCQ: {ref, choice: index}. Free response: {ref, text}."""
     data = request.get_json(silent=True) or {}
     kind, qid = _parse_ref(data.get("ref"))
+    if kind == "custom":  # teacher questions carry their own key
+        r = custom_row(qid)
+        if "text" not in data:
+            answer = int(r["answer"]) if str(r["answer"] or "").isdigit() else None
+            return jsonify({"ai": _ai_ready(), "answer": answer, "explanation": r["explanation"],
+                            "correct": None if answer is None else data.get("choice") == answer})
+        keys = [a for a in (r["answer"] or "").split("|") if a.strip()]
+        return jsonify({"ai": _ai_ready(), "correct": any(same_answer(data.get("text"), k) for k in keys),
+                        "answer_text": keys[0] if keys else None, "explanation": r["explanation"], "saved": True})
     if "text" not in data:
         s = solve(kind, qid)
         answer = _letter_index(s.get("answer"))
@@ -491,3 +593,188 @@ def similar_route():
         conn.commit()
         conn.close()
     return jsonify({"ai": True, "questions": clean})
+
+
+# -------------------------------------------------------------- AI recheck
+def recheck(ref, answer, argument):
+    """A student disputes their grade: ask AI to look again at their answer
+    (with their reasoning). The verdict is saved per (question, answer)."""
+    kind, qid = _parse_ref(ref)
+    norm = re.sub(r"\s+", "", str(answer)).lower()[:300]
+    conn = db.get_conn()
+    hit = conn.execute("SELECT verdict FROM ql_rechecks WHERE ref=? AND answer=?", (ref, norm)).fetchone()
+    conn.close()
+    if hit:
+        return {**json.loads(hit["verdict"]), "saved": True}
+    if not _ai_ready():
+        return {"ai": False, "correct": None,
+                "explanation": "AI checking is switched off right now, so your teacher will review this."}
+    if kind == "custom":
+        r = custom_row(qid)
+        source = (f"Question: {r['prompt']}\nOptions: {r['options'] or 'none'}\n"
+                  f"Answer key (0-based option index or text): {r['answer'] or r['widget']}")
+        images = []
+    else:
+        row = _row(kind, qid)
+        key = solve(kind, qid).get("answer") if kind == "sat" or _is_mcq(kind, row) else (
+            widget_spec(qid) or solve(kind, qid).get("answer"))
+        source = f"The question is in the image.\n{_text_block(row)}\nCurrent answer key (may be wrong): {key}"
+        images = _images(kind, qid)
+    prompt = (f"A student thinks their answer to this math question was marked wrong unfairly. Solve the "
+              f"question yourself, carefully, then judge the student's answer. Accept equivalent forms.\n{source}\n"
+              f"Student's answer: {answer}\nStudent's note: {argument or '(none)'}\n{STYLE}\n"
+              'Return ONLY JSON: {"correct": true|false, "answer": "the correct answer", '
+              '"key_wrong": true|false (is the current answer key wrong?), '
+              '"explanation": "two or three sentences for the student"}')
+    out = _gemini(prompt, timeout=60, images=images)
+    if not isinstance(out, dict) or not isinstance(out.get("correct"), bool):
+        return {"ai": True, "correct": None, "explanation": "AI couldn't check this one, so your teacher will review it."}
+    verdict = {"ai": True, "correct": out["correct"], "answer": out.get("answer"),
+               "key_wrong": bool(out.get("key_wrong")), "explanation": out.get("explanation")}
+    conn = db.get_conn()
+    conn.execute("INSERT OR REPLACE INTO ql_rechecks VALUES (?,?,?,?)", (ref, norm, json.dumps(verdict), time.time()))
+    conn.commit()
+    conn.close()
+    return verdict
+
+
+# ------------------------------------------------------------ admin editing
+def _require_admin():
+    if not _is_admin():
+        abort(401, "admin login required")
+
+
+@bp.route("/api/admin/ql/item/<ref>", methods=["GET", "PUT", "DELETE"])
+def admin_item(ref):
+    """Read, fix the answer of, or remove (hide) one bank question.
+    PUT body: {answer: "B"} (MCQ), {answer_text: "..."} (typed answer),
+    {widget: spec} (table/matching/graph/parts), plus optional hint/explanation.
+    DELETE hides it from students; PUT {restore: true} brings it back."""
+    _require_admin()
+    kind, qid = _parse_ref(ref.replace("-", ":"))
+    if kind == "custom":
+        abort(400, "use /api/admin/ql/custom")
+    row = _row(kind, qid)
+    table = "course_questions" if kind == "course" else "questions"
+    conn = db.get_conn()
+    if request.method == "DELETE":
+        conn.execute("INSERT OR IGNORE INTO ql_hidden VALUES (?,?)", (kind, qid))
+    elif request.method == "PUT":
+        data = request.get_json(silent=True) or {}
+        if data.get("restore"):
+            conn.execute("DELETE FROM ql_hidden WHERE kind=? AND qid=?", (kind, qid))
+        if data.get("answer"):
+            letter = str(data["answer"]).strip().upper()[:1]
+            if letter not in LETTERS:
+                conn.close()
+                abort(400, "answer must be a letter A-F")
+            conn.execute(f"UPDATE {table} SET correct=? WHERE id=?", (letter, qid))
+            conn.execute("UPDATE ql_keys SET answer=? WHERE kind=? AND qid=?", (letter, kind, qid))
+        if data.get("answer_text"):
+            conn.execute("INSERT INTO ql_keys (kind, qid, answer, created_at) VALUES (?,?,?,?) "
+                         "ON CONFLICT(kind, qid) DO UPDATE SET answer=excluded.answer",
+                         (kind, qid, str(data["answer_text"]).strip()[:300], time.time()))
+            conn.execute("DELETE FROM ql_checks WHERE kind=? AND qid=?", (kind, qid))  # old verdicts are stale
+        if isinstance(data.get("widget"), dict) and kind == "course":
+            spec = data["widget"]
+            if spec.get("widget") not in ("table", "matching", "graph", "parts", "multi"):
+                conn.close()
+                abort(400, "unknown widget type")
+            conn.execute("INSERT OR REPLACE INTO ql_widget_edits VALUES (?,?)", (qid, json.dumps(spec)))
+        for field in ("hint", "explanation"):
+            if field in data:
+                conn.execute(f"UPDATE ql_keys SET {field}=? WHERE kind=? AND qid=?", (data[field] or None, kind, qid))
+        conn.execute("DELETE FROM ql_rechecks WHERE ref=?", (f"{kind}:{qid}",))
+    conn.commit()
+    key = conn.execute("SELECT * FROM ql_keys WHERE kind=? AND qid=?", (kind, qid)).fetchone()
+    hidden = conn.execute("SELECT 1 FROM ql_hidden WHERE kind=? AND qid=?", (kind, qid)).fetchone() is not None
+    conn.close()
+    g.pop("ql_admin", None)
+    row = _row(kind, qid)
+    mcq = _is_mcq(kind, row)
+    return jsonify({"ref": f"{kind}:{qid}", "image": _image_url(kind, qid), "hidden": hidden,
+                    "type": "widget" if kind == "course" and (widget_spec(qid) or {}).get("widget", "none") != "none"
+                    else "mcq" if mcq else "free",
+                    "answer": (re.findall(r"[A-F]", row["correct"] or "") or [None])[0] or (key["answer"] if key else None),
+                    "options": _option_count(row, []) if kind == "course" else 4,
+                    "widget": widget_spec(qid) if kind == "course" else None,
+                    "hint": key["hint"] if key else None, "explanation": key["explanation"] if key else None})
+
+
+QUESTION_TYPES = ("mcq", "free", "widget")
+
+
+def _custom_fields(data):
+    qtype = data.get("type")
+    if qtype not in QUESTION_TYPES:
+        abort(400, "type must be mcq, free or widget")
+    prompt = str(data.get("prompt") or "").strip()[:4000]
+    image = data.get("image") or None
+    if image and (not re.match(r"data:image/[\w+.-]+;base64,", image) or len(image) > 3_000_000):
+        abort(400, "the picture must be an image under 2 MB")
+    if not prompt and not image:
+        abort(400, "write the question or add a picture")
+    options, answer, widget = [], None, None
+    if qtype == "mcq":
+        options = [str(o).strip()[:500] for o in data.get("options") or [] if str(o).strip()][:6]
+        if len(options) < 2:
+            abort(400, "add at least two options")
+        try:
+            answer = int(data.get("answer"))
+            assert 0 <= answer < len(options)
+        except (TypeError, ValueError, AssertionError):
+            abort(400, "choose the correct option")
+        answer = str(answer)
+    elif qtype == "free":
+        answer = "|".join(a.strip() for a in str(data.get("answer") or "").split("|") if a.strip())[:500]
+        if not answer:
+            abort(400, "write the correct answer")
+    else:
+        widget = data.get("widget")
+        if not isinstance(widget, dict) or widget.get("widget") not in ("table", "matching", "graph", "parts", "multi"):
+            abort(400, "set up the table, matching, graph or parts answer")
+        widget = json.dumps(widget)
+    return (qtype, prompt, image, json.dumps(options), answer, widget,
+            str(data.get("hint") or "").strip()[:500] or None, str(data.get("explanation") or "").strip()[:2000] or None)
+
+
+@bp.route("/api/admin/ql/custom", methods=["POST"])
+def admin_custom_create():
+    """Add a teacher question to a course topic: {course: "c227", topic: "t1", type, prompt,
+    image (data URL), options + answer (index) | answer (text, "|" between accepted forms) | widget}."""
+    _require_admin()
+    data = request.get_json(silent=True) or {}
+    course, topic = str(data.get("course") or ""), str(data.get("topic") or "")
+    if not re.fullmatch(r"c\d+", course) or not re.fullmatch(r"t\d+", topic):
+        abort(400, "choose a course and topic")
+    conn = db.get_conn()
+    cur = conn.execute("INSERT INTO ql_custom (course, topic, type, prompt, image, options, answer, widget, hint, "
+                       "explanation, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                       (course, topic, *_custom_fields(data), time.time()))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "item": _custom_item(custom_row(cur.lastrowid))})
+
+
+@bp.route("/api/admin/ql/custom/<int:cid>", methods=["GET", "PUT", "DELETE"])
+def admin_custom(cid):
+    _require_admin()
+    row = custom_row(cid)
+    conn = db.get_conn()
+    if request.method == "DELETE":
+        conn.execute("DELETE FROM ql_custom WHERE id=?", (cid,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True})
+    if request.method == "PUT":
+        data = {**dict(row), "options": json.loads(row["options"] or "[]"),
+                "widget": json.loads(row["widget"] or "null"), **(request.get_json(silent=True) or {})}
+        conn.execute("UPDATE ql_custom SET type=?, prompt=?, image=?, options=?, answer=?, widget=?, hint=?, "
+                     "explanation=? WHERE id=?", (*_custom_fields(data), cid))
+        conn.execute("DELETE FROM ql_rechecks WHERE ref=?", (f"custom:{cid}",))
+        conn.commit()
+        row = custom_row(cid)
+    conn.close()
+    item = _custom_item(row)
+    item["answer_text"] = row["answer"] if row["type"] == "free" else None
+    return jsonify({"ok": True, "item": item})
