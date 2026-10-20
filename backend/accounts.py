@@ -337,7 +337,8 @@ def admin_student(sid):
                 abort(400, "Passwords need at least 8 characters.")
             conn.execute("UPDATE ql_students SET pw_hash=? WHERE id=?",
                          (generate_password_hash(str(data["password"])), sid))
-        if "grade" in data and _group(int(data.get("grade") or 0), str(data.get("track") or "")):
+        grade = str(data.get("grade") or "")
+        if grade.isdigit() and _group(int(grade), str(data.get("track") or "")):
             conn.execute("UPDATE ql_students SET grade=?, track=? WHERE id=?", (int(data["grade"]), data["track"], sid))
     conn.commit()
     conn.close()
