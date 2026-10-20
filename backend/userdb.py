@@ -49,6 +49,8 @@ def _sql(query):
 class _PgConn:
     """Enough of sqlite3.Connection's interface for this app, over psycopg."""
 
+    _conn = None
+
     def __init__(self, pool):
         self._pool = pool
         self._conn = pool.getconn()
@@ -89,7 +91,7 @@ def _get_pool():
         if _pool is None:
             from psycopg_pool import ConnectionPool
             # Neon closes idle connections, so each one is checked before use.
-            _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=10, open=True,
+            _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=10, open=True, timeout=20,
                                    check=ConnectionPool.check_connection,
                                    kwargs={"row_factory": _row_factory,
                                            # no server-side prepared statements: safe behind Neon's pooler
@@ -98,19 +100,42 @@ def _get_pool():
     return _pool
 
 
+class _RequestConn:
+    """The request's shared connection. close() leaves it open for the rest of
+    the request; Flask's teardown ends it (rolling back anything uncommitted,
+    as closing a sqlite3 connection would)."""
+
+    def __init__(self, conn):
+        self._shared = conn
+
+    def __getattr__(self, name):
+        return getattr(self._shared, name)
+
+    def close(self):
+        pass
+
+
 def connect():
-    if POSTGRES:
-        conn = _PgConn(_get_pool())
-        if has_app_context():
-            g.setdefault("userdb_conns", []).append(conn)
-        return conn
-    return db.get_conn()
+    if not POSTGRES:
+        return db.get_conn()
+    if not has_app_context():
+        return _PgConn(_get_pool())
+    # One connection per request: Neon is a network hop away, so opening one
+    # per query is slow, and a request never holds more than one pool slot.
+    if "userdb_conn" not in g:
+        g.userdb_conn = _PgConn(_get_pool())
+    return _RequestConn(g.userdb_conn)
 
 
 def close_request_connections(_exc=None):
-    """Flask teardown: return any connection a request left open."""
-    for conn in g.pop("userdb_conns", []):
+    """Flask teardown: hand the request's connection back to the pool."""
+    conn = g.pop("userdb_conn", None)
+    if conn is not None:
         conn.close()
+
+
+def pool_stats():
+    return _pool.get_stats() if _pool is not None else None
 
 
 def insert(conn, query, params=()):

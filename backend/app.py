@@ -5,6 +5,7 @@ import random
 import re
 import secrets
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import db
@@ -1743,7 +1744,7 @@ def server_error(e):
     the error's type in the message so it can be reported."""
     if isinstance(e, HTTPException):
         return api_error(e)
-    app.logger.exception("Unhandled error on %s %s", request.method, request.path)
+    app.logger.exception("Unhandled error on %s %s (db pool: %s)", request.method, request.path, userdb.pool_stats())
     if request.path.startswith("/api/"):
         return jsonify({"error": f"Server error ({type(e).__name__}). Please try again in a minute."}), 500
     return "Server error. Please try again in a minute.", 500
@@ -1753,15 +1754,20 @@ def server_error(e):
 def health():
     """Is the student database reachable? Never shows the connection string."""
     out = {"db": "postgres" if userdb.POSTGRES else "sqlite", "database_url_set": bool(userdb.DATABASE_URL)}
+    started = time.time()
     try:
         conn = userdb.connect()
         out["students"] = conn.execute("SELECT COUNT(*) AS n FROM ql_students").fetchone()["n"]
         out["school_list"] = conn.execute("SELECT COUNT(*) AS n FROM ql_roster").fetchone()["n"]
         conn.close()
         out["ok"] = True
+        out["ms"] = round((time.time() - started) * 1000)
     except Exception as e:  # report, don't crash
         detail = re.sub(r"[a-z]+://\S+", "<url>", str(e))[:300]
         out.update(ok=False, error=f"{type(e).__name__}: {detail}")
+    stats = userdb.pool_stats() or {}
+    out["pool"] = {k: stats.get(k) for k in ("pool_size", "pool_available", "requests_waiting",
+                                             "connections_errors", "connections_lost", "requests_errors")}
     return jsonify(out), 200 if out["ok"] else 503
 
 
