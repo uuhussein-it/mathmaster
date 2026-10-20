@@ -5,6 +5,7 @@ import { h, mount } from './ui.js';
 import { CHARACTERS } from './characters.js';
 import { profile, onProfileChange, xpToNext } from './state.js';
 import { register, startRouter, go } from './router.js';
+import { loadAccount } from './account.js';
 
 import { renderSelect } from './screens/select.js';
 import { renderHub } from './screens/hub.js';
@@ -13,6 +14,9 @@ import { renderSat } from './screens/sat.js';
 import { renderPlay } from './screens/play.js';
 import { renderSimulator } from './screens/simulator.js';
 import { renderResults } from './screens/results.js';
+import { renderLogin } from './screens/login.js';
+import { renderLevel } from './screens/level.js';
+import { renderAdmin } from './screens/admin.js';
 
 /** Top bar: hero portrait, level, XP progress, score and streak. */
 function renderHud() {
@@ -41,6 +45,9 @@ function renderHud() {
         h('span', { 'aria-hidden': 'true' }, '🔥'), h('b', {}, profile.streak), h('small', {}, 'Streak'))));
 }
 
+register('login', renderLogin);
+register('level', renderLevel);
+register('admin', renderAdmin);
 register('select', renderSelect);
 register('hub', renderHub);
 register('curriculum', renderCurriculum);
@@ -51,4 +58,4 @@ register('results', renderResults, { needsPayload: true });
 
 onProfileChange(renderHud);
 renderHud();
-startRouter();
+loadAccount().then(startRouter);

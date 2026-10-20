@@ -100,6 +100,12 @@ export function recordSession(summary) {
   save();
 }
 
+/** Swap in another profile (the signed-in student's saved one, or a blank one). */
+export function replaceProfile(saved) {
+  Object.assign(profile, blank(), saved || {});
+  save();
+}
+
 /** Clear all progress on this device. */
 export function resetProfile() {
   Object.assign(profile, blank());

@@ -4,6 +4,10 @@
  * function may return a cleanup callback (used to stop timers).
  */
 import { profile } from './state.js';
+import { account } from './account.js';
+
+// Screens that work without a student account.
+const OPEN = new Set(['login', 'admin']);
 
 const routes = new Map();
 let payload = null;
@@ -21,7 +25,12 @@ export function go(name, data = null) {
 
 function render() {
   let name = location.hash.replace(/^#\/?/, '') || 'hub';
-  if (!profile.character) name = 'select';
+  // Sign in, then pick a hero, then a level; the teacher's admin page needs none of that.
+  if (!OPEN.has(name)) {
+    if (!account.student) name = 'login';
+    else if (!profile.character) name = 'select';
+    else if (!account.student.group && name !== 'select') name = 'level';
+  }
   let route = routes.get(name);
   // Session screens can't be restored after a reload, so fall back to the hub.
   if (!route || (route.needsPayload && !payload)) {

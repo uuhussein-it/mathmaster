@@ -8,6 +8,7 @@ import { evaluate } from '../scoring.js';
 import { go } from '../router.js';
 import { reportSession } from '../data.js';
 import { answerSummary } from '../widgets.js';
+import { openFeedback } from '../feedback.js';
 
 const correctText = (q) => (q.type === 'widget' ? answerSummary(q.widget)
   : q.type === 'free' ? q.answerText : q.answer != null && answerLabel(q, q.answer));
@@ -84,6 +85,9 @@ export function renderResults(app, r) {
             questionBody(q, { small: true }),
             h('p', {}, h('span.muted', {}, 'Your answer: '), q.text || (q.chosen >= 0 ? answerLabel(q, q.chosen) : '—'), ' ', h('b', {}, q.correct ? '✓' : '✗')),
             !q.correct && correctText(q) && h('p', {}, h('span.muted', {}, 'Correct: '), correctText(q)),
-            q.explanation && h('p.explanation', {}, q.explanation)))))));
+            q.explanation && h('p.explanation', {}, q.explanation),
+            q.ref && h('button.btn.ghost.sm.report-btn', {
+              onclick: () => openFeedback({ q, answer: q.text || (q.chosen >= 0 ? answerLabel(q, q.chosen) : ''), wrong: !q.correct }),
+            }, q.correct ? '⚑ Report a problem' : '⚑ I think I’m right')))))));
 }
 

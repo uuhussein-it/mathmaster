@@ -167,3 +167,18 @@ export const prefs = {
     try { localStorage.setItem(`questlearn.${key}`, JSON.stringify(value)); } catch { /* ignore */ }
   },
 };
+
+/** A dialog over the page. Returns a function that closes it. */
+export function modal(title, ...body) {
+  const close = () => { layer.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = (e) => e.key === 'Escape' && close();
+  const layer = h('div.modal-layer', { onclick: (e) => e.target === layer && close() },
+    h('div.modal.panel', { role: 'dialog', 'aria-modal': 'true', 'aria-label': title },
+      h('div.modal-head', {}, h('h2', {}, title),
+        h('button.btn.ghost.sm', { type: 'button', 'aria-label': 'Close', onclick: close }, '✕')),
+      h('div.modal-body', {}, body)));
+  document.addEventListener('keydown', onKey);
+  document.body.append(layer);
+  layer.querySelector('input, textarea, select, button:not([aria-label=Close])')?.focus();
+  return close;
+}

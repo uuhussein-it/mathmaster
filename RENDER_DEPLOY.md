@@ -66,11 +66,11 @@ site is at `https://<your-service>.onrender.com`.
 - **Free tier sleeps** when idle (~1 min cold start on first hit). Fine for a
   practice site. The paid tier ($7/mo) keeps it always-on and adds a persistent
   disk.
-- **⚠️ Admin edits need a persistent disk.** SQLite lives on the container's
-  ephemeral disk on the free tier, so **every answer you fix in the Admin page
-  is lost when Render restarts or redeploys** — and student results reset too.
-  To make your fixes stick, attach a **persistent disk** (paid) and point
-  `SAT_DB_PATH` at it (see the comment in `render.yaml`), or move to Postgres.
+- **Keep accounts and edits: set `DATABASE_URL`.** The free tier resets its
+  disk on every restart or deploy. Student accounts, progress, the school list,
+  feedback and every admin edit are saved in Postgres when `DATABASE_URL` is
+  set, so they survive (see "Save progress in Neon" below). Without it they
+  live in SQLite and are lost on each deploy.
 - The DB is already seeded — you do NOT need to run `seed.py`/`seed_courses.py`
   on the server. Those scripts are included only for reference / rebuilding.
 - Health check: `/api/courses` (returns 200 once up).
@@ -99,9 +99,29 @@ Everything Gemini produces is saved and reused, so the same question never
 goes to Gemini twice: solutions/hints/explanations in `ql_keys`, verdicts on
 typed answers in `ql_checks` (per question + answer), and "more like this"
 questions in `ql_generated` (pressing it again on the same question serves the
-saved ones). On the free plan the
-database resets on every deploy/restart, so attach a disk (see `render.yaml`)
-to keep that cache, student results and admin fixes.
+saved ones). This cache lives in the bundled SQLite file, so on the free plan
+it starts again from `data/ai_seed.json` after each deploy.
 
 Without a key the site still works: only questions with an answer key are
 served (about 480 course MCQs plus QuestLearn's original SAT set).
+
+## Student accounts, groups and the admin page
+
+- Students sign in at `/` with their school email and create a password on their first visit, then pick a hero and their level (grade + track). That puts them in a group such as "Grade 11 · Advanced", whose play area and leaderboard open first.
+- Teachers sign in at `/#/admin` with `TEACHER_USERNAME` / `ADMIN_PASSWORD`. The admin page can fix answers, remove questions, add questions of any type (multiple choice, short answer, table, matching, graph, multi-part), remove students from the leaderboard, reset passwords, read feedback and upload the school's student list.
+- **School student list:** upload the Excel file on the admin page (School list tab). After that, only emails on the list can create an account. It is not stored in the repository because it holds students' personal data.
+- Optional `SCHOOL_EMAIL_DOMAIN` (e.g. `actvet.gov.ae`): restricts sign-ups to that domain while no list is uploaded.
+
+## Save progress in Neon (free)
+
+1. Sign up at https://neon.tech and create a project (the free plan is enough;
+   pick the region closest to Render's, e.g. Frankfurt).
+2. On the project dashboard press **Connect** and copy the connection string.
+   It looks like `postgresql://user:password@ep-....neon.tech/neondb?sslmode=require`.
+3. In Render: your service → **Environment** → add `DATABASE_URL` with that
+   string → **Save, rebuild and deploy**.
+4. Sign in on the admin page and upload the school list again (it is now kept).
+
+The tables are created on the first start. The question bank itself stays in
+`data/sat.db` in the repository; answer fixes made on the admin page are saved
+in Neon and re-applied to it on every start.

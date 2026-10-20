@@ -25,13 +25,9 @@ services:
       # the Render dashboard. Without it, only questions with an answer key play.
       - key: GEMINI_API_KEY
         sync: false
-    # NOTE (persistent results, paid tier only):
-    # To keep student results -- AND your admin answer fixes -- across
-    # restarts, attach a disk and set the DB path to it, e.g. mount at /data:
-    #   disk:
-    #     name: data
-    #     mountPath: /data
-    #     sizeGB: 1
-    #   - key: SAT_DB_PATH
-    #     value: /data/sat.db
-    # backend/db.py already reads SAT_DB_PATH.
+      # Student accounts, progress, the school list, feedback and admin edits
+      # are saved in this Postgres database so they survive redeploys. Paste the
+      # connection string of a free Neon database (https://neon.tech). Without
+      # it they are kept in SQLite, which the free plan resets on every deploy.
+      - key: DATABASE_URL
+        sync: false

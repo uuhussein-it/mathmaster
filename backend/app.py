@@ -24,7 +24,7 @@ app = Flask(__name__, static_folder=FRONTEND, static_url_path="")
 # --- Admin access -----------------------------------------------------------
 # TEACHER_USERNAME / TEACHER_PASSWORD / SECRET_KEY come from the environment
 # (set them as Render env vars). The fallbacks exist only so the app still boots
-# locally. Students never authenticate at all -- they only type a display name.
+# locally. Students sign in separately with their school email (backend/accounts.py).
 TEACHER_USERNAME = os.environ.get("TEACHER_USERNAME") or os.environ.get("ADMIN_USERNAME") or "teacher"
 TEACHER_PASSWORD = os.environ.get("ADMIN_PASSWORD") or "teacher"
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
@@ -1717,7 +1717,21 @@ def ai_grade_batch():
 
 
 import questlearn
-questlearn.init(app, gemini=_gemini, images=_question_image_parts, ai_ready=_ai_ready)
+questlearn.init(app, gemini=_gemini, images=_question_image_parts, ai_ready=_ai_ready, is_admin=is_admin)
+
+import accounts
+accounts.init(app, is_admin=is_admin, recheck=questlearn.recheck)
+
+
+from werkzeug.exceptions import HTTPException  # noqa: E402
+
+
+@app.errorhandler(HTTPException)
+def api_error(e):
+    """API errors as JSON ({"error": message}) so the app can show the message."""
+    if request.path.startswith("/api/"):
+        return jsonify({"error": e.description}), e.code
+    return e
 
 
 @app.route("/api/progress", methods=["POST"])
