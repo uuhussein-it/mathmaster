@@ -1722,6 +1722,9 @@ questlearn.init(app, gemini=_gemini, images=_question_image_parts, ai_ready=_ai_
 import accounts
 accounts.init(app, is_admin=is_admin, recheck=questlearn.recheck)
 
+import userdb  # noqa: E402
+app.teardown_appcontext(userdb.close_request_connections)
+
 
 from werkzeug.exceptions import HTTPException  # noqa: E402
 
@@ -1732,6 +1735,34 @@ def api_error(e):
     if request.path.startswith("/api/"):
         return jsonify({"error": e.description}), e.code
     return e
+
+
+@app.errorhandler(Exception)
+def server_error(e):
+    """Unexpected errors: full traceback in the server log (Render → Logs), and
+    the error's type in the message so it can be reported."""
+    if isinstance(e, HTTPException):
+        return api_error(e)
+    app.logger.exception("Unhandled error on %s %s", request.method, request.path)
+    if request.path.startswith("/api/"):
+        return jsonify({"error": f"Server error ({type(e).__name__}). Please try again in a minute."}), 500
+    return "Server error. Please try again in a minute.", 500
+
+
+@app.route("/api/health")
+def health():
+    """Is the student database reachable? Never shows the connection string."""
+    out = {"db": "postgres" if userdb.POSTGRES else "sqlite", "database_url_set": bool(userdb.DATABASE_URL)}
+    try:
+        conn = userdb.connect()
+        out["students"] = conn.execute("SELECT COUNT(*) AS n FROM ql_students").fetchone()["n"]
+        out["school_list"] = conn.execute("SELECT COUNT(*) AS n FROM ql_roster").fetchone()["n"]
+        conn.close()
+        out["ok"] = True
+    except Exception as e:  # report, don't crash
+        detail = re.sub(r"[a-z]+://\S+", "<url>", str(e))[:300]
+        out.update(ok=False, error=f"{type(e).__name__}: {detail}")
+    return jsonify(out), 200 if out["ok"] else 503
 
 
 @app.route("/api/progress", methods=["POST"])

@@ -46,6 +46,7 @@ export function renderHub(app) {
             h('span.online-dot', { 'aria-hidden': 'true' }), ` ${online.length} online now`)),
         h('div.lobby-actions', {},
           h('button.btn.primary', { onclick: playCourse }, '⚔️ Play my course'),
+          h('button.btn', { onclick: () => go('sat') }, '🎯 SAT practice'),
           h('button.btn.ghost.sm', { onclick: () => go('level') }, 'Change level'))),
       h('div.lobby-members', { 'aria-label': 'Students online' },
         online.slice(0, 24).map((m) => h('div.member', {}, avatar(m), h('span', {}, m.id === me.id ? 'You' : m.name))),
