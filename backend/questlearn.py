@@ -460,7 +460,17 @@ def _norm(text):
     t = re.sub(r"[×·]", "*", t)
     t = re.sub(r"[⁰¹²³⁴⁵⁶⁷⁸⁹]+", lambda m: "^" + m.group(0).translate(_SUPERS), t)
     t = re.sub(r"\s+", "", t)
-    t = re.sub(r"^([a-z]|f\([a-z]\)|y)=(?=.)", "", t)
+    t = t.replace("sqrt", "√").replace("cbrt", "∛").replace("theta", "θ")
+    t = re.sub(r"(^|[^a-z])pi(?![a-z])", r"\1π", t)
+    t = re.sub(r"(^|[^a-z])inf(inity)?(?![a-z])", r"\1∞", t)
+    t = t.replace("<=", "≤").replace(">=", "≥")
+    t = re.sub(r"!=|=/=", "≠", t)
+    t = re.sub(r"\+/?-", "±", t)
+    t = re.sub(r"°|degrees?$", "", t)
+    t = re.sub(r"([√∛])\(([\w.π]+)\)", r"\1\2", t)  # √(3) ≡ √3
+    t = re.sub(r"\^\((-?[\w.]+)\)", r"^\1", t)  # x^(2) ≡ x^2
+    t = re.sub(r"([\w.)π])\*(?=[a-zπθ√∛(])", r"\1", t)  # 2*√3 ≡ 2√3
+    t = re.sub(r"^([a-zθ]|f\([a-z]\)|y)=(?=.)", "", t)
     return re.sub(r"\.$", "", t)
 
 

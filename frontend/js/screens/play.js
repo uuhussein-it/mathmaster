@@ -12,7 +12,8 @@ import { createScorer } from '../scoring.js';
 import { go } from '../router.js';
 import { checkAnswer, ensureSolved, fetchKeys, fetchSimilar } from '../data.js';
 import { openFeedback } from '../feedback.js';
-import { renderWidget, emptyValue, gradeWidget, isAnswered, answerSummary, valueSummary } from '../widgets.js';
+import { renderWidget, emptyValue, gradeWidget, isAnswered, answerSummary, valueSummary, typesText } from '../widgets.js';
+import { mathPad } from '../mathpad.js';
 
 export function renderPlay(app, config) {
   const { mode, questions } = config;
@@ -98,7 +99,7 @@ export function renderPlay(app, config) {
   }
 
   function freeAnswer() {
-    return h('form.free-answer', {
+    const form = h('form.free-answer', {
       onsubmit: (e) => { e.preventDefault(); submitFree(e.currentTarget.elements.answer.value); },
     },
     h('label', { for: 'free-input' }, 'Your answer'),
@@ -108,6 +109,8 @@ export function renderPlay(app, config) {
         oninput: (e) => { draft = e.target.value; },
       }),
       h('button.btn.primary', { type: 'submit', disabled: locked }, 'Check')));
+    if (!locked) form.append(mathPad(form));
+    return form;
   }
 
   /** Table / matching / graph / multi-part answer, graded locally from its spec. */
@@ -115,8 +118,10 @@ export function renderPlay(app, config) {
     const box = h('div.widget-box');
     const fill = () => box.replaceChildren(...[
       renderWidget(q.widget, { locked, value: widgetValue, result: widgetResult, onChange: (redraw) => redraw && fill() }),
+      !locked && typesText(q.widget) && pad,
       !locked && h('button.btn.primary.w-check', { type: 'button', onclick: submitWidget }, 'Check answer'),
     ].filter(Boolean));
+    const pad = mathPad(box);
     fill();
     return box;
   }

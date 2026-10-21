@@ -24,7 +24,14 @@ export function normalize(text) {
     .replace(/[×·]/g, '*')
     .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, (m) => `^${[...m].map((c) => SUPERS[c]).join('')}`)
     .replace(/\s+/g, '')
-    .replace(/^([a-z]|f\([a-z]\)|y)=(?=.)/, '') // "x = 4" ≡ "4"
+    .replace(/sqrt/g, '√').replace(/cbrt/g, '∛').replace(/theta/g, 'θ')
+    .replace(/(^|[^a-z])pi(?![a-z])/g, '$1π').replace(/(^|[^a-z])inf(inity)?(?![a-z])/g, '$1∞')
+    .replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/!=|=\/=/g, '≠').replace(/\+\/?-/g, '±')
+    .replace(/°|degrees?$/g, '')
+    .replace(/([√∛])\(([\w.π]+)\)/g, '$1$2') // √(3) ≡ √3
+    .replace(/\^\((-?[\w.]+)\)/g, '^$1') // x^(2) ≡ x^2
+    .replace(/([\w.)π])\*(?=[a-zπθ√∛(])/g, '$1') // 2*√3 ≡ 2√3
+    .replace(/^([a-zθ]|f\([a-z]\)|y)=(?=.)/, '') // "x = 4" ≡ "4"
     .replace(/\.$/, '');
 }
 
@@ -52,6 +59,11 @@ export function sameAnswer(given, expected) {
 }
 
 // ------------------------------------------------------------ rendering
+/** Whether the widget has typed (not just numeric) answers, so it gets the math keys. */
+export function typesText(spec) {
+  return spec.widget === 'parts' || (spec.widget === 'multi' && spec.items.some(typesText));
+}
+
 export function emptyValue(spec) {
   if (spec.widget === 'multi') return spec.items.map(emptyValue);
   if (spec.widget === 'table') return spec.table.rows.map((row) => row.map(() => ''));
