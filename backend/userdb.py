@@ -170,3 +170,15 @@ def create_tables(script):
     conn.executescript(script)
     conn.commit()
     conn.close()
+
+
+def add_column(table, column, decl):
+    """Add a column to an existing table if it isn't there yet."""
+    conn = connect()
+    if POSTGRES:
+        decl = re.sub(r"\bREAL\b", "DOUBLE PRECISION", decl)
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {decl}")
+    elif column not in [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+    conn.commit()
+    conn.close()

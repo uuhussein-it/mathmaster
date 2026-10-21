@@ -41,7 +41,9 @@ Render to it via a GitHub Personal Access Token (Render dashboard).
   it at the repo. `render.yaml` sets everything (build + start + health).
 - OR **New → Web Service** → pick the repo, and use:
   - Build command: `pip install -r requirements.txt`
-  - Start command: `gunicorn --workers 2 --threads 4 --timeout 120 --chdir . wsgi:application`
+  - Start command: `gunicorn --workers 1 --threads 64 --timeout 120 --chdir . wsgi:application`
+    (one worker: live arena fights are kept in that process's memory, so both
+    players must reach the same one; the 64 threads serve everyone else)
   - (Leave Build/Start blank if you use the Blueprint — it fills them in.)
 
 ### 3. Deploy
@@ -125,3 +127,23 @@ served (about 480 course MCQs plus QuestLearn's original SAT set).
 The tables are created on the first start. The question bank itself stays in
 `data/sat.db` in the repository; answer fixes made on the admin page are saved
 in Neon and re-applied to it on every start.
+
+## Teachers and the admin
+
+- The account set by `TEACHER_USERNAME` / `ADMIN_PASSWORD` is the **admin**: it can do everything, including uploading the school list, deleting students, resetting passwords and adding teachers (admin page → Teachers tab).
+- **Teachers** sign in on the same page with their email and the password the admin gave them. They can fix questions, read feedback and manage the leaderboard, but cannot see or change the school list, delete accounts or reset passwords.
+
+## Class arena (fights between classmates)
+
+- Students reach the arena from the hub (🥊 Arena) once they are level 3 (change with `ARENA_UNLOCK_LEVEL`). They can only challenge classmates in their own group who are online.
+- Health comes from the student's level, attack from quiz accuracy and the special meter from their best answer streak. Fireball (level 3), Shield (level 5) and Critical Strike (level 8) unlock with level, and so do bronze, silver and gold looks.
+- A fight lasts 60 seconds. The winner takes 10% of the lower XP total (5 to 50) from the loser plus a 10 XP bonus; a draw changes nothing. The server runs the whole fight: the browser only sends which keys are held, so a changed page cannot fake hits or health.
+- Fights use a WebSocket on the same address, which Render supports with no extra setup. **Keep a single gunicorn worker** (see the start command above).
+
+## Security
+
+- Sign-in cookies are HTTP-only, sent only over HTTPS on Render, and expire after 14 days. Every sign-in starts a fresh session.
+- Requests that change data must come from the site's own pages; other sites get 403.
+- Sign-in, sign-up and email checks are rate limited (too many tries give "Too many attempts").
+- Saved progress is checked on the server: XP and score can only grow as fast as a student can really earn them, and the level is recomputed from XP.
+- Security headers (Content-Security-Policy, no framing, no sniffing, HSTS on HTTPS) are sent on every page.

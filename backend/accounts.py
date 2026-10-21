@@ -16,6 +16,7 @@ import time
 from flask import Blueprint, abort, jsonify, request, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
+import security
 import userdb
 
 bp = Blueprint("accounts", __name__)
@@ -57,7 +58,15 @@ def init(app, is_admin, recheck):
             ref TEXT, category TEXT, message TEXT,
             answer TEXT, ai_verdict TEXT,
             created_at REAL, resolved INTEGER NOT NULL DEFAULT 0);
+        CREATE TABLE IF NOT EXISTS ql_staff (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            name TEXT NOT NULL, pw_hash TEXT NOT NULL, created_at REAL);
     """)
+    # XP won or lost in the arena (kept apart from quiz XP, which the browser
+    # reports) and when the profile was last saved (for the tamper checks).
+    userdb.add_column("ql_students", "arena_xp", "INTEGER NOT NULL DEFAULT 0")
+    userdb.add_column("ql_students", "profile_at", "REAL")
     app.register_blueprint(bp)
 
 
@@ -74,7 +83,8 @@ def _public(row, me=False):
     profile = json.loads(row["profile"] or "{}")
     out = {"id": row["id"], "name": row["name"], "grade": row["grade"], "track": row["track"],
            "group": _group(row["grade"], row["track"]), "score": row["score"], "level": row["level"],
-           "character": profile.get("character"),
+           "character": profile.get("character"), "arena_xp": row["arena_xp"] or 0,
+           "xp": max(0, int(profile.get("totalXp") or 0) + (row["arena_xp"] or 0)),
            "online": bool(row["last_seen"]) and time.time() - row["last_seen"] < ONLINE_SECONDS}
     if me:
         out.update(email=row["email"], profile=profile)
@@ -108,6 +118,22 @@ def _require_admin():
         abort(401, "admin login required")
 
 
+def staff_login(email, password):
+    """A teacher account the admin created, or None."""
+    email = str(email or "").strip().lower()
+    security.rate_limit("staff-login-email", 8, 15 * 60, key=email)
+    conn = userdb.connect()
+    row = conn.execute("SELECT * FROM ql_staff WHERE email=?", (email,)).fetchone()
+    conn.close()
+    return row if row and check_password_hash(row["pw_hash"], str(password or "")) else None
+
+
+def _sign_in(sid):
+    session.clear()  # a fresh session on every sign-in (no session fixation)
+    session["student_id"] = sid
+    session.permanent = True
+
+
 def _body():
     return request.get_json(silent=True) or {}
 
@@ -132,6 +158,7 @@ def check_email():
     email = str(_body().get("email") or "").strip().lower()
     if not EMAIL.match(email):
         abort(400, "Enter a valid email address.")
+    security.rate_limit("check-email", 30, 5 * 60)
     conn = userdb.connect()
     exists = conn.execute("SELECT 1 FROM ql_students WHERE email=?", (email,)).fetchone() is not None
     used, entry = _roster_entry(conn, email)
@@ -144,7 +171,7 @@ def check_email():
 @bp.route("/api/auth/me")
 def me():
     row = current_student()
-    return jsonify({"student": _public(row, me=True) if row else None, "admin": bool(_is_admin()),
+    return jsonify({"student": _public(row, me=True) if row else None, "admin": bool(_is_admin()), "role": security.role(),
                     "domains": SCHOOL_DOMAINS})
 
 
@@ -157,6 +184,7 @@ def signup():
     m = EMAIL.match(email)
     if not m:
         abort(400, "Enter a valid email address.")
+    security.rate_limit("signup", 10, 60 * 60)
     conn = userdb.connect()
     used, entry = _roster_entry(conn, email)
     if used and not entry:
@@ -183,8 +211,7 @@ def signup():
     conn.commit()
     row = conn.execute("SELECT * FROM ql_students WHERE id=?", (sid,)).fetchone()
     conn.close()
-    session["student_id"] = sid
-    session.permanent = True
+    _sign_in(sid)
     return jsonify({"student": _public(row, me=True)})
 
 
@@ -192,13 +219,14 @@ def signup():
 def login():
     data = _body()
     email = str(data.get("email") or "").strip().lower()
+    security.rate_limit("login", 20, 15 * 60)
+    security.rate_limit("login-email", 8, 15 * 60, key=email)
     conn = userdb.connect()
     row = conn.execute("SELECT * FROM ql_students WHERE email=?", (email,)).fetchone()
     conn.close()
     if not row or not check_password_hash(row["pw_hash"], str(data.get("password") or "")):
         abort(401, "Wrong email or password.")
-    session["student_id"] = row["id"]
-    session.permanent = True
+    _sign_in(row["id"])
     return jsonify({"student": _public(row, me=True)})
 
 
@@ -222,18 +250,61 @@ def update_me():
         track = str(data.get("track", track) or "")
         if not _group(grade, track):
             abort(400, "Choose a grade from 9 to 12 and a track.")
+    now = time.time()
     if isinstance(data.get("profile"), dict):
-        profile = data["profile"]
+        profile = checked_profile(profile, data["profile"], now - (row["profile_at"] or row["created_at"] or now))
     name = re.sub(r"\s+", " ", str(data.get("name") or row["name"])).strip()[:40] or row["name"]
-    score = max(0, int(profile.get("score") or 0))
-    level = max(1, int(profile.get("level") or 1))
+    saved = json.dumps(profile)
+    if len(saved) > 200_000:
+        abort(413, "Your saved progress is too large.")
     conn = userdb.connect()
-    conn.execute("UPDATE ql_students SET name=?, grade=?, track=?, profile=?, score=?, level=? WHERE id=?",
-                 (name, grade, track, json.dumps(profile)[:200_000], score, level, row["id"]))
+    conn.execute("UPDATE ql_students SET name=?, grade=?, track=?, profile=?, score=?, level=?, profile_at=? WHERE id=?",
+                 (name, grade, track, saved, int(profile.get("score") or 0), max(1, int(profile.get("level") or 1)),
+                  now, row["id"]))
     conn.commit()
     row = conn.execute("SELECT * FROM ql_students WHERE id=?", (row["id"],)).fetchone()
     conn.close()
     return jsonify({"student": _public(row, me=True)})
+
+
+XP_PER_SECOND = 15   # well above what answering questions can earn (see scoring.js)
+SCORE_PER_SECOND = 200
+INT_FIELDS = ("level", "xp", "totalXp", "score", "streak", "bestStreak", "answered", "correct")
+
+
+def xp_to_next(level):
+    return 100 + (level - 1) * 50  # same as state.js
+
+
+def level_for(total_xp):
+    level, rest = 1, total_xp
+    while rest >= xp_to_next(level):
+        rest -= xp_to_next(level)
+        level += 1
+    return level, rest
+
+
+def checked_profile(old, new, elapsed):
+    """The browser reports quiz progress; keep it believable. Numbers are made
+    whole and non-negative, gains are capped by the time since the last save,
+    and level is recomputed from total XP, so editing the saved profile in the
+    browser can't jump a student up the leaderboard or the arena."""
+    out = dict(new)
+    for f in INT_FIELDS:
+        try:
+            out[f] = max(0, int(new.get(f) or 0))
+        except (TypeError, ValueError):
+            out[f] = 0
+    elapsed = max(0.0, min(elapsed, 3600.0))
+    prev = {f: max(0, int(old.get(f) or 0)) for f in ("totalXp", "score", "answered")}
+    out["totalXp"] = min(out["totalXp"], prev["totalXp"] + 400 + int(XP_PER_SECOND * elapsed))
+    out["score"] = min(out["score"], prev["score"] + 2000 + int(SCORE_PER_SECOND * elapsed))
+    out["answered"] = min(out["answered"], prev["answered"] + 20 + int(elapsed))
+    out["correct"] = min(out["correct"], out["answered"])
+    out["bestStreak"] = min(out["bestStreak"], out["correct"])
+    out["streak"] = min(out["streak"], out["bestStreak"])
+    out["level"], out["xp"] = level_for(out["totalXp"])
+    return out
 
 
 # ---------------------------------------------------------------------- groups
@@ -321,6 +392,9 @@ def admin_student(sid):
     """PUT {hidden} hides/shows on the leaderboard, {password} resets it,
     {grade, track} moves groups. DELETE removes the account."""
     _require_admin()
+    data = _body()
+    if request.method == "DELETE" or data.get("password"):
+        security.require_owner()  # teachers can hide and move students, not delete or reset them
     conn = userdb.connect()
     if not conn.execute("SELECT 1 FROM ql_students WHERE id=?", (sid,)).fetchone():
         conn.close()
@@ -328,7 +402,6 @@ def admin_student(sid):
     if request.method == "DELETE":
         conn.execute("DELETE FROM ql_students WHERE id=?", (sid,))
     else:
-        data = _body()
         if "hidden" in data:
             conn.execute("UPDATE ql_students SET hidden=? WHERE id=?", (int(bool(data["hidden"])), sid))
         if data.get("password"):
@@ -357,6 +430,8 @@ def admin_roster():
     header name (Email, Full Name English, Section, Cluster, Students ID); the
     grade comes from a Grade column or a sheet named like G09."""
     _require_admin()
+    if request.method == "POST":
+        security.require_owner()
     conn = userdb.connect()
     if request.method == "POST":
         f = request.files.get("file")
@@ -431,6 +506,43 @@ def admin_feedback_resolve(fid):
     _require_admin()
     conn = userdb.connect()
     conn.execute("UPDATE ql_feedback SET resolved=? WHERE id=?", (int(bool(_body().get("resolved", True))), fid))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------- staff
+@bp.route("/api/admin/staff", methods=["GET", "POST"])
+def admin_staff():
+    """The admin's teacher accounts. POST {email, name, password} adds one or
+    sets a new password; teachers sign in on the admin page with their email."""
+    security.require_owner()
+    conn = userdb.connect()
+    if request.method == "POST":
+        data = _body()
+        email = str(data.get("email") or "").strip().lower()
+        name = re.sub(r"\s+", " ", str(data.get("name") or "")).strip()[:60]
+        password = str(data.get("password") or "")
+        if not EMAIL.match(email) or not name:
+            conn.close()
+            abort(400, "Enter the teacher's name and email.")
+        if len(password) < 10:
+            conn.close()
+            abort(400, "Teacher passwords need at least 10 characters.")
+        conn.execute("INSERT INTO ql_staff (email, name, pw_hash, created_at) VALUES (?,?,?,?) "
+                     "ON CONFLICT (email) DO UPDATE SET name=excluded.name, pw_hash=excluded.pw_hash",
+                     (email, name, generate_password_hash(password), time.time()))
+        conn.commit()
+    rows = conn.execute("SELECT id, email, name, created_at FROM ql_staff ORDER BY name").fetchall()
+    conn.close()
+    return jsonify({"staff": [dict(r) for r in rows]})
+
+
+@bp.route("/api/admin/staff/<int:tid>", methods=["DELETE"])
+def admin_staff_delete(tid):
+    security.require_owner()
+    conn = userdb.connect()
+    conn.execute("DELETE FROM ql_staff WHERE id=?", (tid,))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})

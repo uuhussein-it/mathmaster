@@ -6,7 +6,7 @@
  */
 import { profile, onProfileChange, replaceProfile } from './state.js';
 
-export const account = { student: null, admin: false, ready: false };
+export const account = { student: null, admin: false, role: null, ready: false };
 
 async function api(path, { method = 'GET', body } = {}) {
   const res = await fetch(path, {
@@ -32,6 +32,7 @@ export async function loadAccount() {
   try {
     const me = await api('api/auth/me');
     account.admin = me.admin;
+    account.role = me.role;
     adopt(me.student);
   } catch { /* offline: carry on signed out */ }
   account.ready = true;
@@ -64,8 +65,14 @@ function pushProfile() {
   clearTimeout(timer);
   timer = setTimeout(() => {
     if (!account.student) return;
+    const sent = { totalXp: profile.totalXp, score: profile.score };
     api('api/me', { method: 'PUT', body: { profile, name: profile.name } })
-      .then((r) => { account.student = r.student; })
+      .then((r) => {
+        account.student = r.student;
+        // The server caps progress that looks tampered with; if it did, take its numbers.
+        const saved = r.student.profile || {};
+        if (saved.totalXp < sent.totalXp || saved.score < sent.score) replaceProfile(saved);
+      })
       .catch(() => {});
   }, 800);
 }
@@ -78,13 +85,15 @@ export const sendFeedback = (body) => api('api/ql/feedback', { method: 'POST', b
 
 // ---------------------------------------------------------------- teacher
 export async function adminLogin(username, password) {
-  await api('api/admin/login', { method: 'POST', body: { username, password } });
+  const r = await api('api/admin/login', { method: 'POST', body: { username, password } });
   account.admin = true;
+  account.role = r.role;
 }
 
 export async function adminLogout() {
   await api('api/admin/logout', { method: 'POST' }).catch(() => {});
   account.admin = false;
+  account.role = null;
 }
 
 export const adminApi = api;

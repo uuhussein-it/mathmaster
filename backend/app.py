@@ -29,8 +29,8 @@ app = Flask(__name__, static_folder=FRONTEND, static_url_path="")
 TEACHER_USERNAME = os.environ.get("TEACHER_USERNAME") or os.environ.get("ADMIN_USERNAME") or "teacher"
 TEACHER_PASSWORD = os.environ.get("ADMIN_PASSWORD") or "teacher"
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(32)
-app.config.update(SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE="Lax",
-                  PERMANENT_SESSION_LIFETIME=60 * 60 * 12)
+import security  # noqa: E402  cookies, headers, cross-site blocking, roles
+security.init(app)
 
 MODULE1_SIZE = 22
 MODULE2_SIZE = 22
@@ -112,7 +112,8 @@ def option_images_for(qid):
 
 
 def is_admin():
-    return bool(session.get("admin"))
+    """Any staff session (teacher or admin); admin-only actions use security.is_owner()."""
+    return security.is_staff()
 
 
 def _consttime_eq(a, b):
@@ -631,7 +632,7 @@ def questions():
 
 @app.route("/api/admin/me")
 def admin_me():
-    return jsonify({"is_admin": is_admin(),
+    return jsonify({"is_admin": is_admin(), "role": security.role(),
                     "username": session.get("teacher") if is_admin() else None})
 
 
@@ -640,17 +641,24 @@ def admin_login():
     body = request.get_json(force=True) or {}
     given_user = str(body.get("username") or "").strip()
     given_pass = str(body.get("password") or "")
+    security.rate_limit("staff-login", 10, 15 * 60)
     # Both halves must match. We compare with a constant-time helper so the
     # response time does not leak how much of the username was correct.
     user_ok = _consttime_eq(given_user, TEACHER_USERNAME)
     pass_ok = _consttime_eq(given_pass, TEACHER_PASSWORD)
-    if not (user_ok and pass_ok):
-        abort(401, "wrong username or password")
-    session.clear()
+    if user_ok and pass_ok:
+        role, name = "admin", TEACHER_USERNAME
+    else:
+        teacher = accounts.staff_login(given_user, given_pass)  # teacher accounts made by the admin
+        if not teacher:
+            abort(401, "wrong username or password")
+        role, name = "teacher", teacher["name"]
+    session.clear()  # a fresh session: nothing from before sign-in carries over
     session["admin"] = True
-    session["teacher"] = TEACHER_USERNAME
+    session["role"] = role
+    session["teacher"] = name
     session.permanent = True
-    return jsonify({"ok": True, "is_admin": True, "username": TEACHER_USERNAME})
+    return jsonify({"ok": True, "is_admin": True, "role": role, "username": name})
 
 
 @app.route("/api/admin/logout", methods=["POST"])
@@ -1722,6 +1730,9 @@ questlearn.init(app, gemini=_gemini, images=_question_image_parts, ai_ready=_ai_
 
 import accounts
 accounts.init(app, is_admin=is_admin, recheck=questlearn.recheck)
+
+import arena  # noqa: E402
+arena.init(app, current_student=accounts.current_student)
 
 import userdb  # noqa: E402
 app.teardown_appcontext(userdb.close_request_connections)

@@ -4,7 +4,9 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --workers 2 --threads 4 --timeout 120 --chdir . wsgi:application
+    # One worker: live arena fights are kept in that worker's memory. Each fight
+    # player holds a thread, hence the many threads.
+    startCommand: gunicorn --workers 1 --threads 64 --timeout 120 --chdir . wsgi:application
     healthCheckPath: /api/courses
     envVars:
       - key: PYTHON_VERSION

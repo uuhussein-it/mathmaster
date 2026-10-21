@@ -9,7 +9,8 @@ import { renderWidget, emptyValue, gradeWidget, answerSummary } from '../widgets
 import { parseTable, tableText, parseMatching, matchingText, parseParts, partsText, EXAMPLES } from '../widget-text.js';
 import { go } from '../router.js';
 
-const TABS = [['questions', '📚 Questions'], ['students', '🧑‍🎓 Students'], ['feedback', '💬 Feedback'], ['roster', '📋 School list']];
+const TABS = [['questions', '📚 Questions'], ['students', '🧑‍🎓 Students'], ['feedback', '💬 Feedback'],
+  ['roster', '📋 School list', 'admin'], ['teachers', '👩‍🏫 Teachers', 'admin']];
 const TYPES = [
   ['mcq', 'Multiple choice'], ['free', 'Short answer'], ['table', 'Fill-in table'],
   ['matching', 'Matching'], ['graph', 'Plot on a graph'], ['parts', 'Multi-part'],
@@ -19,7 +20,8 @@ const when = (t) => (t ? new Date(t * 1000).toLocaleString() : '—');
 
 export function renderAdmin(app) {
   let tab = 'questions';
-  const state = { index: null, course: null, topic: null, data: null, students: null, group: '', search: '', feedback: null, roster: null };
+  const state = { index: null, course: null, topic: null, data: null, students: null, group: '', search: '', feedback: null, roster: null, staff: null };
+  const owner = () => account.role === 'admin';
 
   if (!account.admin) return drawLogin();
   draw();
@@ -38,7 +40,7 @@ export function renderAdmin(app) {
         }
       },
     },
-    h('label.field', {}, h('span', {}, 'Username'), h('input', { name: 'username', required: true, autocomplete: 'username' })),
+    h('label.field', {}, h('span', {}, 'Username or email'), h('input', { name: 'username', required: true, autocomplete: 'username' })),
     h('label.field', {}, h('span', {}, 'Password'), h('input', { name: 'password', type: 'password', required: true, autocomplete: 'current-password' })),
     h('button.btn.primary.lg', { type: 'submit' }, 'Sign in'));
     mount(app, h('section.auth', {},
@@ -52,14 +54,14 @@ export function renderAdmin(app) {
     const body = h('div.admin-body', {}, h('p.muted', {}, 'Loading…'));
     mount(app, h('section.admin', {},
       h('div.admin-head', {},
-        h('div', {}, h('p.eyebrow', {}, 'Teacher'), h('h1.display', {}, 'Admin')),
+        h('div', {}, h('p.eyebrow', {}, owner() ? 'Admin' : 'Teacher'), h('h1.display', {}, 'Admin')),
         h('div.admin-head-actions', {},
           h('a.btn.ghost.sm', { href: '#/hub' }, 'Student view'),
           h('button.btn.ghost.sm', { onclick: async () => { await adminLogout(); go('login'); } }, 'Sign out'))),
-      h('nav.admin-tabs', { role: 'tablist' }, TABS.map(([id, label]) =>
+      h('nav.admin-tabs', { role: 'tablist' }, TABS.filter(([, , who]) => !who || owner()).map(([id, label]) =>
         h('button.chip', { role: 'tab', 'aria-selected': String(tab === id), onclick: () => { tab = id; draw(); } }, label))),
       body));
-    ({ questions: questionsTab, students: studentsTab, feedback: feedbackTab, roster: rosterTab })[tab](body)
+    ({ questions: questionsTab, students: studentsTab, feedback: feedbackTab, roster: rosterTab, teachers: teachersTab })[tab](body)
       .catch((e) => body.replaceChildren(h('p.auth-error', {}, e.message)));
   }
 
@@ -337,7 +339,7 @@ export function renderAdmin(app) {
           h('td', {}, h('button.btn.ghost.sm', {
             onclick: () => set(s, { hidden: !s.hidden }, s.hidden ? 'Back on the leaderboard' : 'Removed from the leaderboard'),
           }, s.hidden ? '↩ Show' : '🚫 Remove')),
-          h('td.admin-row-actions', {},
+          owner() && h('td.admin-row-actions', {},
             h('button.btn.ghost.sm', {
               onclick: () => {
                 const pw = prompt(`New password for ${s.name} (at least 8 characters):`);
@@ -410,5 +412,42 @@ export function renderAdmin(app) {
         },
       }, 'Upload')),
       status));
+  }
+
+  // ------------------------------------------------------------- teachers
+  async function teachersTab(body) {
+    state.staff ||= (await adminApi('api/admin/staff')).staff;
+    const reload = () => { state.staff = null; draw(); };
+    const form = h('form.panel.auth-form', {
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const { name, email, password } = e.target.elements;
+        try {
+          await adminApi('api/admin/staff', { method: 'POST', body: { name: name.value, email: email.value, password: password.value } });
+          toast('Teacher saved', `${name.value} can sign in with their email.`, { icon: '✅', tone: 'success' });
+          reload();
+        } catch (err) {
+          toast('Not saved', err.message, { tone: 'danger', icon: '⚠️' });
+        }
+      },
+    },
+    h('h3', {}, 'Add a teacher'),
+    h('p.muted', {}, 'Teachers can fix questions, read feedback and hide students from the leaderboard. Only you can upload the school list, reset passwords, delete accounts and manage teachers. Saving an existing email sets a new password.'),
+    h('label.field', {}, h('span', {}, 'Name'), h('input', { name: 'name', required: true })),
+    h('label.field', {}, h('span', {}, 'Email'), h('input', { name: 'email', type: 'email', required: true })),
+    h('label.field', {}, h('span', {}, 'Password (at least 10 characters)'), h('input', { name: 'password', type: 'password', minlength: 10, required: true, autocomplete: 'new-password' })),
+    h('button.btn.primary', { type: 'submit' }, 'Save teacher'));
+    body.replaceChildren(form,
+      state.staff.length ? h('div.table-wrap', {}, h('table.admin-table', {},
+        h('thead', {}, h('tr', {}, ['Teacher', 'Email', ''].map((c) => h('th', {}, c)))),
+        h('tbody', {}, state.staff.map((t) => h('tr', {},
+          h('td', {}, h('b', {}, t.name)), h('td', {}, t.email),
+          h('td.admin-row-actions', {}, h('button.btn.ghost.sm.danger', {
+            onclick: async () => {
+              if (!confirm(`Remove ${t.name}'s teacher account?`)) return;
+              await adminApi(`api/admin/staff/${t.id}`, { method: 'DELETE' });
+              reload();
+            },
+          }, 'Remove'))))))) : h('p.muted', {}, 'No teacher accounts yet.'));
   }
 }
