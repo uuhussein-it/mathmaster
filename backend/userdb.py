@@ -25,6 +25,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
 POSTGRES = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 
 _pool = None
+_pool_pid = None
 _pool_lock = threading.Lock()
 
 
@@ -51,9 +52,14 @@ class _PgConn:
 
     _conn = None
 
-    def __init__(self, pool):
+    def __init__(self, pool=None):
+        """From the pool, or (pool=None) a direct connection of its own."""
         self._pool = pool
-        self._conn = pool.getconn()
+        if pool is None:
+            import psycopg
+            self._conn = psycopg.connect(DATABASE_URL, connect_timeout=15, **_CONN_KWARGS)
+        else:
+            self._conn = pool.getconn()
 
     def execute(self, query, params=()):
         return self._conn.execute(_sql(query), params or None)
@@ -78,24 +84,33 @@ class _PgConn:
                 conn.rollback()  # end a read-only transaction (uncommitted writes are dropped, as in sqlite3)
             except Exception:
                 pass  # a broken connection: the pool discards it
-            self._pool.putconn(conn)
+            if self._pool is None:
+                conn.close()
+            else:
+                self._pool.putconn(conn)
 
     # A request that fails between connect() and close() must still hand its
     # connection back, or the pool runs dry and every later request times out.
     __del__ = close
 
 
+_CONN_KWARGS = {"row_factory": _row_factory,
+                # no server-side prepared statements: safe behind Neon's pooler
+                "prepare_threshold": None}
+
+
 def _get_pool():
-    global _pool
+    """This process's pool. gunicorn can load the app and then fork its
+    workers; a pool made before the fork has lost its background threads, so
+    it never opens a new connection. Each process therefore makes its own."""
+    global _pool, _pool_pid
     with _pool_lock:
-        if _pool is None:
+        if _pool is None or _pool_pid != os.getpid():
             from psycopg_pool import ConnectionPool
             # Neon closes idle connections, so each one is checked before use.
             _pool = ConnectionPool(DATABASE_URL, min_size=1, max_size=10, open=True, timeout=20,
-                                   check=ConnectionPool.check_connection,
-                                   kwargs={"row_factory": _row_factory,
-                                           # no server-side prepared statements: safe behind Neon's pooler
-                                           "prepare_threshold": None})
+                                   check=ConnectionPool.check_connection, kwargs=_CONN_KWARGS)
+            _pool_pid = os.getpid()
             atexit.register(_pool.close)
     return _pool
 
@@ -119,7 +134,7 @@ def connect():
     if not POSTGRES:
         return db.get_conn()
     if not has_app_context():
-        return _PgConn(_get_pool())
+        return _PgConn()  # startup: no pool before gunicorn forks
     # One connection per request: Neon is a network hop away, so opening one
     # per query is slow, and a request never holds more than one pool slot.
     if "userdb_conn" not in g:
@@ -135,7 +150,7 @@ def close_request_connections(_exc=None):
 
 
 def pool_stats():
-    return _pool.get_stats() if _pool is not None else None
+    return _pool.get_stats() if _pool is not None and _pool_pid == os.getpid() else None
 
 
 def insert(conn, query, params=()):
