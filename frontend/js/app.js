@@ -17,6 +17,8 @@ import { renderResults } from './screens/results.js';
 import { renderLogin } from './screens/login.js';
 import { renderLevel } from './screens/level.js';
 import { renderAdmin } from './screens/admin.js';
+import { renderArena } from './screens/arena.js';
+import { renderFight } from './screens/fight.js';
 
 /** Top bar: hero portrait, level, XP progress, score and streak. */
 function renderHud() {
@@ -55,6 +57,8 @@ register('sat', renderSat);
 register('play', renderPlay, { needsPayload: true });
 register('simulator', renderSimulator, { needsPayload: true });
 register('results', renderResults, { needsPayload: true });
+register('arena', renderArena);
+register('fight', renderFight, { needsPayload: true });
 
 onProfileChange(renderHud);
 renderHud();
