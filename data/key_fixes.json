@@ -1,0 +1,560 @@
+{
+ "kind": "course",
+ "fixes": [
+  {
+   "qid": 11201,
+   "answer": "x = 2",
+   "explanation": "Cross-multiply: −2(x − 2) = 3(2x − 4), so −2x + 4 = 6x − 12. Then 16 = 8x, so x = 2."
+  },
+  {
+   "qid": 11204,
+   "answer": "x = 6/7",
+   "explanation": "Distribute: (10x − 2) − 12x = (2x − 2) + (3x − 6), so −2x − 2 = 5x − 8. Then 6 = 7x, so x = 6/7."
+  },
+  {
+   "qid": 11206,
+   "answer": "x = 1",
+   "explanation": "Square perimeter 4(4x − 1) = 16x − 4 and rectangle perimeter 2(3x + 3) = 6x + 6. Setting them equal gives 10x = 10, so x = 1."
+  },
+  {
+   "qid": 11324,
+   "answer": "105",
+   "explanation": "x° is drawn outside the triangle (between the up-right and down-right rays at the top vertex), so it is the exterior angle: 55 + 50 = 105; 75 is the interior angle there."
+  },
+  {
+   "qid": 11332,
+   "answer": "31",
+   "explanation": "∠5 and ∠8 are same-side interior angles: 112 + 2y + 6 = 180 gives 2y = 62, y = 31."
+  },
+  {
+   "qid": 11333,
+   "answer": "46",
+   "explanation": "∠3 (interior, at j) and ∠8 (exterior, at k) are not alternate exterior angles; ∠8 is vertical to ∠5, which is same-side interior with ∠3, so ∠3 + ∠8 = 180: 2x + 16 = 108, x = 46."
+  },
+  {
+   "qid": 11336,
+   "answer": "60",
+   "explanation": "x is the interior angle of the parallelogram at the other end of the bottom edge (left of the cut, above the bottom edge); consecutive angles are supplementary, so x = 180 − 120 = 60."
+  },
+  {
+   "qid": 11354,
+   "correct": "CE",
+   "explanation": "Select-all question: SAS with ∠A ≅ ∠L needs both AB ≅ LK (C) and AC ≅ LM (E)."
+  },
+  {
+   "qid": 11359,
+   "answer": "36",
+   "explanation": "△ABC ≅ △FDE: D ↔ B so y = 48; ∠F ↔ ∠A = 180 − 108 − 48 = 24, so 2x − 48 = 24 and x = 36."
+  },
+  {
+   "qid": 10404,
+   "answer": "1) x = 20/a, 2) x = −9/a, 3) x = 4/a",
+   "explanation": "−7 = −ax − 16 gives 9 = −ax, so x = −9/a."
+  },
+  {
+   "qid": 10420,
+   "answer": "x = 1",
+   "explanation": "16x − 4 = 6x + 6 gives 10x = 10, so x = 1."
+  },
+  {
+   "qid": 10433,
+   "answer": "x = 5",
+   "explanation": "|x − 8| = 2x − 7: x = −1 is extraneous; x − 8 = −(2x − 7) gives x = 5, and 2|5 − 8| + 14 = 20 = 4(5). x = 11 fails (20 ≠ 44)."
+  },
+  {
+   "qid": 10437,
+   "answer": "y = 4/5",
+   "explanation": "10(4y + 7) = 15(6y + 2) gives 40y + 70 = 90y + 30, so 50y = 40 and y = 4/5; y = 1/2 gives 9/15 vs 5/10."
+  },
+  {
+   "qid": 10481,
+   "answer": "D",
+   "explanation": "Line passes through (1, 3) and (2, 0) (also (0, 6)); slope = (0 − 3)/(2 − 1) = −3, which is option D, not B (−1/3)."
+  },
+  {
+   "qid": 10508,
+   "correct": "B",
+   "explanation": "Cost for any time in (0,1] is $13, so each step has an open circle on the left and a closed dot on the right; that is graph B. Graph A has closed left / open right."
+  },
+  {
+   "qid": 10527,
+   "answer": "6.8",
+   "explanation": "8 = (2/5)(3) + b gives b = 8 − 1.2 = 6.8."
+  },
+  {
+   "qid": 10541,
+   "correct": "DBA",
+   "explanation": "y − 7 = 3(x + 4) gives 3x − y = −19; the answer bank only has 3, −1, −19 (not −3, 1, 19), so the key must use A > 0."
+  },
+  {
+   "qid": 10559,
+   "correct": "B",
+   "explanation": "Points read from the grid are (1,5),(2,7),(3,3),(4,6),(5,2),(6,3),(7,0),(8,2); mean point (4.5, 3.5). Least-squares line is y ≈ −0.71x + 6.69, i.e. option B. Option C gives 1.9 at x = 4.5, leaving most points above it."
+  },
+  {
+   "qid": 10592,
+   "correct": "AB",
+   "explanation": "Select-all question: 20y > −7 + 18y gives y > −3.5 = −7/2, so both A (y > −3.5) and B (y > −7/2) are correct."
+  },
+  {
+   "qid": 10607,
+   "correct": "D",
+   "explanation": "4 pads cost 4 × 3.25 = 13; 18 − 13 = 5 and 24 − 13 = 11, so 5 ≤ 0.75x ≤ 11, which is option D (option A is 6 ≤ 0.75x ≤ 12)."
+  },
+  {
+   "qid": 11388,
+   "answer": "5",
+   "explanation": "(3.7×4.2)/1.5 = 10.36 = 1.036×10, so 10^(1+13−x) = 10^9 gives x = 5."
+  },
+  {
+   "qid": 11394,
+   "answer": "No real solution",
+   "explanation": "Right side simplifies to 2x² − 7x − 3, giving 2x² + 3x + 12 = 0 with discriminant 9 − 96 = −87 < 0; x = 6 does not satisfy it (LHS 129, RHS 51)."
+  },
+  {
+   "qid": 11398,
+   "answer": "≈ 14.98 ft",
+   "explanation": "2x² + 10x − 299 = 0 gives x = (−10 + √2492)/4 ≈ 9.98, so height x + 5 ≈ 14.98 ft."
+  },
+  {
+   "qid": 11430,
+   "answer": "The square stone",
+   "explanation": "Square area 12 × 12 = 144 sq in; round area π(6.5)² ≈ 132.7 sq in, so the square stone gives more stone."
+  },
+  {
+   "qid": 11432,
+   "answer": "x = 5",
+   "explanation": "(x + 1)² = 4(x + 4) gives x² − 2x − 15 = 0, x = 5 or −3; −3 is extraneous; x = 0 gives 1 − 4 = −3 ≠ 0."
+  },
+  {
+   "qid": 10619,
+   "answer": "4x² - 10x + 1",
+   "explanation": "x terms: 3x - 3x + x - 11x = -10x, so the perimeter is 4x² - 10x + 1."
+  },
+  {
+   "qid": 10664,
+   "correct": "DEF",
+   "explanation": "The source is a three-item matching question; a single letter only covers the pentagon. Regular hexagon = 720/6 = 120°, regular octagon = 1080/8 = 135°."
+  },
+  {
+   "qid": 10668,
+   "answer": "17",
+   "explanation": "All labelled angles (5x−10, 4x, 2x+3) and the two right angles are exterior angles; 90 + 90 + 5x − 10 + 4x + 2x + 3 = 360 gives 11x = 187, x = 17."
+  },
+  {
+   "qid": 10672,
+   "answer": "68°",
+   "explanation": "2x, 3x+2, 4x−18, 2x+2 are the four exterior angles of quadrilateral KLMJ: 11x − 14 = 360, x = 34, so m∠RKL = 2x = 68°."
+  },
+  {
+   "qid": 10673,
+   "answer": "157°",
+   "explanation": "ABCDEFGH is an octagon (sum 1080°); (1080 − 80 − 80 − 135) ÷ 5 = 157°."
+  },
+  {
+   "qid": 10675,
+   "correct": "CAB",
+   "explanation": "Diagonals bisect each other: EI = IG = 4 and HI = FI = 5."
+  },
+  {
+   "qid": 10692,
+   "answer": "m∠BIF = 126°, m∠JBC = 63°, m∠BJD = 117°",
+   "explanation": "At B, ∠ABI + 54° + ∠JBC = 180° with the two congruent outer tiles giving equal angles, so ∠JBC = 63°; ∠BJD = 180° − 63° = 117° (BC ∥ JD)."
+  },
+  {
+   "qid": 10695,
+   "answer": "6√13 ≈ 21.6 cm²",
+   "explanation": "7 cm labels the slanted side, not the dashed height; height = √(7² − 6²) = √13, area = 6√13 ≈ 21.6 cm²."
+  },
+  {
+   "qid": 10700,
+   "answer": "m∠BDC = 48°, m∠EBC = 42°",
+   "explanation": "Triangle AEB (side AB) has base angles 48°, so ∠ABD = 48° = ∠BDC (alternate angles, AB ∥ DC) and ∠EBC = 90° − 48° = 42°."
+  },
+  {
+   "qid": 10706,
+   "correct": "A",
+   "explanation": "Every rhombus has perpendicular diagonals (AC ⊥ BD); congruent diagonals hold only for a square."
+  },
+  {
+   "qid": 10713,
+   "answer": "14",
+   "explanation": "2(x + 5) = 8x − 2 gives x = 2, so BD = 14; square diagonals are congruent, so AC = 14."
+  },
+  {
+   "qid": 10715,
+   "answer": "14",
+   "explanation": "2(x + 5) = 8x − 2 gives x = 2, BD = 14, and AC = BD = 14 in a square."
+  },
+  {
+   "qid": 10718,
+   "answer": "107",
+   "explanation": "m∠W = 55° and m∠Y = 91° are unequal, so the congruent kite angles are ∠X and ∠Z: 2·m∠WXY = 360 − 55 − 91 = 214, m∠WXY = 107°."
+  },
+  {
+   "qid": 10719,
+   "correct": "CB",
+   "explanation": "The question has two blanks; B (78°) only answers angle D. Angle C is supplementary to angle D along leg CD (equal to angle B), so it is 102°."
+  },
+  {
+   "qid": 10741,
+   "answer": "2.25",
+   "explanation": "ABDE ~ CDEF gives AB/CD = BD/DE: 5/4 = BD/5, BD = 6.25, AF = 6.25 − 4 = 2.25."
+  },
+  {
+   "qid": 10744,
+   "answer": "1.5",
+   "explanation": "Angle marks give A↔L, D↔P, so AB=14 ↔ LM=x+9 and BC=10 ↔ MN=x+6: 14(x+6)=10(x+9), x=1.5. x=15 satisfies no proportion."
+  },
+  {
+   "qid": 10752,
+   "answer": "A",
+   "explanation": "Triangle A has angles 72° and 63° like ΔGHI (AA). In C the 72° angle is between sides 8 and 6, but in ΔGHI sides 4 and 3 include the 63° angle, so C is not similar."
+  },
+  {
+   "qid": 10755,
+   "answer": "AA",
+   "explanation": "∠F ≅ ∠G (marked) and ∠FJH ≅ ∠GJI (vertical angles); only one pair of sides is given, so SAS cannot apply."
+  },
+  {
+   "qid": 10757,
+   "answer": "Yes, ΔABC ~ ΔDEF by SAS Similarity",
+   "explanation": "AB/DE = 3.6/6 = 0.6 and BC/EF = 3/5 = 0.6 with included ∠B = ∠E = 53°."
+  },
+  {
+   "qid": 10758,
+   "answer": "A, B",
+   "explanation": "D↔I, E↔G, F↔H with ratio 1.5 (DE=2↔IG=3, EF=4↔GH=6). HI = 4.5 gives SSS (A); ∠E ≅ ∠G is included between proportional sides (B). ∠D ≅ ∠I is not included between known proportional sides."
+  },
+  {
+   "qid": 10759,
+   "answer": "2/3",
+   "explanation": "10/7.5 = (11x+2)/(9x+1) gives 90x+10 = 82.5x+15, 7.5x = 5, x = 2/3."
+  },
+  {
+   "qid": 10762,
+   "answer": "Mariam is correct",
+   "explanation": "Sides 10,12,14 and 5,6,7 are in ratio 2, so the triangles are similar by SSS; Mariam claimed similar."
+  },
+  {
+   "qid": 10765,
+   "answer": "x = 11",
+   "explanation": "10/15 = (2x+4)/(4x−5) gives 8x−10 = 6x+12, x = 11."
+  },
+  {
+   "qid": 10766,
+   "answer": "6",
+   "explanation": "3(x−1)/7.5 = 8/4 gives x − 1 = 5, so x = 6 (also 10/(x−1) = 2)."
+  },
+  {
+   "qid": 10772,
+   "answer": "1.5",
+   "explanation": "0.5/0.75 = 0.6/x gives x = 0.9 for the Pine–Clay block, but the question asks for Bush to Clay: 0.6 + 0.9 = 1.5 mi."
+  },
+  {
+   "qid": 10776,
+   "answer": "A",
+   "explanation": "FH/HE = 4/2 = FI/IG = 6/3, so HI ∥ EG (A) is true. C is false: HI/EG = FH/FE = 2/3, not FH/HE = 2."
+  },
+  {
+   "qid": 10782,
+   "correct": "C",
+   "explanation": "Corresponding sides/altitudes: x/7 = 2/5 is option C; option D is x/7 = 5/2."
+  },
+  {
+   "qid": 10786,
+   "answer": "21/8",
+   "explanation": "6/10 = AB/(7 − AB) gives 6(7 − AB) = 10AB, 42 = 16AB, AB = 21/8 = 2.625."
+  },
+  {
+   "qid": 10787,
+   "answer": "Corresponding medians of similar triangles are proportional to corresponding sides",
+   "explanation": "BD and HF are corresponding medians."
+  },
+  {
+   "qid": 10789,
+   "answer": "24/7",
+   "explanation": "CD/MQ = AD/PM gives x/4 = 6/7, so x = 24/7 ≈ 3.43."
+  },
+  {
+   "qid": 10790,
+   "answer": "AF = 5.4 km, BF = 3.6 km",
+   "explanation": "TF bisects angle ATB (two 64° angles), so AF/BF = 6/4 with AF + BF = 9."
+  },
+  {
+   "qid": 10807,
+   "answer": "acute triangle",
+   "explanation": "XY² = 10, YZ² = 13, XZ² = 17; 10 + 13 = 23 > 17 and no pair sums to the third, so it is a triangle and it is acute, not right."
+  },
+  {
+   "qid": 10818,
+   "answer": "4√3 − 4",
+   "explanation": "BC = 8/2 = 4, AC = 4√3, triangle BDC is 45-45-90 so DC = 4; AD = AC − DC = 4√3 − 4 ≈ 2.93."
+  },
+  {
+   "qid": 10820,
+   "correct": "B",
+   "explanation": "Right angle at E; side adjacent to D is DE = 5, hypotenuse DF = 13, so cos D = 5/13 (option B). 5/12 is cot D."
+  },
+  {
+   "qid": 10823,
+   "correct": "B",
+   "explanation": "AB = 6 (hypotenuse), BC = 2, so AC = √32 = 4√2 and cos A = 4√2/6 = 2√2/3 (option B). −1 is impossible for an acute angle."
+  },
+  {
+   "qid": 10838,
+   "answer": "16.60",
+   "explanation": "Area = ½ × 5.4 × 7.1 × sin 60° = 19.17 × 0.8660 = 16.6017, which rounds to 16.60, not 16.61."
+  },
+  {
+   "qid": 10846,
+   "answer": "y ≈ 4.99",
+   "explanation": "y² = 61 − 60cos53° ≈ 61 − 36.11 = 24.89, and √24.89 ≈ 4.99, not 4.81."
+  },
+  {
+   "qid": 10847,
+   "answer": "BC ≈ 7.47, m∠B ≈ 57.2°, m∠C ≈ 37.8°",
+   "explanation": "BC² = 4.6² + 6.3² − 2(4.6)(6.3)cos85° ≈ 60.85 − 5.05 = 55.80, BC ≈ 7.47; sin C = 4.6·sin85°/7.47 ≈ 0.6135 → C ≈ 37.8°, B = 180 − 85 − 37.8 ≈ 57.2°."
+  },
+  {
+   "qid": 10849,
+   "answer": "≈ 59.78 ft",
+   "explanation": "x = 90·sin41°/sin81° = 90(0.6561)/0.9877 ≈ 59.78 ft."
+  },
+  {
+   "qid": 10850,
+   "answer": "i. 3 cm, ii. 39°, iii. 71°",
+   "explanation": "sin A = 2·sin70°/2.98 ≈ 0.630 → A ≈ 39.1°, which rounds to 39°, so B = 180 − 70 − 39 = 71°."
+  },
+  {
+   "qid": 10853,
+   "answer": "≈ 841 ft",
+   "explanation": "c² = 175² + 860² − 2(175)(860)cos78° = 770225 − 62582 ≈ 707643, so c ≈ 841.2 ft."
+  },
+  {
+   "qid": 10858,
+   "correct": "CA",
+   "explanation": "The graph's horizontal asymptote is y = -4 and it passes through (1, -3) and (2, -1), so y = 3^(x - 1) - 4: h = 1 and k = -4."
+  },
+  {
+   "qid": 10876,
+   "answer": "x = -1/13",
+   "explanation": "(1/2)^(x-3) = 2^(3-x) and 16^(3x+1) = 2^(12x+4); 3 - x = 12x + 4 gives 13x = -1, so x = -1/13."
+  },
+  {
+   "qid": 10877,
+   "answer": "x = 1",
+   "explanation": "(25/81)^(2x+1) = (5/9)^(4x+2) and (729/125)^(-3x+1) = (5/9)^(9x-3); 4x + 2 = 9x - 3 gives 5x = 5, so x = 1, not -7."
+  },
+  {
+   "qid": 10879,
+   "answer": "1) e², 2) 16e¹⁰ˣ, 3) -4e¹², 4) -24e²",
+   "explanation": "Part 4: -216e^(5/2) / (9e^(1/2)) = -24e²."
+  },
+  {
+   "qid": 10892,
+   "correct": "AD",
+   "explanation": "Select-all question: log₈ 2 = 1/3, and both log₆₄ 4 and log₁₂₅ 5 equal 1/3."
+  },
+  {
+   "qid": 10917,
+   "answer": "x = 27",
+   "explanation": "x² − 23x − 108 = (x − 27)(x + 4); x = 27 gives 756 on both sides, x = −4 is extraneous."
+  },
+  {
+   "qid": 10924,
+   "answer": "≈ 79,315 Pa",
+   "explanation": "log P = 5 − 1560/15500 = 4.899355, so P = 10^4.899355 ≈ 79,315, not 76,384."
+  },
+  {
+   "qid": 10934,
+   "answer": "x = ln(11) - 3",
+   "explanation": "-2e^(x+3) = -22 gives e^(x+3) = 11, so x = ln 11 - 3."
+  },
+  {
+   "qid": 10939,
+   "answer": "ln(4/3)",
+   "explanation": "(1/3)ln 8 = ln 2, so ln 2 - ln 3 + ln 2 = ln(2*2/3) = ln(4/3)."
+  },
+  {
+   "qid": 10941,
+   "answer": "No solution",
+   "explanation": "(2x+1)(2x+3) = (2x-2)^2 gives 16x = 1, x = 1/16, which makes 2x - 2 negative, so it is extraneous; x = 5 does not satisfy the equation."
+  },
+  {
+   "qid": 10948,
+   "correct": "AB",
+   "explanation": "The question asks for two equivalent forms; B, (x^2+2x-15)/(x^2-11x+10), is the expanded form of A."
+  },
+  {
+   "qid": 10951,
+   "answer": "2(d+1)/(d-1)",
+   "explanation": "2(d+3)/((d+2)(d-1)) * (d+2)(d+1)/(d+3) = 2(d+1)/(d-1)."
+  },
+  {
+   "qid": 10952,
+   "answer": "C",
+   "explanation": "B is (x-3)/(x+8)."
+  },
+  {
+   "qid": 10960,
+   "answer": "(x + 6)/(5x)",
+   "explanation": "(x-4) appears in both numerator (from x^2+2x-24) and denominator (from x^2-12x+32) and cancels, leaving (x+6)/(5x)."
+  },
+  {
+   "qid": 10963,
+   "answer": "2(4x - 5)(4x + 5)(2x - 1)",
+   "explanation": "16x^2 + 12x - 10 = 2(8x^2 + 6x - 5) = 2(4x + 5)(2x - 1), not (4x-5)(4x+2); so the LCM is 2(4x-5)(4x+5)(2x-1)."
+  },
+  {
+   "qid": 10965,
+   "answer": "(6x − 21)/((x + 5)(x − 4))",
+   "explanation": "8x − 11 − 2(x + 5) = 6x − 21 = 3(2x − 7); nothing cancels with (x + 5)(x − 4)."
+  },
+  {
+   "qid": 10966,
+   "correct": "B",
+   "explanation": "−7(x − 7) + 12(x − 2) = 5x + 25 = 5(x + 5), giving 5/((x − 2)(x − 7)) = 5/(x² − 9x + 14), option B."
+  },
+  {
+   "qid": 10969,
+   "answer": "−1/4",
+   "explanation": "2(x + 5) − (3x + 8) = −x + 2 = −(x − 2), so the result is −(x − 2)/(4(x − 2)) = −1/4."
+  },
+  {
+   "qid": 10970,
+   "answer": "(2x + 13)/((x + 3)(x + 6))",
+   "explanation": "4/(2x + 6) = 2/(x + 3); 2(x + 6) + 1 = 2x + 13."
+  },
+  {
+   "qid": 10981,
+   "correct": "ABC",
+   "explanation": "Select all that apply: hole at x = 5, VA at x = −5, and (x² + 5x + 25)/(x + 5) = x + 25/(x + 5) gives oblique asymptote y = x."
+  },
+  {
+   "qid": 10983,
+   "correct": "CBA",
+   "explanation": "h = (x − 1)/(3x + 3) is the hyperbola (A); g = (x − 1)/3 with a hole at x = −1 is the line (B); f = (x³ − 1)/(3x + 3) is the parabola-like graph with VA x = −1 (C)."
+  },
+  {
+   "qid": 10995,
+   "answer": "x = 2",
+   "explanation": "1 − (x − 8) = 7 gives x = 2; 2 − 8 = −6 ≠ 0, and both sides equal −7/6, so x = 2 is valid."
+  },
+  {
+   "qid": 10996,
+   "answer": "x = −3/4",
+   "explanation": "−2(x + 1) = 4 + 6x gives x = −3/4, which checks (both sides 8/3)."
+  },
+  {
+   "qid": 10997,
+   "answer": "x = -1/2",
+   "explanation": "Clearing denominators gives 2x(x−3)+(x+2)=5, i.e. 2x²−5x−3=0 = (2x+1)(x−3); x=3 is extraneous, so x=−1/2."
+  },
+  {
+   "qid": 10998,
+   "answer": "x = 21",
+   "explanation": "(x−5)+(3x+12)=7x−56 gives 4x+7=7x−56, so x=21."
+  },
+  {
+   "qid": 11003,
+   "answer": "x < -5 or 1 <= x < 7",
+   "explanation": "(2x−2)/((x+5)(x−7)) ≤ 0: sign is − for x<−5, + on (−5,1), − on (1,7), + for x>7."
+  },
+  {
+   "qid": 11006,
+   "answer": "k < 0 or k > 5/6",
+   "explanation": "5/(9k) < 2/3: for k>0 gives k>5/6; every k<0 also works since the left side is negative."
+  },
+  {
+   "qid": 11008,
+   "answer": "30 ml",
+   "explanation": "10 + 0.6x = 0.4(40 + x) gives 0.2x = 6, so x = 30 ml."
+  },
+  {
+   "qid": 11030,
+   "answer": "2.5%",
+   "explanation": "15 is +2σ; by the empirical rule 2.5% (2.35% + 0.15%) lies above +2σ."
+  },
+  {
+   "qid": 11828,
+   "answer": "x = 12.5",
+   "explanation": "The vertical side is split into 4 equal 12-inch spaces, so the parallel shelves split the 50-inch slanted side into 4 equal parts: x = 50/4 = 12.5."
+  },
+  {
+   "qid": 11041,
+   "answer": "≈ 8.3 km",
+   "explanation": "d = √(64 + 9 − 48 cos 85°) = √68.82 ≈ 8.3 km; 9 km is not a correct rounding."
+  },
+  {
+   "qid": 11058,
+   "answer": "i. (175√3 + 175) + (175√3 − 175)i ≈ 478.1 + 128.1i; ii. 14cos155° + 14i sin155° ≈ −12.69 + 5.92i",
+   "explanation": "i: 350√2(cos π/12 + i sin π/12) = 175(√3+1) + 175(√3−1)i. ii: 14 cis 155°, not 14 cis 135°."
+  },
+  {
+   "qid": 11059,
+   "answer": "−(1 + √3)/6 − ((√3 − 1)/6)i",
+   "explanation": "(√2/3)(cos(−165°) + i sin(−165°)); cos165° = −(√6+√2)/4, sin165° = (√6−√2)/4."
+  },
+  {
+   "qid": 11062,
+   "answer": "262144",
+   "explanation": "8⁶(cos 2π + i sin 2π) = 262144."
+  },
+  {
+   "qid": 11074,
+   "answer": "-65",
+   "explanation": "Question asks for the 4th term: a2=-5, a3=25, a4=-3(25)+10=-65; 25 is the 3rd term."
+  },
+  {
+   "qid": 11075,
+   "answer": "20",
+   "explanation": "Terms are 6, 4, 0, 0, 10; the fifth partial sum is 20."
+  },
+  {
+   "qid": 11084,
+   "answer": "408",
+   "explanation": "n = 17 terms, sum = (17/2)(-24 + 72) = 17 × 24 = 408."
+  },
+  {
+   "qid": 11086,
+   "answer": "48, 60, 72",
+   "explanation": "n = 12 and d = (180 - 48)/11 = 12, not 4."
+  },
+  {
+   "qid": 11087,
+   "answer": "-15, -6, 3",
+   "explanation": "2982 = 14(a1 + 228) gives a1 = -15; d = 243/27 = 9."
+  },
+  {
+   "qid": 11089,
+   "answer": "350",
+   "explanation": "10 terms, first 17, last 53: sum = 5 × 70 = 350."
+  },
+  {
+   "qid": 11090,
+   "answer": "AED 4,400",
+   "explanation": "(11/2)(150 + 650) = 5.5 × 800 = 4400."
+  },
+  {
+   "qid": 11100,
+   "answer": "-8",
+   "explanation": "-2912 = 364·a1 gives a1 = -8 (364 × 8 = 2912)."
+  },
+  {
+   "qid": 11102,
+   "answer": "≈ 471.2 cm",
+   "explanation": "S30 = 30(1 − 0.95^30)/0.05 = 600(1 − 0.214639) ≈ 471.22."
+  },
+  {
+   "qid": 11188,
+   "answer": "y = 2x + 5",
+   "explanation": "f(x) = x² + 2x⁻², f(−1) = 3, f′(−1) = −2 + 4 = 2, so tangent y − 3 = 2(x + 1), y = 2x + 5."
+  },
+  {
+   "qid": 11192,
+   "correct": "A",
+   "explanation": "y′ = −3/x⁴ + x, at x = 1 gives −2, which is option A (B is 1/4)."
+  }
+ ]
+}

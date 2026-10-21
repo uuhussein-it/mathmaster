@@ -86,6 +86,9 @@ export function renderArena(app) {
         statBar('⚔️ Attack', me.attack, 12, `${me.attack}`),
         statBar('⚡ Special', me.charge, 3, `×${me.charge}`)),
       h('p.muted.small', {}, 'Health grows with your level, attack with your quiz accuracy, and the special meter with your best answer streak.'),
+      h('div.arena-gear', {},
+        Object.values(me.gear).filter((g) => g.color).map((g) => h('span.arena-gear-item', { title: g.name }, g.icon, ' ', g.name)),
+        h('button.btn.ghost.sm', { onclick: () => go('armory') }, '🛡️ Change gear')),
       h('h3.sub-title', {}, 'Special moves'),
       h('ul.arena-specials', {}, specials));
   }

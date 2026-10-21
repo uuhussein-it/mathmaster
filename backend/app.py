@@ -1731,6 +1731,9 @@ questlearn.init(app, gemini=_gemini, images=_question_image_parts, ai_ready=_ai_
 import accounts
 accounts.init(app, is_admin=is_admin, recheck=questlearn.recheck)
 
+import gear  # noqa: E402
+gear.init(app, current_student=accounts.current_student)
+
 import arena  # noqa: E402
 arena.init(app, current_student=accounts.current_student)
 

@@ -20,6 +20,7 @@ from collections import deque
 
 from flask import Blueprint, abort, jsonify, request, session
 
+import gear
 import security
 import userdb
 
@@ -82,13 +83,15 @@ def stats(row):
     answered, correct = int(p.get("answered") or 0), int(p.get("correct") or 0)
     accuracy = correct / answered if answered >= 10 else 0.6
     streak = min(20, int(p.get("bestStreak") or 0))
+    bonus = gear.bonuses(row)
     return {
         "level": level,
         "accuracy": round(accuracy, 2),
         "best_streak": streak,
-        "hp": 100 + 10 * min(level, 20),
-        "attack": round(6 + 6 * accuracy, 1),
-        "charge": round(1 + streak / 10, 2),
+        "hp": 100 + 10 * min(level, 20) + bonus["hp"],
+        "attack": round(6 + 6 * accuracy + bonus["attack"], 1),
+        "charge": round(1 + streak / 10 + bonus["charge"], 2),
+        "gear": gear.looks(row),
         "specials": [s[0] for s in SPECIALS if level >= s[2]],
         "skin": next(name for lvl, name in SKINS if level >= lvl),
         "unlocked": level >= UNLOCK_LEVEL,
@@ -316,7 +319,8 @@ class Fighter:
                 "x": round(self.x, 1), "y": round(self.y, 1), "vx": round(self.vx), "facing": self.facing,
                 "hp": round(max(0, self.hp), 1), "max_hp": self.max_hp, "meter": round(self.meter),
                 "action": self.action, "action_t": round(self.action_t, 2), "stun": self.stun > 0,
-                "block": self.blocking(), "shield": self.shield > 0, "specials": self.st["specials"]}
+                "block": self.blocking(), "shield": self.shield > 0, "specials": self.st["specials"],
+                "gear": self.st["gear"]}
 
     def blocking(self):
         return bool(self.keys.get("block")) and self.y == 0 and self.action is None and self.stun <= 0
@@ -579,6 +583,8 @@ class Match:
                          (self.grp, a.id, b.id, a.name, b.name, self.result["winner"], round(max(0, a.hp)),
                           round(max(0, b.hp)), self.result["reason"], self.stake, self.ended))
             for f in self.f:
+                if self.result["winner"] == f.id:
+                    conn.execute("UPDATE ql_students SET arena_wins = arena_wins + 1 WHERE id=?", (f.id,))
                 if self.result["xp"][f.id]:
                     conn.execute("UPDATE ql_students SET arena_xp = arena_xp + ? WHERE id=?",
                                  (self.result["xp"][f.id], f.id))

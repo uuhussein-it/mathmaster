@@ -7,15 +7,14 @@
  * (also A/D/W/S and Z/X/C). Touch screens get on-screen buttons.
  */
 import { h, mount, burst } from '../ui.js';
-import { CHARACTERS } from '../characters.js';
 import { go } from '../router.js';
 import { account } from '../account.js';
+import { drawFighter } from '../fighter-art.js';
 
 const W = 960;
 const H = 540;
 const FLOOR = 470;
 const DELAY = 90; // ms behind the newest update, so there are two to blend between
-const SKIN_COLORS = { base: null, bronze: '#d08a4c', silver: '#d6deeb', gold: '#ffd34d' };
 const KEYMAP = {
   ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right', ArrowUp: 'up', w: 'up',
   ArrowDown: 'down', s: 'down', j: 'punch', z: 'punch', k: 'kick', x: 'kick', l: 'block', c: 'block',
@@ -28,7 +27,6 @@ export function renderFight(app, { match }) {
   const snaps = [];
   const particles = [];
   const texts = [];
-  const portraits = {};
   let socket = null;
   let raf = 0;
   let heartbeat = 0;
@@ -139,15 +137,6 @@ export function renderFight(app, { match }) {
   }
 
   // ------------------------------------------------------------------- draw
-  function portrait(character) {
-    if (!portraits[character]) {
-      const img = new Image();
-      img.src = (CHARACTERS[character] || CHARACTERS.warrior).portrait;
-      portraits[character] = img;
-    }
-    return portraits[character];
-  }
-
   /** The state DELAY ms ago, blended between the two updates around it. */
   function current(now) {
     if (!snaps.length) return null;
@@ -164,125 +153,6 @@ export function renderFight(app, { match }) {
       fighters: b.fighters.map((f, j) => ({ ...f, x: lerp(a.fighters[j].x, f.x), y: lerp(a.fighters[j].y, f.y) })),
       projectiles: b.projectiles,
     };
-  }
-
-  function drawFighter(f, now, over) {
-    const hero = CHARACTERS[f.character] || CHARACTERS.warrior;
-    const ko = over && f.hp <= 0;
-    const x = f.x;
-    const base = FLOOR - f.y;
-    const t = now / 1000;
-    ctx.save();
-    // shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(x, FLOOR + 6, 46 - Math.min(30, f.y / 8), 10, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.translate(x, base);
-    ctx.scale(f.facing, 1);
-    if (ko) ctx.rotate(-Math.PI / 2.2);
-    else if (f.stun) ctx.rotate(-0.22);
-    const aura = SKIN_COLORS[f.skin];
-    if (aura) {
-      ctx.shadowColor = aura;
-      ctx.shadowBlur = 18 + Math.sin(t * 4) * 6;
-    }
-    const walking = !f.action && !f.block && f.y === 0 && f.vx !== 0;
-    const bob = f.y > 0 ? 0 : Math.sin(t * (walking ? 12 : 3)) * (walking ? 3 : 2);
-    const hip = -78 + bob;
-    const shoulder = -138 + bob;
-    const progress = f.action ? f.action_t : 0;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = shade(hero.color, -35);
-    ctx.lineWidth = 15;
-    // legs
-    const kick = f.action === 'kick' || f.action === 'critical';
-    const stride = walking ? Math.sin(t * 12) * 16 : 10;
-    line(0, hip, kick ? 70 * ext(progress, f.action) + 8 : stride, kick ? hip - 10 * ext(progress, f.action) : 0);
-    line(0, hip, -stride - 6, 0);
-    // torso
-    ctx.fillStyle = hero.color;
-    roundRect(-22, shoulder, 44, hip - shoulder + 6, 14);
-    ctx.fill();
-    if (aura) {
-      ctx.strokeStyle = aura;
-      ctx.lineWidth = 3;
-      roundRect(-22, shoulder, 44, hip - shoulder + 6, 14);
-      ctx.stroke();
-    }
-    // belt
-    ctx.fillStyle = aura || shade(hero.color, -70);
-    ctx.fillRect(-22, hip - 12, 44, 8);
-    // arms, with fists
-    ctx.strokeStyle = shade(hero.color, -20);
-    ctx.lineWidth = 12;
-    let fists;
-    if (f.block) {
-      fists = [[34, shoulder - 14], [26, shoulder - 6]];
-      line(10, shoulder + 10, ...fists[0]);
-      line(-6, shoulder + 12, ...fists[1]);
-    } else if (f.action === 'punch' || f.action === 'critical') {
-      fists = [[30 + 62 * ext(progress, f.action), shoulder + 10], [18, shoulder + 30]];
-      line(10, shoulder + 12, ...fists[0]);
-      line(-8, shoulder + 14, ...fists[1]);
-    } else {
-      fists = [[30, shoulder + 30 + bob], [14, shoulder + 36 + bob]];
-      line(10, shoulder + 12, ...fists[0]);
-      line(-8, shoulder + 14, ...fists[1]);
-    }
-    ctx.fillStyle = f.action === 'critical' ? '#ff4d6d' : '#f5f5f5';
-    for (const [fx, fy] of fists) {
-      ctx.beginPath();
-      ctx.arc(fx, fy, 8, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // head: the hero's portrait
-    ctx.shadowBlur = 0;
-    const img = portrait(f.character);
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(4, shoulder - 26, 27, 0, Math.PI * 2);
-    ctx.clip();
-    if (img.complete && img.naturalWidth) {
-      ctx.scale(f.facing, 1); // undo the mirroring so the face isn't flipped
-      ctx.drawImage(img, 4 * f.facing - 27, shoulder - 53, 54, 54);
-    } else {
-      ctx.fillStyle = '#f2d2b6';
-      ctx.fill();
-    }
-    ctx.restore();
-    ctx.strokeStyle = aura || hero.color;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(4, shoulder - 26, 27, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-    if (f.shield) {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(138,216,255,0.9)';
-      ctx.fillStyle = 'rgba(138,216,255,0.18)';
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.ellipse(x, base - 95, 70, 110, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
-  }
-
-  const ext = (t, move) => {
-    const at = { punch: 0.09, kick: 0.18, critical: 0.25 }[move] || 0.1;
-    return t < at ? t / at : Math.max(0, 1 - (t - at) / (at * 1.6));
-  };
-  function line(x1, y1, x2, y2) {
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-  }
-  function roundRect(x, y, w, hgt, r) {
-    ctx.beginPath();
-    ctx.roundRect ? ctx.roundRect(x, y, w, hgt, r) : ctx.rect(x, y, w, hgt);
   }
 
   function drawStage() {
@@ -383,7 +253,7 @@ export function renderFight(app, { match }) {
         ctx.fill();
       }
       // draw yourself in front
-      [...s.fighters].sort((a) => (a.id === me ? 1 : -1)).forEach((f) => drawFighter(f, now, s.phase === 'over'));
+      [...s.fighters].sort((a) => (a.id === me ? 1 : -1)).forEach((f) => drawFighter(ctx, f, { now, over: s.phase === 'over', floor: FLOOR }));
       drawHud(s);
     }
     for (const p of particles) {
@@ -441,10 +311,4 @@ export function renderFight(app, { match }) {
     window.removeEventListener('blur', blur);
     socket?.close();
   };
-}
-
-function shade(hex, amt) {
-  const n = parseInt(hex.slice(1), 16);
-  const c = (v) => Math.max(0, Math.min(255, v + amt));
-  return `rgb(${c(n >> 16)}, ${c((n >> 8) & 255)}, ${c(n & 255)})`;
 }

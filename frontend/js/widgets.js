@@ -61,7 +61,7 @@ export function sameAnswer(given, expected) {
 // ------------------------------------------------------------ rendering
 /** Whether the widget has typed (not just numeric) answers, so it gets the math keys. */
 export function typesText(spec) {
-  return spec.widget === 'parts' || (spec.widget === 'multi' && spec.items.some(typesText));
+  return spec.widget === 'parts' || spec.widget === 'table' || (spec.widget === 'multi' && spec.items.some(typesText));
 }
 
 export function emptyValue(spec) {
