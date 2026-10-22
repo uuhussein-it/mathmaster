@@ -157,3 +157,7 @@ While writing them, 111 stored answer keys were found wrong. `data/key_fixes.jso
 ## Armory (gear)
 
 Students open 🛡️ Armory from the hub. Swords, armor and charms unlock with level, arena wins and best answer streak, show on the hero in fights, and add a small arena bonus (the fair-play cap still applies). Unlocks are checked on the server.
+
+## Lessons
+
+On the School Curriculum screen each topic opens to show its lessons (1.1, 1.2, …). Students can tick a whole topic or just the lessons they want; results and mastery are tracked per lesson. Teacher-written questions appear as a "Teacher questions" lesson in their topic.

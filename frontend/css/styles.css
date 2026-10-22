@@ -259,6 +259,7 @@ kbd {
 .chip-badge { margin-left: 8px; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; background: rgba(255, 255, 255, 0.1); color: var(--muted); }
 .course-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
 .course-head h2 { font-family: var(--font-display); margin: 0; }
+.course-head > .btn { white-space: nowrap; flex-shrink: 0; }
 .topic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .topic {
   display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
@@ -275,6 +276,36 @@ kbd {
 .topic.on .topic-num { background: var(--gold); color: #1b1405; border-color: var(--gold); }
 .topic-name { font-weight: 600; font-size: 15px; }
 .topic-count { font-size: 12px; color: var(--muted); }
+.lesson-tip { margin: -6px 0 12px; }
+.lesson-topics { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 12px; align-items: start; margin-bottom: 8px; }
+.lesson-topic { border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--panel); transition: border-color 0.15s; }
+.lesson-topic.on, .lesson-topic.some { border-color: var(--line); }
+.lesson-topic.on { border-color: var(--gold); }
+.lesson-topic-head { display: grid; grid-template-columns: 1fr auto; align-items: stretch; }
+.lesson-topic .topic { border: 0; background: none; border-radius: var(--radius-sm) 0 0 var(--radius-sm); }
+.lesson-topic.some .topic-num { background: rgba(230, 192, 106, 0.35); border-color: var(--gold); }
+.lesson-toggle {
+  display: flex; align-items: center; gap: 6px; padding: 0 14px; min-height: 44px; cursor: pointer;
+  background: none; border: 0; border-left: 1px solid var(--line-soft); color: var(--muted); font: inherit; font-size: 12px; font-weight: 700;
+}
+.lesson-toggle:hover, .lesson-toggle[aria-expanded='true'] { color: var(--gold); }
+.lesson-caret { transition: transform 0.15s; }
+.lesson-toggle[aria-expanded='true'] .lesson-caret { transform: rotate(180deg); }
+.lesson-list { list-style: none; margin: 0; padding: 6px 10px 10px; border-top: 1px solid var(--line-soft); display: grid; gap: 6px; }
+.lesson {
+  position: relative; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px;
+  padding: 10px 12px; min-height: 44px; border-radius: 10px; cursor: pointer; border: 1px solid transparent;
+}
+.lesson input { position: absolute; opacity: 0; pointer-events: none; }
+.lesson:hover { background: rgba(255, 255, 255, 0.04); }
+.lesson.on { border-color: var(--line); background: rgba(230, 192, 106, 0.1); }
+.lesson:has(input:focus-visible) { outline: 2px solid var(--gold); outline-offset: 1px; }
+.lesson-ref {
+  min-width: 38px; padding: 3px 6px; border-radius: 7px; text-align: center; font-size: 12px; font-weight: 800;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line-soft);
+}
+.lesson.on .lesson-ref { background: var(--gold); color: #1b1405; border-color: var(--gold); }
+.lesson-name { font-size: 14px; }
 .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px; }
 .mode-card, .format-card {
   text-align: left; padding: 20px; border-radius: var(--radius); cursor: pointer;

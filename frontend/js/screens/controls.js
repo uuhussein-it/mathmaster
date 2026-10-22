@@ -50,3 +50,47 @@ export function selectAllButton(topics, selected, onChange) {
     },
   }, all ? 'Clear all' : 'Select all');
 }
+
+/** Selection key of one lesson inside a topic. */
+export const lessonKey = (topic, lesson) => `${topic.id}/${lesson.id}`;
+
+/**
+ * Topics with their lessons. Ticking a topic picks all its lessons; "Lessons"
+ * opens the topic so single lessons can be picked. `selected` is a Set of
+ * lessonKey()s and `open` a Set of expanded topic ids, both mutated in place.
+ */
+export function lessonPicker(topics, selected, open, onChange) {
+  return h('div.lesson-topics', {}, topics.map((t, i) => {
+    const keys = t.lessons.map((l) => lessonKey(t, l));
+    const picked = keys.filter((k) => selected.has(k)).length;
+    const all = picked === keys.length;
+    const expanded = open.has(t.id);
+    const box = h('input', {
+      type: 'checkbox', checked: all, 'aria-label': `All of ${t.name}`,
+      onchange: () => { keys.forEach((k) => (all ? selected.delete(k) : selected.add(k))); onChange(); },
+    });
+    box.indeterminate = picked > 0 && !all;
+    return h('div.lesson-topic', { class: `${all ? 'on' : picked ? 'some' : ''} ${expanded ? 'open' : ''}` },
+      h('div.lesson-topic-head', {},
+        h('label.topic', { class: picked ? 'on' : '' },
+          box,
+          h('span.topic-num', { 'aria-hidden': 'true' }, i + 1),
+          h('span.topic-name', {}, t.name),
+          h('span.topic-count', {}, all ? `${t.count} Q` : `${picked}/${keys.length} lessons`)),
+        h('button.lesson-toggle', {
+          type: 'button', 'aria-expanded': String(expanded),
+          onclick: () => { expanded ? open.delete(t.id) : open.add(t.id); onChange(); },
+        }, `${keys.length} lessons`, h('span.lesson-caret', { 'aria-hidden': 'true' }, '▾'))),
+      expanded && h('ul.lesson-list', {}, t.lessons.map((l) => {
+        const k = lessonKey(t, l);
+        return h('li', {}, h('label.lesson', { class: selected.has(k) ? 'on' : '' },
+          h('input', {
+            type: 'checkbox', checked: selected.has(k),
+            onchange: (e) => { e.target.checked ? selected.add(k) : selected.delete(k); onChange(); },
+          }),
+          h('span.lesson-ref', {}, l.id === 'extra' ? '✎' : l.id),
+          h('span.lesson-name', {}, l.name),
+          h('span.topic-count', {}, `${l.count} Q`)));
+      })));
+  }));
+}
