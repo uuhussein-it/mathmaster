@@ -2,6 +2,8 @@
  * Setup-screen controls shared by the Curriculum and SAT screens.
  */
 import { h } from '../ui.js';
+import { CHARACTERS } from '../characters.js';
+import { account, loadGroup } from '../account.js';
 
 /** A labelled row of single-choice chips. options: [{ value, label, badge?, disabled? }] */
 export function chips(label, options, current, onPick) {
@@ -66,4 +68,36 @@ export function lessonPicker(topics, selected, open, onChange, mark = (_, i) => 
           h('span.topic-count', {}, `${l.count} Q`)));
       })));
   }));
+}
+
+/** A classmate's portrait (or initial), lit when they're online. */
+export function avatar(m) {
+  const c = CHARACTERS[m.character];
+  return h('span.avatar', { class: m.online ? 'online' : '', title: `${m.name}${m.online ? ' · online' : ''}` },
+    c ? h('img', { src: c.portrait, alt: '' }) : h('span.avatar-letter', {}, m.name[0] || '?'));
+}
+
+/** The top 10 of a loaded group. */
+export function boardList(g) {
+  const me = account.student;
+  return g.leaderboard.length
+    ? h('ol.board', {}, g.leaderboard.slice(0, 10).map((m) =>
+      h('li', { class: m.id === me?.id ? 'me' : '' },
+        h('span.board-rank', {}, m.rank <= 3 ? ['🥇', '🥈', '🥉'][m.rank - 1] : m.rank),
+        avatar(m),
+        h('span.board-name', {}, m.name, m.id === me?.id && h('small', {}, ' (you)')),
+        h('span.board-level', {}, `Lv ${m.level}`),
+        h('span.board-score', {}, m.score.toLocaleString()))))
+    : h('p.muted', {}, 'Answer questions to put your group on the board.');
+}
+
+/** The student's group leaderboard as a panel that loads itself (below the setup controls). */
+export function groupBoard() {
+  const panel = h('section.panel.group-board', { 'aria-label': 'Leaderboard' },
+    h('h3', {}, '🏆 Leaderboard'), h('p.muted', {}, 'Loading your group…'));
+  const id = account.student?.group?.id;
+  if (!id) return null;
+  loadGroup(id).then((g) => panel.replaceChildren(h('h3', {}, `🏆 Leaderboard · ${g.name}`), boardList(g)))
+    .catch(() => panel.lastChild.replaceWith(h('p.muted', {}, 'The leaderboard couldn’t load.')));
+  return panel;
 }

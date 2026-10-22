@@ -144,7 +144,7 @@ in Neon and re-applied to it on every start.
 
 - Sign-in cookies are HTTP-only, sent only over HTTPS on Render, and expire after 14 days. Every sign-in starts a fresh session.
 - Requests that change data must come from the site's own pages; other sites get 403.
-- Sign-in, sign-up and email checks are rate limited (too many tries give "Too many attempts").
+- Sign-in, sign-up and email checks are rate limited (too many tries give "Too many attempts"). The tight limits are per email (8 wrong passwords in 15 minutes); the per-address limits are classroom-sized, because a whole class reaches the site from one school address.
 - Saved progress is checked on the server: XP and score can only grow as fast as a student can really earn them, and the level is recomputed from XP.
 - Security headers (Content-Security-Policy, no framing, no sniffing, HSTS on HTTPS) are sent on every page.
 
@@ -161,3 +161,8 @@ Students open 🛡️ Armory from the hub. Swords, armor and charms unlock with 
 ## Lessons
 
 On the School Curriculum screen each topic opens to show its lessons (1.1, 1.2, …). Students can tick a whole topic or just the lessons they want; results and mastery are tracked per lesson. Teacher-written questions appear as a "Teacher questions" lesson in their topic. SAT Topics Practice works the same way: each SAT topic opens to its skills (Quadratics, Circles, …) plus "Mixed practice" for the original keyed set.
+
+## XP rules
+
+- Skipping a question in a Quiz, or leaving one blank when you submit an SAT section yourself, costs 10 XP (never below the start of your current level). Blanks left when the clock runs out don't count as skips. The results screen shows how much was lost.
+- The Sage earns +25% XP on every right answer and its streak bonus climbs twice as fast (up to ×2); hints still never cost the Sage XP. The Warrior's streak goes up to ×3 and War Cry doubles one answer.

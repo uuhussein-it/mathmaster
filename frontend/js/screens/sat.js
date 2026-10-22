@@ -6,7 +6,7 @@ import { loadSat, prepareQuestions } from '../data.js';
 import { go } from '../router.js';
 import { timedSeconds } from '../characters.js';
 import { profile } from '../state.js';
-import { chips, modeCard, lessonPicker, lessonKey } from './controls.js';
+import { chips, modeCard, lessonPicker, lessonKey, groupBoard } from './controls.js';
 
 const FORMATS = [
   { id: 'full', label: 'Full test', sections: ['rw', 'math'], text: 'Reading & Writing, a short break, then Math.' },
@@ -21,6 +21,7 @@ export function renderSat(app) {
   const sel = { mode: 'sim', format: 'full', count: 10, ...prefs.get('sat', {}), lessons: new Set() };
   const open = new Set(); // topics showing their lessons
   let bank = null;
+  const board = groupBoard(); // loads once; kept across redraws
 
   mount(app, h('section.loading', {}, 'Loading SAT bank…'));
   loadSat().then((data) => { bank = data; draw(); }).catch((err) => mount(app, h('section.panel.error', {}, err.message)));
@@ -61,14 +62,14 @@ export function renderSat(app) {
       h('div.course-head', {}, h('h3', {}, 'Pick topics or lessons'),
         h('button.btn.ghost.sm', { onclick: () => { sel.lessons = new Set(everything ? [] : allKeys); draw(); } },
           everything ? 'Clear all' : 'Select all')),
-      h('p.muted.small.lesson-tip', {}, 'Tick a whole topic, or open its lessons to practise just one.'),
-      ['math', 'rw'].map((section) => h('div.sat-group', {},
-        h('p.eyebrow', {}, bank.sections[section].name),
-        lessonPicker(sectionTopics(section), sel.lessons, open, draw, () => (section === 'math' ? '∑' : '¶')))),
       h('div.start-row', {},
         chips('Questions', [5, 10, 20].map((n) => ({ value: n, label: String(n) })), sel.count, (count) => update({ count })),
         h('button.btn.primary.lg', { disabled: sel.lessons.size === 0, onclick: startTopics },
-          sel.lessons.size ? 'Start practice' : 'Pick at least one lesson')));
+          sel.lessons.size ? 'Start practice' : 'Pick at least one lesson')),
+      h('p.muted.small.lesson-tip', {}, 'Tick a whole topic, or open its lessons to practise just one.'),
+      ['math', 'rw'].map((section) => h('div.sat-group', {},
+        h('p.eyebrow', {}, bank.sections[section].name),
+        lessonPicker(sectionTopics(section), sel.lessons, open, draw, () => (section === 'math' ? '∑' : '¶')))));
 
     mount(app,
       h('section', {},
@@ -83,7 +84,8 @@ export function renderSat(app) {
             icon: '🧩', title: 'Topics Practice', pressed: sel.mode === 'topics', onclick: () => update({ mode: 'topics' }),
             text: 'Drill one SAT skill at a time with hints, skills and explanations.',
           })),
-        sel.mode === 'sim' ? simPanel : topicPanel));
+        sel.mode === 'sim' ? simPanel : topicPanel,
+        board));
   }
 
   function startSim() {

@@ -68,10 +68,16 @@ def client_ip():
     return (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
 
 
-def rate_limit(name, limit, window, key=None):
+def _bucket(name, key, per_ip):
+    return f"{name}|{client_ip() if per_ip else ''}|{key or ''}"
+
+
+def rate_limit(name, limit, window, key=None, per_ip=True, count=True):
     """At most `limit` calls per `window` seconds per visitor (and per `key`,
-    e.g. the email being tried), else 429."""
-    bucket = f"{name}|{client_ip()}|{key or ''}"
+    e.g. the email being tried), else 429. A whole class signs in from one
+    school address, so per-visitor limits must be classroom-sized; the tight
+    limits go on the email. count=False only checks (see `rate_note`)."""
+    bucket = _bucket(name, key, per_ip)
     now = time.time()
     with _hits_lock:
         q = _hits[bucket]
@@ -81,10 +87,17 @@ def rate_limit(name, limit, window, key=None):
             wait = int(q[0] + window - now) + 1
             abort(429, f"Too many attempts. Try again in {max(1, wait // 60) if wait >= 60 else wait} "
                        f"{'minutes' if wait >= 120 else 'minute' if wait >= 60 else 'seconds'}.")
-        q.append(now)
+        if count:
+            q.append(now)
         if len(_hits) > 50_000:  # forget idle visitors
             for k in [k for k, v in _hits.items() if not v or v[-1] < now - 3600]:
                 del _hits[k]
+
+
+def rate_note(name, key=None, per_ip=True):
+    """Count one attempt against a limit checked with count=False (e.g. a wrong password)."""
+    with _hits_lock:
+        _hits[_bucket(name, key, per_ip)].append(time.time())
 
 
 # ----------------------------------------------------------------------- roles

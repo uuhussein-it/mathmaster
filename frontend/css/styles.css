@@ -632,6 +632,8 @@ kbd {
 .level-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; }
 .level-foot p { margin: 0; }
 .lobby { margin-bottom: 24px; }
+.group-board { margin-top: 28px; }
+.group-board h3 { margin: 0 0 12px; }
 .lobby-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 14px; }
 .lobby-head h2 { margin: 2px 0 4px; font: 700 clamp(22px, 3vw, 30px)/1.2 var(--font-display); }
 .lobby-head p { margin: 0; }
