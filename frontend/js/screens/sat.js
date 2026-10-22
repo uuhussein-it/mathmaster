@@ -6,7 +6,7 @@ import { loadSat, prepareQuestions } from '../data.js';
 import { go } from '../router.js';
 import { timedSeconds } from '../characters.js';
 import { profile } from '../state.js';
-import { chips, modeCard, topicGrid, selectAllButton } from './controls.js';
+import { chips, modeCard, lessonPicker, lessonKey } from './controls.js';
 
 const FORMATS = [
   { id: 'full', label: 'Full test', sections: ['rw', 'math'], text: 'Reading & Writing, a short break, then Math.' },
@@ -18,7 +18,8 @@ const FORMATS = [
 const SIM_SIZE = { rw: 54, math: 44 };
 
 export function renderSat(app) {
-  const sel = { mode: 'sim', format: 'full', count: 10, ...prefs.get('sat', {}), topics: new Set() };
+  const sel = { mode: 'sim', format: 'full', count: 10, ...prefs.get('sat', {}), lessons: new Set() };
+  const open = new Set(); // topics showing their lessons
   let bank = null;
 
   mount(app, h('section.loading', {}, 'Loading SAT bank…'));
@@ -54,16 +55,20 @@ export function renderSat(app) {
         h('li', {}, 'No feedback until the end. You get a scaled score from 200–800 per section.')),
       h('button.btn.primary.lg', { onclick: startSim }, 'Start simulator'));
 
-    const allTopics = [...sectionTopics('math'), ...sectionTopics('rw')];
+    const allKeys = [...sectionTopics('math'), ...sectionTopics('rw')].flatMap((t) => t.lessons.map((l) => lessonKey(t, l)));
+    const everything = allKeys.every((k) => sel.lessons.has(k));
     const topicPanel = h('div.panel.sat-panel', {},
-      h('div.course-head', {}, h('h3', {}, 'Pick topics'), selectAllButton(allTopics, sel.topics, draw)),
+      h('div.course-head', {}, h('h3', {}, 'Pick topics or lessons'),
+        h('button.btn.ghost.sm', { onclick: () => { sel.lessons = new Set(everything ? [] : allKeys); draw(); } },
+          everything ? 'Clear all' : 'Select all')),
+      h('p.muted.small.lesson-tip', {}, 'Tick a whole topic, or open its lessons to practise just one.'),
       ['math', 'rw'].map((section) => h('div.sat-group', {},
         h('p.eyebrow', {}, bank.sections[section].name),
-        topicGrid(sectionTopics(section), sel.topics, draw, () => (section === 'math' ? '∑' : '¶')))),
+        lessonPicker(sectionTopics(section), sel.lessons, open, draw, () => (section === 'math' ? '∑' : '¶')))),
       h('div.start-row', {},
         chips('Questions', [5, 10, 20].map((n) => ({ value: n, label: String(n) })), sel.count, (count) => update({ count })),
-        h('button.btn.primary.lg', { disabled: sel.topics.size === 0, onclick: startTopics },
-          sel.topics.size ? 'Start practice' : 'Pick at least one topic')));
+        h('button.btn.primary.lg', { disabled: sel.lessons.size === 0, onclick: startTopics },
+          sel.lessons.size ? 'Start practice' : 'Pick at least one lesson')));
 
     mount(app,
       h('section', {},
@@ -91,11 +96,20 @@ export function renderSat(app) {
   }
 
   function startTopics() {
-    const topics = [...sectionTopics('math'), ...sectionTopics('rw')].filter((t) => sel.topics.has(t.id));
+    // One group per picked lesson, so results and mastery are tracked per lesson.
+    const topics = [...sectionTopics('math'), ...sectionTopics('rw')].flatMap((t) => t.lessons
+      .filter((l) => sel.lessons.has(lessonKey(t, l)))
+      .map((l) => ({
+        key: `sat:${t.id}:${l.id}`,
+        name: t.lessons.length > 1 ? `${t.name} · ${l.name}` : t.name,
+        topic: t.name,
+        questions: t.questions.filter((q) => q.lesson === l.id),
+      })));
+    const whole = new Set(topics.map((g) => g.topic));
     go('play', {
       mode: 'practice',
       origin: 'sat',
-      title: topics.length === 1 ? topics[0].name : `SAT · ${topics.length} topics`,
+      title: topics.length === 1 ? topics[0].name : whole.size === 1 ? [...whole][0] : `SAT · ${topics.length} lessons`,
       subtitle: 'SAT Topics Practice',
       questions: prepareQuestions(topics, { limit: sel.count }),
       timeLimit: null,

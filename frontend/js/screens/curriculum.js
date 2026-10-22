@@ -1,19 +1,20 @@
 /**
- * Path A: School Curriculum. Filter Grade → Track → Term, pick topics and a mode.
+ * Path A: School Curriculum. Filter Grade → Track → Term, pick topics or single lessons, and a mode.
  */
 import { h, mount, prefs } from '../ui.js';
 import { loadCurriculumIndex, loadCourse, prepareQuestions } from '../data.js';
 import { go } from '../router.js';
 import { timedSeconds } from '../characters.js';
 import { profile } from '../state.js';
-import { chips, modeCard, topicGrid, selectAllButton } from './controls.js';
+import { chips, modeCard, lessonPicker, lessonKey } from './controls.js';
 
 const SECONDS_PER_QUIZ_QUESTION = 75;
 const COUNTS = [5, 10, 15, 0]; // 0 = all
 
 export function renderCurriculum(app) {
   const saved = prefs.get('curriculum', {});
-  const sel = { grade: 9, track: 'advanced', term: 1, mode: 'practice', count: 10, ...saved, topics: null };
+  const sel = { grade: 9, track: 'advanced', term: 1, mode: 'practice', count: 10, ...saved, lessons: null };
+  const open = new Set(); // topics showing their lessons
   let index = null;
 
   mount(app, h('section.loading', {}, 'Loading courses…'));
@@ -27,7 +28,7 @@ export function renderCurriculum(app) {
 
   function update(patch) {
     Object.assign(sel, patch);
-    if ('grade' in patch || 'track' in patch || 'term' in patch) sel.topics = null;
+    if ('grade' in patch || 'track' in patch || 'term' in patch) { sel.lessons = null; open.clear(); }
     prefs.set('curriculum', { grade: sel.grade, track: sel.track, term: sel.term, mode: sel.mode, count: sel.count });
     draw();
   }
@@ -36,10 +37,10 @@ export function renderCurriculum(app) {
     const course = findCourse(sel.grade, sel.track, sel.term);
     if (course) {
       loadCourse(course.id); // warm the cache so Start is instant
-      sel.topics ||= new Set(course.topics.map((t) => t.id));
+      sel.lessons ||= new Set(allLessons(course));
     }
-    const available = course ? course.topics.filter((t) => sel.topics.has(t.id))
-      .reduce((n, t) => n + (sel.mode === 'quiz' ? t.mcq : t.count), 0) : 0;
+    const available = course ? course.topics.flatMap((t) => t.lessons.filter((l) => sel.lessons.has(lessonKey(t, l))))
+      .reduce((n, l) => n + (sel.mode === 'quiz' ? l.mcq : l.count), 0) : 0;
 
     let body;
     if (!trackOffered(sel.grade, sel.track)) {
@@ -54,8 +55,9 @@ export function renderCurriculum(app) {
       body = h('div.course', {},
         h('div.course-head', {},
           h('div', {}, h('p.eyebrow', {}, `${course.code} · Grade ${course.grade} · Term ${course.term}`), h('h2', {}, course.title)),
-          selectAllButton(course.topics, sel.topics, draw)),
-        topicGrid(course.topics, sel.topics, draw),
+          selectAllLessons(course)),
+        h('p.muted.small.lesson-tip', {}, 'Tick a whole topic, or open its lessons to practise just one.'),
+        lessonPicker(course.topics, sel.lessons, open, draw),
 
         h('h3.sub-title', {}, 'Mode'),
         h('div.mode-grid', {},
@@ -71,7 +73,7 @@ export function renderCurriculum(app) {
         h('div.start-row', {},
           chips('Questions', COUNTS.map((n) => ({ value: n, label: n ? String(n) : 'All' })), sel.count, (count) => update({ count })),
           h('button.btn.primary.lg', { disabled: available === 0, onclick: () => start(course) },
-            available ? `Start ${sel.mode} · ${Math.min(available, sel.count || available)} Q` : 'Pick at least one topic')));
+            available ? `Start ${sel.mode} · ${Math.min(available, sel.count || available)} Q` : 'Pick at least one lesson')));
     }
 
     mount(app,
@@ -89,17 +91,37 @@ export function renderCurriculum(app) {
         body));
   }
 
+  function allLessons(course) {
+    return course.topics.flatMap((t) => t.lessons.map((l) => lessonKey(t, l)));
+  }
+
+  function selectAllLessons(course) {
+    const keys = allLessons(course);
+    const all = keys.every((k) => sel.lessons.has(k));
+    return h('button.btn.ghost.sm', {
+      onclick: () => { sel.lessons = new Set(all ? [] : keys); draw(); },
+    }, all ? 'Clear all' : 'Select all');
+  }
+
   async function start(meta) {
     const course = await loadCourse(meta.id);
-    const topics = course.topics
-      .filter((t) => sel.topics.has(t.id))
-      .map((t) => ({ ...t, key: `${course.id}:${t.id}` }));
+    // One group per picked lesson, so results and mastery are tracked per lesson.
+    const topics = course.topics.flatMap((t) => t.lessons
+      .filter((l) => sel.lessons.has(lessonKey(t, l)))
+      .map((l) => ({
+        key: `${course.id}:${t.id}:${l.id}`,
+        name: l.id === 'extra' ? `${t.name} · ${l.name}` : `${l.id} ${l.name}`,
+        topic: t.name,
+        questions: t.questions.filter((q) => q.lesson === l.id),
+      })));
+    const whole = new Set(topics.map((g) => g.topic));
     // Free-response needs Gemini to check each answer, so it's Practice-only.
     const questions = prepareQuestions(topics, { limit: sel.count || Infinity, mcqOnly: sel.mode === 'quiz' });
     go('play', {
       mode: sel.mode,
       origin: 'curriculum',
-      title: topics.length === 1 ? topics[0].name : `${course.code} · ${topics.length} topics`,
+      title: topics.length === 1 ? topics[0].name
+        : whole.size === 1 ? [...whole][0] : `${course.code} · ${topics.length} lessons`,
       subtitle: `Grade ${course.grade} · ${trackName(course.track)} · Term ${course.term}`,
       questions,
       ai: index.ai,

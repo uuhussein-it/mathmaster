@@ -302,20 +302,36 @@ def _topic_names():
 
 
 def _course_topics(conn, course_id, code, ai, cached, admin=False, cid=None):
+    """Topics of a course, each with its lessons (subtopics such as 1.2) so a
+    student can practise one lesson. Every question carries its `lesson` id;
+    teacher questions belong to the topic, under a "Teacher questions" lesson."""
     names = _topic_names()
     custom = custom_items(cid, admin) if cid else {}
     topics = []
     for t in conn.execute("SELECT id, topic_no, name FROM course_topics WHERE course_id=? ORDER BY topic_no",
                           (course_id,)).fetchall():
-        rows = conn.execute(
-            """SELECT q.* FROM course_questions q JOIN course_subtopics s ON s.id=q.subtopic_id
-               WHERE s.topic_id=? ORDER BY s.ref, q.number""", (t["id"],)).fetchall()
-        qs = [i for i in (_item("course", r, ai, cached, admin) for r in rows) if i]
-        qs += custom.get(f"t{t['topic_no']}", [])
-        qs += _set_items(rows, admin)
+        qs, lessons = [], []
+        for s in conn.execute("SELECT id, ref, name FROM course_subtopics WHERE topic_id=? ORDER BY id", (t["id"],)):
+            rows = conn.execute("SELECT * FROM course_questions WHERE subtopic_id=? ORDER BY number",
+                                (s["id"],)).fetchall()
+            items = [i for i in (_item("course", r, ai, cached, admin) for r in rows) if i] + _set_items(rows, admin)
+            for i in items:
+                i["lesson"] = s["ref"]
+            if items:
+                lessons.append({"id": s["ref"], "name": s["name"]})
+                qs += items
+        extra = custom.get(f"t{t['topic_no']}", [])
+        for i in extra:
+            i["lesson"] = "extra"
+        if extra:
+            lessons.append({"id": "extra", "ref": "✎", "name": "Teacher questions"})
+            qs += extra
+        for lesson in lessons:
+            mine = [q for q in qs if q["lesson"] == lesson["id"]]
+            lesson.update(count=len(mine), mcq=sum(q["type"] != "free" for q in mine))
         if qs or admin:
             name = names.get(f"{code}_t{t['topic_no']}") or t["name"]
-            topics.append({"id": f"t{t['topic_no']}", "name": name, "questions": qs})
+            topics.append({"id": f"t{t['topic_no']}", "name": name, "lessons": lessons, "questions": qs})
     return topics
 
 
@@ -326,7 +342,7 @@ def curriculum_index():
     courses = []
     for c in _course_meta(conn):
         topics = _course_topics(conn, c.pop("dbid"), c["code"], ai, cached, cid=c["id"])
-        c["topics"] = [{"id": t["id"], "name": t["name"], "count": len(t["questions"]),
+        c["topics"] = [{"id": t["id"], "name": t["name"], "count": len(t["questions"]), "lessons": t["lessons"],
                         "mcq": sum(q["type"] != "free" for q in t["questions"])} for t in topics]
         if c["topics"]:
             courses.append(c)
@@ -398,20 +414,36 @@ def custom_image(cid):
 @bp.route("/api/ql/sat")
 def sat_bank():
     """SAT math from the database merged with QuestLearn's original keyed set
-    (which also supplies Reading & Writing)."""
+    (which also supplies Reading & Writing). Each topic lists its lessons (the
+    database's subtopics, plus "Mixed practice" for the original set) and every
+    question carries its `lesson` id."""
     bank = json.load(open(os.path.join(ROOT, "frontend", "data", "sat.json")))
     by_id = {t["id"]: t for t in bank["topics"]}
+    for t in bank["topics"]:
+        for q in t["questions"]:
+            q["lesson"] = "mixed"
+        t["lessons"] = []
     ai, cached = _ai_ready(), _cached_keys("sat")
     conn = db.get_conn()
     rows = conn.execute(
-        """SELECT q.*, t.name AS topic FROM questions q JOIN subtopics s ON s.id=q.subtopic_id
-           JOIN topics t ON t.id=s.topic_id ORDER BY q.id""").fetchall()
+        """SELECT q.*, t.name AS topic, s.id AS lesson_id, s.name AS lesson_name FROM questions q
+           JOIN subtopics s ON s.id=q.subtopic_id JOIN topics t ON t.id=s.topic_id ORDER BY s.id, q.id""").fetchall()
     conn.close()
     for r in rows:
         item = _item("sat", r, ai, cached)
         topic = by_id.get(SAT_TOPICS.get(r["topic"]))
         if item and topic:
+            item["lesson"] = f"s{r['lesson_id']}"
+            if not any(l["id"] == item["lesson"] for l in topic["lessons"]):
+                topic["lessons"].append({"id": item["lesson"], "name": r["lesson_name"].replace("&", " & ")})
             topic["questions"].append(item)
+    for t in bank["topics"]:
+        if any(q["lesson"] == "mixed" for q in t["questions"]):
+            t["lessons"].append({"id": "mixed", "name": "Mixed practice"})
+        for n, lesson in enumerate(t["lessons"], 1):
+            lesson["ref"] = "★" if lesson["id"] == "mixed" else str(n)
+            mine = [q for q in t["questions"] if q["lesson"] == lesson["id"]]
+            lesson.update(count=len(mine), mcq=sum(q.get("type", "mcq") != "free" for q in mine))
     bank["ai"] = ai
     return jsonify(bank)
 
