@@ -93,6 +93,7 @@ export function renderPlay(app, config) {
 
   function sourceTag(item) {
     if (item.source === 'ai') return h('span.q-source.ai', { title: 'Written by Gemini from a question you answered' }, '✨ AI practice');
+    if (item.source === 'set') return h('span.q-source.set', { title: 'A new question written to practise the same skill as a course question' }, '📘 Practice set');
     if (item.source === 'course') return h('span.q-source', { title: 'From your course practice questions' }, 'Course bank');
     if (item.source === 'sat') return h('span.q-source', { title: 'From the SAT question bank' }, 'SAT bank');
     return null;
@@ -170,7 +171,7 @@ export function renderPlay(app, config) {
         ? h('p.explanation', {}, q.explanation)
         : config.ai && q.ref && h('p.explanation.muted', {}, 'Gemini is writing an explanation…'),
       h('div.feedback-actions', {},
-        config.ai && h('button.btn.ghost.similar-btn', { onclick: addSimilar, disabled: addedSimilar },
+        (config.ai || q.more) && h('button.btn.ghost.similar-btn', { onclick: addSimilar, disabled: addedSimilar },
           addedSimilar ? '✨ Added to this run' : '✨ 3 more like this'),
         q.ref && h('button.btn.ghost.report-btn', {
           onclick: () => openFeedback({ q, answer: a.text || (a.chosen >= 0 ? answerLabel(q, a.chosen) : ''), wrong: !a.correct }),

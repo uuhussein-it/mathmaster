@@ -85,16 +85,23 @@ export function renderAdmin(app) {
         h('label.field', {}, h('span', {}, 'Topic'), h('select', {
           onchange: (e) => { state.topic = e.target.value; draw(); },
         }, topics.map((t) => h('option', { value: t.id, selected: t.id === state.topic }, `${t.name} (${t.questions.length})`)))),
+        h('label.admin-check', {}, h('input', {
+          type: 'checkbox', checked: !!state.showSets, onchange: (e) => { state.showSets = e.target.checked; draw(); },
+        }), ` Show practice sets (${topic ? topic.questions.filter((q) => q.source === 'set').length : 0})`),
         h('button.btn.primary', { onclick: () => editCustom(null, reload) }, '＋ Add question')),
-      topic ? h('div.admin-qs', {}, topic.questions.map((q, i) => questionCard(q, i, reload)))
+      topic ? h('div.admin-qs', {}, topic.questions.filter((q) => state.showSets || q.source !== 'set')
+        .map((q, i) => questionCard(q, i, reload)))
         : h('p.muted', {}, 'This course has no topics.'));
   }
 
   function questionCard(q, i, reload) {
     const teacher = q.source === 'teacher';
+    const set = q.source === 'set';
     const typeName = q.type === 'widget' ? (TYPES.find(([id]) => id === q.widget.widget)?.[1] || 'Steps')
       : TYPES.find(([id]) => id === q.type)?.[1];
-    const key = q.type === 'widget' ? answerSummary(q.widget) : q.type === 'mcq' && q.answer != null ? LETTERS[q.answer] : null;
+    const key = q.type === 'widget' ? answerSummary(q.widget)
+      : q.type === 'mcq' && q.answer != null ? (set ? `${LETTERS[q.answer]}) ${q.options[q.answer]}` : LETTERS[q.answer])
+        : q.answer_text || null;
     return h('article.admin-q', { class: q.hidden ? 'hidden-q' : '' },
       h('div.admin-q-media', {},
         q.image ? h('img', { src: q.image, alt: `Question ${i + 1}`, loading: 'lazy' }) : h('p', {}, q.q)),
@@ -102,6 +109,7 @@ export function renderAdmin(app) {
         h('div.admin-q-tags', {},
           h('span.q-tag', {}, `#${i + 1}`), h('span.q-tag', {}, typeName),
           teacher && h('span.q-tag.teacher', {}, 'Teacher question'),
+          set && h('span.q-tag.set', {}, 'Practice set'),
           q.hidden && h('span.q-tag.removed', {}, 'Removed')),
         key && h('p.admin-key', {}, h('span.muted', {}, 'Answer: '), key),
         h('div.admin-q-actions', {},
@@ -114,7 +122,7 @@ export function renderAdmin(app) {
                   reload();
                 },
               }, '🗑 Delete')]
-            : [h('button.btn.ghost.sm', { onclick: () => editAnswer(q.ref, reload) }, '✏️ Edit answer'),
+            : [!set && h('button.btn.ghost.sm', { onclick: () => editAnswer(q.ref, reload) }, '✏️ Edit answer'),
               q.hidden
                 ? h('button.btn.ghost.sm', { onclick: async () => { await itemApi(q.ref, 'PUT', { restore: true }); reload(); } }, '↩ Restore')
                 : h('button.btn.ghost.sm.danger', { onclick: async () => { await itemApi(q.ref, 'DELETE'); reload(); } }, '🚫 Remove')])));

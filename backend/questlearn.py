@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from flask import Blueprint, abort, g, jsonify, request
 
 import db
+import practice_sets
 import userdb
 
 bp = Blueprint("questlearn", __name__)
@@ -64,6 +65,7 @@ def init(app, gemini, images, ai_ready, is_admin):
     """)
     _fill_answer_keys(conn)
     _load_ai_seed(conn)
+    _apply_key_fixes(conn)
     conn.commit()
     # Teacher-made data lives in the user database (Neon when DATABASE_URL is set).
     userdb.create_tables("""
@@ -144,6 +146,30 @@ def _load_ai_seed(conn):
         [(r["kind"], r["qid"], r["answer"], r.get("hint"), r.get("explanation"), r.get("at", 0)) for r in rows])
 
 
+def _apply_key_fixes(conn):
+    """Correct stored answers found wrong when the practice sets were written
+    (data/key_fixes.json). MCQ fixes set the official letter (several letters
+    mark a question with more than one right choice); typed-answer fixes set
+    the stored answer. A teacher's own answer edit is replayed afterwards and wins."""
+    path = os.path.join(ROOT, "data", "key_fixes.json")
+    if not os.path.exists(path):
+        return
+    raw = json.load(open(path))
+    kind = raw["kind"]
+    table = "course_questions" if kind == "course" else "questions"
+    for f in raw["fixes"]:
+        answer = f.get("correct") or f["answer"]
+        key = conn.execute("SELECT answer FROM ql_keys WHERE kind=? AND qid=?", (kind, f["qid"])).fetchone()
+        if key and key["answer"] == answer:
+            continue  # already applied
+        if f.get("correct"):
+            conn.execute(f"UPDATE {table} SET correct=? WHERE id=?", (f["correct"], f["qid"]))
+        conn.execute("INSERT INTO ql_keys (kind, qid, answer, hint, explanation, created_at) VALUES (?,?,?,?,?,?) "
+                     "ON CONFLICT(kind, qid) DO UPDATE SET answer=excluded.answer, hint=NULL, "
+                     "explanation=excluded.explanation", (kind, f["qid"], answer, None, f.get("explanation"), time.time()))
+        conn.execute("DELETE FROM ql_checks WHERE kind=? AND qid=?", (kind, f["qid"]))  # graded against the old key
+
+
 # --------------------------------------------------------------------- bank
 def _option_count(row, letters):
     filled = sum(1 for k in ("option_a", "option_b", "option_c", "option_d", "option_e", "option_f")
@@ -200,6 +226,8 @@ def _item(kind, row, ai, cached, admin=False):
     if hidden and not admin:
         return None
     item = _build_item(kind, row, ai, cached)
+    if item and kind == "course" and practice_sets.for_source(row["id"]):
+        item["more"] = True  # "more like this" draws on its practice set, no AI needed
     if item and admin:
         item["hidden"] = hidden
     return item
@@ -249,6 +277,25 @@ def _course_meta(conn):
     return out
 
 
+def _set_items(rows, admin=False):
+    """Practice-set questions written for these curriculum questions. Removing a
+    question on the admin page also removes its set."""
+    hidden = _admin_state()[0]
+    out = []
+    for r in rows:
+        if ("course", r["id"]) in hidden and not admin:
+            continue
+        for q in practice_sets.for_source(r["id"]):
+            off = ("set", q["id"]) in hidden or ("course", r["id"]) in hidden
+            if off and not admin:
+                continue
+            item = practice_sets.item(q, admin)
+            if admin:
+                item["hidden"] = off
+            out.append(item)
+    return out
+
+
 def _topic_names():
     path = os.path.join(ROOT, "data", "topic_names.json")
     return json.load(open(path)) if os.path.exists(path) else {}
@@ -265,6 +312,7 @@ def _course_topics(conn, course_id, code, ai, cached, admin=False, cid=None):
                WHERE s.topic_id=? ORDER BY s.ref, q.number""", (t["id"],)).fetchall()
         qs = [i for i in (_item("course", r, ai, cached, admin) for r in rows) if i]
         qs += custom.get(f"t{t['topic_no']}", [])
+        qs += _set_items(rows, admin)
         if qs or admin:
             name = names.get(f"{code}_t{t['topic_no']}") or t["name"]
             topics.append({"id": f"t{t['topic_no']}", "name": name, "questions": qs})
@@ -375,10 +423,17 @@ def status():
 
 # ----------------------------------------------------------------- answers
 def _parse_ref(ref):
-    m = re.fullmatch(r"(course|sat|custom):(\d+)", str(ref or ""))
+    m = re.fullmatch(r"(course|sat|custom|set):(\d+)", str(ref or ""))
     if not m:
         abort(400)
     return m.group(1), int(m.group(2))
+
+
+def _set_q(qid):
+    q = practice_sets.get(qid)
+    if not q:
+        abort(404)
+    return q
 
 
 def _row(kind, qid):
@@ -474,8 +529,16 @@ def _norm(text):
     return re.sub(r"\.$", "", t)
 
 
+_ABOUT = re.compile(r"^(?:[a-z]?≈|~|approximately|approx\.?|about|aed)")
+_UNIT = re.compile(r"(?<=[\d.])(?:sq\.?)?(?:ft|feet|foot|in|inches|km|kilometers?|kilometres?|m|meters?|metres?|cm|"
+                   r"centimeters?|mm|ml|l|pa|pascals?|miles?|mi|units?|aed|dirhams?|kg|g|seconds?|sec|s|minutes?|min|"
+                   r"hours?|h)(?:\^[23])?$")
+
+
 def _number(text):
+    """A typed answer as a number, ignoring "≈", a currency and a trailing unit."""
     t = _norm(text).replace(",", "").replace("$", "")
+    t = _UNIT.sub("", _ABOUT.sub("", t))
     m = re.match(r"^(-?)(\d+)\s+(\d+)/(\d+)$", re.sub(r"[−–]", "-", str(text or "").strip()))
     if m:
         return (-1 if m.group(1) else 1) * (int(m.group(2)) + int(m.group(3)) / int(m.group(4)))
@@ -506,6 +569,10 @@ def _letter_index(answer):
 def solve_route():
     """Hint + explanation (and the key for MCQ, used by the Sage's skill)."""
     kind, qid = _parse_ref((request.get_json(silent=True) or {}).get("ref"))
+    if kind == "set":
+        q = _set_q(qid)
+        return jsonify({"ai": _ai_ready(), "hint": q.get("hint"), "explanation": q.get("explanation"),
+                        "answer": q["answer"] if q["type"] == "mcq" else None})
     if kind == "custom":
         r = custom_row(qid)
         return jsonify({"ai": _ai_ready(), "hint": r["hint"], "explanation": r["explanation"],
@@ -521,6 +588,14 @@ def check_route():
     """Grade one answer. MCQ: {ref, choice: index}. Free response: {ref, text}."""
     data = request.get_json(silent=True) or {}
     kind, qid = _parse_ref(data.get("ref"))
+    if kind == "set":  # practice sets carry their own key
+        q = _set_q(qid)
+        if q["type"] == "mcq":
+            return jsonify({"ai": _ai_ready(), "answer": q["answer"], "explanation": q.get("explanation"),
+                            "hint": q.get("hint"), "correct": data.get("choice") == q["answer"]})
+        keys = practice_sets.keys(q) if q["type"] == "free" else []
+        return jsonify({"ai": _ai_ready(), "correct": any(same_answer(data.get("text"), k) for k in keys),
+                        "answer_text": keys[0] if keys else None, "explanation": q.get("explanation"), "saved": True})
     if kind == "custom":  # teacher questions carry their own key
         r = custom_row(qid)
         if "text" not in data:
@@ -571,13 +646,19 @@ def check_route():
     return jsonify(result)
 
 
+def _set_key(qid):
+    q = practice_sets.get(qid)
+    return q["answer"] if q and q["type"] == "mcq" else None
+
+
 @bp.route("/api/ql/keys", methods=["POST"])
 def keys_route():
     """Answer keys for a finished quiz/simulator: {refs: [...]} -> {keys: {ref: index|null}}."""
     refs = [r for r in ((request.get_json(silent=True) or {}).get("refs") or [])][:120]
     parsed = [(r, _parse_ref(r)) for r in refs]
     with ThreadPoolExecutor(max_workers=6) as pool:
-        answers = list(pool.map(lambda p: _letter_index(solve(*p[1]).get("answer")), parsed))
+        answers = list(pool.map(lambda p: _set_key(p[1][1]) if p[1][0] == "set"
+                                else _letter_index(solve(*p[1]).get("answer")), parsed))
     return jsonify({"ai": _ai_ready(), "keys": {r: a for (r, _), a in zip(parsed, answers)}})
 
 
@@ -597,6 +678,15 @@ def similar_route():
     n = max(1, min(int(data.get("n") or 3), 5))
     q = data.get("question") or {}
     tag = data.get("ref") or str(q.get("id") or "text")
+    ref = re.fullmatch(r"(course|set):(\d+)", str(data.get("ref") or ""))
+    src = (int(ref.group(2)) if ref.group(1) == "course" else (practice_sets.get(int(ref.group(2))) or {}).get("src")) if ref else None
+    hidden = _admin_state()[0]
+    written = [practice_sets.item(s) for s in practice_sets.for_source(src)
+               if ("set", s["id"]) not in hidden and s["id"] != (int(ref.group(2)) if ref.group(1) == "set" else None)]
+    if ref and ref.group(1) == "set" and not written:
+        return jsonify({"ai": _ai_ready(), "questions": []})
+    if written:  # questions written for this one ahead of time: no AI call
+        return jsonify({"ai": _ai_ready(), "questions": random.sample(written, min(n, len(written))), "saved": True})
     # Questions already written for this one are reused instead of asking Gemini again.
     saved = _saved_similar(tag)
     if len(saved) >= n:
@@ -655,7 +745,12 @@ def recheck(ref, answer, argument):
     if not _ai_ready():
         return {"ai": False, "correct": None,
                 "explanation": "AI checking is switched off right now, so your teacher will review this."}
-    if kind == "custom":
+    if kind == "set":
+        q = _set_q(qid)
+        source = (f"Question: {q['q']}\nOptions: {q.get('options') or 'none'}\n"
+                  f"Answer key: {practice_sets.answer_text(q)}")
+        images = []
+    elif kind == "custom":
         r = custom_row(qid)
         source = (f"Question: {r['prompt']}\nOptions: {r['options'] or 'none'}\n"
                   f"Answer key (0-based option index or text): {r['answer'] or r['widget']}")
@@ -701,6 +796,8 @@ def admin_item(ref):
     kind, qid = _parse_ref(ref.replace("-", ":"))
     if kind == "custom":
         abort(400, "use /api/admin/ql/custom")
+    if kind == "set":
+        return _admin_set_item(qid)
     _row(kind, qid)  # 404 for an unknown question
     users = userdb.connect()
     if request.method == "DELETE":
@@ -754,6 +851,24 @@ def admin_item(ref):
                     "options": _option_count(row, []) if kind == "course" else 4,
                     "widget": widget_spec(qid) if kind == "course" else None,
                     "hint": key["hint"] if key else None, "explanation": key["explanation"] if key else None})
+
+
+def _admin_set_item(qid):
+    """Practice-set questions can be removed and restored, not edited."""
+    q = _set_q(qid)
+    users = userdb.connect()
+    if request.method == "DELETE":
+        users.execute("INSERT INTO ql_hidden VALUES (?,?) ON CONFLICT DO NOTHING", ("set", qid))
+    elif request.method == "PUT":
+        if not (request.get_json(silent=True) or {}).get("restore"):
+            users.close()
+            abort(400, "practice-set questions can only be removed or restored")
+        users.execute("DELETE FROM ql_hidden WHERE kind=? AND qid=?", ("set", qid))
+    users.commit()
+    hidden = users.execute("SELECT 1 FROM ql_hidden WHERE kind=? AND qid=?", ("set", qid)).fetchone() is not None
+    users.close()
+    g.pop("ql_admin", None)
+    return jsonify({**practice_sets.item(q, admin=True), "hidden": hidden})
 
 
 QUESTION_TYPES = ("mcq", "free", "widget")

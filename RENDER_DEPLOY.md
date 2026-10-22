@@ -147,3 +147,13 @@ in Neon and re-applied to it on every start.
 - Sign-in, sign-up and email checks are rate limited (too many tries give "Too many attempts").
 - Saved progress is checked on the server: XP and score can only grow as fast as a student can really earn them, and the level is recomputed from XP.
 - Security headers (Content-Security-Policy, no framing, no sniffing, HSTS on HTTPS) are sent on every page.
+
+## Practice sets
+
+`data/practice_sets.json` holds 3–4 new questions written for each curriculum question, in mixed formats (multiple choice, typed answer, complete-the-blanks, tables, matching and graphs). They carry their own answer keys, so no AI is needed to grade them. They appear in course practice with a "📘 Practice set" tag, and "3 more like this" uses them before asking Gemini. On the admin page, tick "Show practice sets" to see them; any one can be removed, and removing a curriculum question also removes its set.
+
+While writing them, 111 stored answer keys were found wrong. `data/key_fixes.json` corrects them at startup (a teacher's own answer edit still wins). Questions with more than one right choice are stored with all their letters and left out, like other "select all that apply" questions. Typed answers now also match when the student adds or leaves off "≈", a currency or a unit (59.78 ft = 59.78).
+
+## Armory (gear)
+
+Students open 🛡️ Armory from the hub. Swords, armor and charms unlock with level, arena wins and best answer streak, show on the hero in fights, and add a small arena bonus (the fair-play cap still applies). Unlocks are checked on the server.
