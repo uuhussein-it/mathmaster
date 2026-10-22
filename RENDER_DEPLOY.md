@@ -160,4 +160,4 @@ Students open 🛡️ Armory from the hub. Swords, armor and charms unlock with 
 
 ## Lessons
 
-On the School Curriculum screen each topic opens to show its lessons (1.1, 1.2, …). Students can tick a whole topic or just the lessons they want; results and mastery are tracked per lesson. Teacher-written questions appear as a "Teacher questions" lesson in their topic.
+On the School Curriculum screen each topic opens to show its lessons (1.1, 1.2, …). Students can tick a whole topic or just the lessons they want; results and mastery are tracked per lesson. Teacher-written questions appear as a "Teacher questions" lesson in their topic. SAT Topics Practice works the same way: each SAT topic opens to its skills (Quadratics, Circles, …) plus "Mixed practice" for the original keyed set.
