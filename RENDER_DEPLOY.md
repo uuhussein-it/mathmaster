@@ -133,12 +133,18 @@ in Neon and re-applied to it on every start.
 - The account set by `TEACHER_USERNAME` / `ADMIN_PASSWORD` is the **admin**: it can do everything, including uploading the school list, deleting students, resetting passwords and adding teachers (admin page → Teachers tab).
 - **Teachers** sign in on the same page with their email and the password the admin gave them. They can fix questions, read feedback and manage the leaderboard, but cannot see or change the school list, delete accounts or reset passwords.
 
-## Class arena (fights between classmates)
+## Class arena (games between classmates)
 
-- Students reach the arena from the hub (🥊 Arena) once they are level 3 (change with `ARENA_UNLOCK_LEVEL`). They can only challenge classmates in their own group who are online.
-- Health comes from the student's level, attack from quiz accuracy and the special meter from their best answer streak. Fireball (level 3), Shield (level 5) and Critical Strike (level 8) unlock with level, and so do bronze, silver and gold looks.
-- A fight lasts 60 seconds. The winner takes 10% of the lower XP total (5 to 50) from the loser plus a 10 XP bonus; a draw changes nothing. The server runs the whole fight: the browser only sends which keys are held, so a changed page cannot fake hits or health.
-- Fights use a WebSocket on the same address, which Render supports with no extra setup. **Keep a single gunicorn worker** (see the start command above).
+- Students reach the arena from the hub (🥊 Arena) once they are level 3 (change with `ARENA_UNLOCK_LEVEL`). They pick a game and challenge a classmate in their own group who is online, or press 🤖 Practice to play the game against a bot (no XP at stake, nothing saved).
+- **Games** (each up to 60 seconds):
+  - 🥊 **Fight**: health comes from the student's level, attack from quiz accuracy and the special meter from their best answer streak. Fireball (level 3), Shield (level 5) and Critical Strike (level 8) unlock with level, and so do bronze, silver and gold looks.
+  - 🏎️ **Car Race**: steer around cones and oil, drive over boost pads; a right answer to the math question on screen fires nitro, a wrong one locks it for 2 seconds. First across the line wins.
+  - ⚡ **Math Duel**: both players get the same question; the first right answer scores, a wrong answer locks you out of that question. First to 7 wins.
+  - 💎 **Number Hunt**: collect the numbers that fit the rule (primes, multiples of 3, factors of 48, …); a wrong number costs a point. The rule changes every 15 seconds.
+- Math questions are made on the server to suit the student's grade (arithmetic, percentages, roots, powers, equations; functions and slope from grade 10).
+- The winner takes 10% of the lower XP total (5 to 50) from the loser plus a 10 XP bonus; a draw changes nothing. Leaving a game loses it. The server runs every game: the browser only sends which buttons are held and which answer was tapped, so a changed page cannot fake moves, answers or results.
+- On phones and tablets the game fills the screen with its buttons laid over it, and double-tap and pinch zoom are switched off while a game is open.
+- Games use a WebSocket on the same address, which Render supports with no extra setup. **Keep a single gunicorn worker** (see the start command above).
 
 ## Security
 

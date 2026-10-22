@@ -1,9 +1,10 @@
 /**
- * The class arena lobby: your fighter (stats come from your quiz progress),
- * classmates to challenge, incoming challenges, the fight leaderboard and your
- * recent fights. A challenge that's accepted opens the fight screen for both.
+ * The class arena lobby: pick a game (Fight, Car Race, Math Duel, Number
+ * Hunt), challenge a classmate or practise against a bot. Also your fighter
+ * (stats come from your quiz progress), incoming challenges, the leaderboard
+ * and your recent games. An accepted challenge opens the game for both.
  */
-import { h, mount, toast } from '../ui.js';
+import { h, mount, toast, prefs } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
 import { go } from '../router.js';
 import { adminApi as api } from '../account.js';
@@ -16,6 +17,7 @@ export function renderArena(app) {
   let error = '';
   let timer = null;
   let stopped = false;
+  let pick = prefs.get('arena-game', 'fight');
 
   async function refresh() {
     try {
@@ -47,8 +49,12 @@ export function renderArena(app) {
     refresh();
   }
 
-  const challenge = (f) => act(() => api('api/arena/challenge', { method: 'POST', body: { opponent: f.id } }),
-    () => toast('Challenge sent', `Waiting for ${f.name} to accept…`, { icon: '🥊' }));
+  const gameOf = (id) => data.games.find((g) => g.id === id) || data.games[0];
+  const challenge = (f) => act(() => api('api/arena/challenge', { method: 'POST', body: { opponent: f.id, game: pick } }),
+    () => toast('Challenge sent', `${gameOf(pick).name}: waiting for ${f.name} to accept…`, { icon: gameOf(pick).icon }));
+  const practise = (g) => act(() => api('api/arena/practice', { method: 'POST', body: { game: g.id } }),
+    (r) => { if (r.match) { stopped = true; go('fight', { match: r.match }); } });
+  const choose = (id) => { pick = id; prefs.set('arena-game', id); draw(); };
   const answer = (c, accept) => act(() => api(`api/arena/challenge/${c.id}`, { method: 'POST', body: { accept } }),
     (r) => { if (r.match) { stopped = true; go('fight', { match: r.match }); } });
   const cancel = (c) => act(() => api(`api/arena/challenge/${c.id}`, { method: 'DELETE' }));
@@ -106,12 +112,12 @@ export function renderArena(app) {
   function challenges() {
     const rows = [
       ...data.incoming.map((c) => h('div.arena-challenge.incoming', {},
-        h('span', {}, '🥊 ', h('b', {}, c.from), ' challenges you to a fight!'),
+        h('span', {}, `${gameOf(c.game).icon} `, h('b', {}, c.from), ` challenges you to ${c.game === 'fight' ? 'a fight' : gameOf(c.game).name}!`),
         h('div', {},
           h('button.btn.primary.sm', { onclick: () => answer(c, true) }, 'Fight!'),
           h('button.btn.ghost.sm', { onclick: () => answer(c, false) }, 'Not now')))),
       ...data.outgoing.map((c) => h('div.arena-challenge', {},
-        h('span', {}, '⏳ Waiting for ', h('b', {}, c.to), ' to accept…'),
+        h('span', {}, `⏳ ${gameOf(c.game).name}: waiting for `, h('b', {}, c.to), ' to accept…'),
         h('button.btn.ghost.sm', { onclick: () => cancel(c) }, 'Cancel'))),
     ];
     return rows.length ? h('section.arena-challenges', { 'aria-live': 'polite' }, rows) : null;
@@ -128,7 +134,7 @@ export function renderArena(app) {
           portrait(f.character, '.sm'),
           h('span.arena-name', {}, f.name, h('small', {}, `Lv ${f.level} · ${f.wins}W ${f.losses}L`)),
           why ? h('span.muted.small', {}, why)
-            : h('button.btn.sm', { disabled: !me.unlocked, onclick: () => challenge(f) }, 'Challenge'));
+            : h('button.btn.sm', { disabled: !me.unlocked, onclick: () => challenge(f) }, `${gameOf(pick).icon} Challenge`));
       })) : h('p.muted', {}, 'No classmates have joined yet.'));
   }
 
@@ -148,11 +154,25 @@ export function renderArena(app) {
   function history() {
     if (!data.history.length) return null;
     const label = { win: 'Won', loss: 'Lost', draw: 'Draw' };
-    const how = { ko: 'KO', time: 'time', forfeit: 'forfeit' };
+    const how = { ko: 'KO', time: 'time', forfeit: 'forfeit', finish: 'finish line', score: 'first to 7' };
     return h('section.panel', {},
-      h('h3.sub-title', {}, 'Your recent fights'),
+      h('h3.sub-title', {}, 'Your recent games'),
       h('ul.arena-history', {}, data.history.map((f) => h('li', { class: f.result },
-        h('b', {}, label[f.result]), h('span', {}, ` vs ${f.opponent} (${how[f.reason] || f.reason})`)))));
+        h('span', {}, `${gameOf(f.game).icon} `), h('b', {}, label[f.result]), h('span', {}, ` vs ${f.opponent} (${how[f.reason] || f.reason})`)))));
+  }
+
+  function gamePicker(me) {
+    return h('section.panel.arena-games', {},
+      h('div.arena-games-head', {},
+        h('h3.sub-title', {}, '🎮 Choose a game'),
+        h('p.muted.small', {}, 'Challenge a classmate to the game you pick, or practise against a bot (no XP at stake).')),
+      h('div.arena-game-grid', { role: 'radiogroup', 'aria-label': 'Game' }, data.games.map((g) =>
+        h('div.arena-game', { class: g.id === pick ? 'on' : '' },
+          h('button.arena-game-pick', { type: 'button', role: 'radio', 'aria-checked': String(g.id === pick), onclick: () => choose(g.id) },
+            h('span.arena-game-icon', { 'aria-hidden': 'true' }, g.icon),
+            h('b', {}, g.name),
+            h('span', {}, g.text)),
+          h('button.btn.ghost.sm', { disabled: !me.unlocked || !data.realtime, onclick: () => practise(g) }, '🤖 Practice')))));
   }
 
   function draw() {
@@ -169,12 +189,13 @@ export function renderArena(app) {
         !data.realtime && h('p.auth-error', {}, 'Live fights aren’t available on this server yet.'),
         error && h('p.auth-error', {}, error),
         challenges(),
+        gamePicker(me),
         h('div.arena-grid', {},
           h('div', {}, me.unlocked ? meCard(me) : lockedCard(me), history()),
           h('div', {}, fighters(me), board())),
         h('p.muted.small.arena-rules', {},
-          'Fights last 60 seconds. Knock out your opponent or have more health when time runs out. ',
-          'The winner takes XP from the loser (10% of the lower total, 5 to 50) plus a 10 XP bonus. A draw changes nothing.')));
+          'Every game lasts up to 60 seconds. ',
+          'The winner takes XP from the loser (10% of the lower total, 5 to 50) plus a 10 XP bonus. A draw changes nothing. Practice games against the bot don’t change XP.')));
   }
 
   draw();

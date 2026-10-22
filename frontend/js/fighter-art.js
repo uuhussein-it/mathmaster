@@ -8,7 +8,7 @@ import { CHARACTERS } from './characters.js';
 export const SKIN_COLORS = { base: null, bronze: '#d08a4c', silver: '#d6deeb', gold: '#ffd34d' };
 
 const portraits = {};
-function portrait(character) {
+export function portrait(character) {
   if (!portraits[character]) {
     const img = new Image();
     img.src = (CHARACTERS[character] || CHARACTERS.warrior).portrait;
