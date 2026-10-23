@@ -38,7 +38,7 @@ export function renderCurriculum(app) {
     const course = findCourse(sel.grade, sel.track, sel.term);
     if (course) {
       loadCourse(course.id); // warm the cache so Start is instant
-      sel.lessons ||= new Set(allLessons(course));
+      sel.lessons ||= new Set(); // nothing ticked: students pick their own lessons
     }
     const available = course ? course.topics.flatMap((t) => t.lessons.filter((l) => sel.lessons.has(lessonKey(t, l))))
       .reduce((n, l) => n + (sel.mode === 'quiz' ? l.mcq : l.count), 0) : 0;
