@@ -6,7 +6,7 @@ import { loadCurriculumIndex, loadCourse, prepareQuestions } from '../data.js';
 import { go } from '../router.js';
 import { timedSeconds } from '../characters.js';
 import { profile } from '../state.js';
-import { chips, modeCard, lessonPicker, lessonKey } from './controls.js';
+import { chips, modeCard, lessonPicker, lessonKey, groupBoard } from './controls.js';
 
 const SECONDS_PER_QUIZ_QUESTION = 75;
 const COUNTS = [5, 10, 15, 0]; // 0 = all
@@ -16,6 +16,7 @@ export function renderCurriculum(app) {
   const sel = { grade: 9, track: 'advanced', term: 1, mode: 'practice', count: 10, ...saved, lessons: null };
   const open = new Set(); // topics showing their lessons
   let index = null;
+  const board = groupBoard(); // loads once; kept across redraws
 
   mount(app, h('section.loading', {}, 'Loading courses…'));
   loadCurriculumIndex()
@@ -37,7 +38,7 @@ export function renderCurriculum(app) {
     const course = findCourse(sel.grade, sel.track, sel.term);
     if (course) {
       loadCourse(course.id); // warm the cache so Start is instant
-      sel.lessons ||= new Set(allLessons(course));
+      sel.lessons ||= new Set(); // nothing ticked: students pick their own lessons
     }
     const available = course ? course.topics.flatMap((t) => t.lessons.filter((l) => sel.lessons.has(lessonKey(t, l))))
       .reduce((n, l) => n + (sel.mode === 'quiz' ? l.mcq : l.count), 0) : 0;
@@ -56,9 +57,6 @@ export function renderCurriculum(app) {
         h('div.course-head', {},
           h('div', {}, h('p.eyebrow', {}, `${course.code} · Grade ${course.grade} · Term ${course.term}`), h('h2', {}, course.title)),
           selectAllLessons(course)),
-        h('p.muted.small.lesson-tip', {}, 'Tick a whole topic, or open its lessons to practise just one.'),
-        lessonPicker(course.topics, sel.lessons, open, draw),
-
         h('h3.sub-title', {}, 'Mode'),
         h('div.mode-grid', {},
           modeCard({
@@ -73,7 +71,11 @@ export function renderCurriculum(app) {
         h('div.start-row', {},
           chips('Questions', COUNTS.map((n) => ({ value: n, label: n ? String(n) : 'All' })), sel.count, (count) => update({ count })),
           h('button.btn.primary.lg', { disabled: available === 0, onclick: () => start(course) },
-            available ? `Start ${sel.mode} · ${Math.min(available, sel.count || available)} Q` : 'Pick at least one lesson')));
+            available ? `Start ${sel.mode} · ${Math.min(available, sel.count || available)} Q` : 'Pick at least one lesson')),
+
+        h('h3.sub-title', {}, 'Topics'),
+        h('p.muted.small.lesson-tip', {}, 'Tick a whole topic, or open its lessons to practise just one.'),
+        lessonPicker(course.topics, sel.lessons, open, draw));
     }
 
     mount(app,
@@ -88,7 +90,8 @@ export function renderCurriculum(app) {
           chips('Academic term', index.terms.map((term) => ({
             value: term, label: `Term ${term}`, badge: findCourse(sel.grade, sel.track, term) ? null : 'Soon',
           })), sel.term, (term) => update({ term }))),
-        body));
+        body,
+        board));
   }
 
   function allLessons(course) {

@@ -158,7 +158,8 @@ def check_email():
     email = str(_body().get("email") or "").strip().lower()
     if not EMAIL.match(email):
         abort(400, "Enter a valid email address.")
-    security.rate_limit("check-email", 30, 5 * 60)
+    security.rate_limit("check-email", 600, 5 * 60)
+    security.rate_limit("check-email-one", 30, 5 * 60, key=email)
     conn = userdb.connect()
     exists = conn.execute("SELECT 1 FROM ql_students WHERE email=?", (email,)).fetchone() is not None
     used, entry = _roster_entry(conn, email)
@@ -184,7 +185,8 @@ def signup():
     m = EMAIL.match(email)
     if not m:
         abort(400, "Enter a valid email address.")
-    security.rate_limit("signup", 10, 60 * 60)
+    security.rate_limit("signup", 300, 60 * 60)
+    security.rate_limit("signup-email", 10, 60 * 60, key=email, per_ip=False)
     conn = userdb.connect()
     used, entry = _roster_entry(conn, email)
     if used and not entry:
@@ -219,12 +221,14 @@ def signup():
 def login():
     data = _body()
     email = str(data.get("email") or "").strip().lower()
-    security.rate_limit("login", 20, 15 * 60)
-    security.rate_limit("login-email", 8, 15 * 60, key=email)
+    security.rate_limit("login", 600, 15 * 60)
+    # Only wrong passwords count towards an email's limit.
+    security.rate_limit("login-email", 8, 15 * 60, key=email, count=False)
     conn = userdb.connect()
     row = conn.execute("SELECT * FROM ql_students WHERE email=?", (email,)).fetchone()
     conn.close()
     if not row or not check_password_hash(row["pw_hash"], str(data.get("password") or "")):
+        security.rate_note("login-email", key=email)
         abort(401, "Wrong email or password.")
     _sign_in(row["id"])
     return jsonify({"student": _public(row, me=True)})

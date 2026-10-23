@@ -4,7 +4,7 @@
 import { h, mount, burst, formatTime, answerLabel, questionBody, kpi } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
 import { profile, recordSession } from '../state.js';
-import { evaluate } from '../scoring.js';
+import { evaluate, SKIP_XP } from '../scoring.js';
 import { go } from '../router.js';
 import { reportSession } from '../data.js';
 import { answerSummary } from '../widgets.js';
@@ -54,7 +54,9 @@ export function renderResults(app, r) {
           h('p', {}, verdict.text),
           r.levels > 0 && h('p.level-up', {}, `⭐ Level up! You reached level ${profile.level}.`),
           h('div.kpis', {},
-            kpi('XP earned', `+${r.xp}`, `incl. +${r.bonus} completion bonus`),
+            kpi('XP earned', `${r.xp >= 0 ? '+' : ''}${r.xp}`, r.skips
+              ? `incl. +${r.bonus} bonus, −${r.lost} for ${r.skips} skipped`
+              : `incl. +${r.bonus} completion bonus`),
             kpi('Points', `+${r.score.toLocaleString()}`),
             kpi('Best streak', r.bestStreak),
             kpi('Time', formatTime(r.seconds))))),
@@ -83,7 +85,8 @@ export function renderResults(app, r) {
         h('ol', {}, r.items.map((q) =>
           h('li.review-item', { class: q.correct ? 'good' : 'bad' },
             questionBody(q, { small: true }),
-            h('p', {}, h('span.muted', {}, 'Your answer: '), q.text || (q.chosen >= 0 ? answerLabel(q, q.chosen) : '—'), ' ', h('b', {}, q.correct ? '✓' : '✗')),
+            h('p', {}, h('span.muted', {}, 'Your answer: '), q.text || (q.chosen >= 0 ? answerLabel(q, q.chosen) : q.skipped ? 'Skipped' : '—'), ' ', h('b', {}, q.correct ? '✓' : '✗'),
+              q.skipped && h('small.muted', {}, ` −${SKIP_XP} XP`)),
             !q.correct && correctText(q) && h('p', {}, h('span.muted', {}, 'Correct: '), correctText(q)),
             q.explanation && h('p.explanation', {}, q.explanation),
             q.ref && h('button.btn.ghost.sm.report-btn', {

@@ -14,7 +14,7 @@ export const CHARACTERS = {
     image: 'assets/characters/sage.jpg',
     portrait: 'assets/characters/sage-portrait.jpg',
     blurb: 'Reads the problem behind the problem. Best for learners who like to understand every step.',
-    passive: { name: "Scholar's Calm", text: 'Hints never reduce the XP you earn.' },
+    passive: { name: "Scholar's Calm", text: 'Hints never reduce XP, every right answer earns +25% XP, and the streak bonus climbs twice as fast (up to ×2).' },
     skill: { name: 'Arcane Insight', icon: '🔮', text: 'Eliminate two wrong answers and reveal a deep hint.' },
   },
   warrior: {
@@ -46,7 +46,13 @@ export const SKILL_CHARGES = { practice: 3, quiz: 2, sim: 2 };
 /** XP multiplier for the current streak. */
 export function streakMultiplier(characterId, streak) {
   const steps = Math.min(streak, 10);
-  return characterId === 'warrior' ? 1 + steps * 0.2 : 1 + steps * 0.05;
+  const perStep = { warrior: 0.2, sage: 0.1 }[characterId] ?? 0.05;
+  return 1 + steps * perStep;
+}
+
+/** Extra XP on every correct answer: the Sage's passive (it has no XP skill like the Warrior's War Cry). */
+export function heroXpBoost(characterId) {
+  return characterId === 'sage' ? 1.25 : 1;
 }
 
 /** Time multiplier for timed modes. */

@@ -6,7 +6,7 @@
 import { h, mount, toast, formatTime, LETTERS, questionBody, timerEl, startCountdown } from '../ui.js';
 import { CHARACTERS, SKILL_CHARGES, applySkill } from '../characters.js';
 import { profile, topicMastery } from '../state.js';
-import { createScorer, satScaled } from '../scoring.js';
+import { createScorer, satScaled, SKIP_XP } from '../scoring.js';
 import { go } from '../router.js';
 import { ensureSolved } from '../data.js';
 import { resolveKeys } from './play.js';
@@ -39,6 +39,7 @@ export function renderSimulator(app, config) {
       low: 60,
       onExpire: () => {
         toast("Time's up", `${section().name} submitted.`, { icon: '⏰', tone: 'danger' });
+        section().timedOut = true; // blanks left when time runs out aren't skips
         submitSection();
       },
     });
@@ -91,7 +92,7 @@ export function renderSimulator(app, config) {
           h('div.actions', {},
             h('button.btn.ghost', { onclick: () => goTo('question') }, '← Back to questions'),
             h('span.spacer'),
-            h('button.btn.primary', { onclick: () => confirm(`Submit ${s.name}? You can't return to it.`) && submitSection() }, 'Submit section')))));
+            h('button.btn.primary', { onclick: () => confirm(submitWarning(s)) && submitSection() }, 'Submit section')))));
       return;
     }
 
@@ -159,6 +160,12 @@ export function renderSimulator(app, config) {
     draw();
   }
 
+  function submitWarning(s) {
+    const blank = s.picks.filter((p) => p === null).length;
+    return `Submit ${s.name}? You can't return to it.` +
+      (blank ? `\n\n${blank} left blank: each skipped question costs ${SKIP_XP} XP.` : '');
+  }
+
   async function finish() {
     stopTimer();
     await resolveKeys(app, sections.flatMap((s) => s.questions));
@@ -169,8 +176,9 @@ export function renderSimulator(app, config) {
       s.questions.forEach((q, i) => {
         const ok = s.picks[i] === q.answer;
         if (ok) correct += 1;
-        scorer.settle({ correct: ok, doubleXp: s.doubleXp.has(i), topicKey: q.topicKey, topicName: q.topicName });
-        items.push({ ...q, chosen: s.picks[i] ?? -1, correct: ok });
+        const skipped = s.picks[i] == null && !s.timedOut;
+        scorer.settle({ correct: ok, skipped, doubleXp: s.doubleXp.has(i), topicKey: q.topicKey, topicName: q.topicName });
+        items.push({ ...q, chosen: s.picks[i] ?? -1, correct: ok, skipped });
       });
       return { name: s.name, correct, total: s.questions.length, scaled: satScaled(correct, s.questions.length) };
     });

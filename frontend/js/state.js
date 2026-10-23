@@ -60,6 +60,15 @@ export function chooseHero(character, name) {
 }
 
 /** Add XP and return how many levels were gained. */
+/** Take XP away (skip penalty), never below the start of the current level. Returns what was taken. */
+export function loseXp(amount) {
+  const taken = Math.max(0, Math.min(amount, profile.xp));
+  profile.xp -= taken;
+  profile.totalXp -= taken;
+  save();
+  return taken;
+}
+
 export function addXp(amount) {
   let gained = 0;
   profile.xp += amount;

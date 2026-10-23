@@ -8,7 +8,7 @@
 import { h, mount, toast, floatText, burst, LETTERS, answerLabel, questionBody, timerEl, startCountdown } from '../ui.js';
 import { CHARACTERS, SKILL_CHARGES, streakMultiplier, applySkill } from '../characters.js';
 import { profile, topicMastery } from '../state.js';
-import { createScorer } from '../scoring.js';
+import { createScorer, SKIP_XP } from '../scoring.js';
 import { go } from '../router.js';
 import { checkAnswer, ensureSolved, fetchKeys, fetchSimilar } from '../data.js';
 import { openFeedback } from '../feedback.js';
@@ -86,7 +86,7 @@ export function renderPlay(app, config) {
           }, h('span', { 'aria-hidden': 'true' }, hero.skill.icon), ` ${hero.skill.name}`, h('span.charges', {}, charges), h('kbd', {}, 'S')),
           practice && h('button.btn.ghost', { onclick: hint, disabled: locked || usedHint }, '💡 Hint', h('kbd', {}, 'H')),
           h('span.spacer'),
-          !practice && h('button.btn.ghost', { onclick: () => choose(-1) }, 'Skip'))));
+          !practice && h('button.btn.ghost', { onclick: () => choose(-1, null, true), title: `Skipping costs ${SKIP_XP} XP` }, `Skip (−${SKIP_XP} XP)`))));
     if (practice && locked && !checking) app.querySelector('.next-btn')?.focus();
     else if (q.type === 'free' && !locked) app.querySelector('.free-answer input')?.focus();
   }
@@ -181,10 +181,10 @@ export function renderPlay(app, config) {
   }
 
   // ---------------------------------------------------------------- actions
-  function choose(i, el) {
+  function choose(i, el, skipped = false) {
     if (locked || finished) return;
     locked = true;
-    const record = { chosen: i, correct: i === q.answer, usedHint, doubleXp, topicKey: q.topicKey, topicName: q.topicName };
+    const record = { chosen: i, correct: i === q.answer, usedHint, doubleXp, skipped, topicKey: q.topicKey, topicName: q.topicName };
     answers[index] = record;
 
     if (!practice) {
@@ -299,7 +299,7 @@ export function renderPlay(app, config) {
       notes.pop();
     }
     notes.push({ tone: 'hint', title: 'Hint', text: q.hint || 'Write down what you know, what you need, and the formula that links them.' });
-    if (hero.id === 'sage') toast(hero.passive.name, hero.passive.text, { portrait: hero.portrait });
+    if (hero.id === 'sage') toast(hero.passive.name, 'This hint costs you no XP.', { portrait: hero.portrait });
     draw();
   }
 
@@ -344,10 +344,11 @@ export function renderPlay(app, config) {
     const items = questions.map((qq, i) => {
       const a = (answers[i] ||= { chosen: -1, correct: false, topicKey: qq.topicKey, topicName: qq.topicName });
       if (!practice) {
-        a.correct = a.chosen >= 0 && a.chosen === qq.answer;
+        // Widgets (tables, graphs…) were graded when submitted; choices are scored now.
+        if (qq.type !== 'widget') a.correct = a.chosen >= 0 && a.chosen === qq.answer;
         scorer.settle(a);
       }
-      return { ...qq, chosen: a.chosen, text: a.text, correct: a.correct };
+      return { ...qq, chosen: a.chosen, text: a.text, correct: a.correct, skipped: a.skipped };
     });
     go('results', scorer.results({ config, modeLabel: practice ? 'Practice' : 'Quiz', items, startedAt }));
   }

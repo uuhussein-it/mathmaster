@@ -3,16 +3,18 @@
  * A scorer walks answers in order so streak multipliers stay consistent
  * whether answers are settled live (Practice) or at the end (Quiz, Simulator).
  */
-import { profile, recordAnswer, addXp } from './state.js';
-import { streakMultiplier, hintPenalty } from './characters.js';
+import { profile, recordAnswer, addXp, loseXp } from './state.js';
+import { streakMultiplier, hintPenalty, heroXpBoost } from './characters.js';
 
 const BASE_XP = { practice: 10, quiz: 15, sim: 15 };
+/** XP lost for each question skipped on purpose (so skipping hard ones to farm easy XP doesn't pay). */
+export const SKIP_XP = 10;
 
 export function createScorer(mode) {
-  const s = { streak: 0, bestStreak: 0, xp: 0, score: 0, levels: 0 };
+  const s = { streak: 0, bestStreak: 0, xp: 0, score: 0, levels: 0, skips: 0, lost: 0 };
 
   /**
-   * Settle one answered item: { correct, usedHint, doubleXp, topicKey, topicName }.
+   * Settle one answered item: { correct, usedHint, doubleXp, skipped, topicKey, topicName }.
    * Returns what was earned so the UI can show it.
    */
   s.settle = (item) => {
@@ -25,13 +27,19 @@ export function createScorer(mode) {
       mult = streakMultiplier(profile.character, s.streak);
       const hint = item.usedHint ? hintPenalty(profile.character) : 1;
       const boost = item.doubleXp ? 2 : 1;
-      xp = Math.round(BASE_XP[mode] * mult * hint * boost);
+      xp = Math.round(BASE_XP[mode] * mult * hint * boost * heroXpBoost(profile.character));
       points = Math.round(100 * mult * boost);
     } else {
       s.streak = 0;
+      if (item.skipped) {
+        const lost = loseXp(SKIP_XP);
+        s.skips += 1;
+        s.lost += lost;
+        xp = -lost;
+      }
     }
     recordAnswer({ topicKey: item.topicKey, topicName: item.topicName, correct: item.correct, points });
-    const levels = xp ? addXp(xp) : 0;
+    const levels = xp > 0 ? addXp(xp) : 0;
     s.xp += xp;
     s.score += points;
     s.levels += levels;
@@ -62,6 +70,8 @@ export function createScorer(mode) {
       score: s.score,
       bestStreak: s.bestStreak,
       levels: s.levels,
+      skips: s.skips,
+      lost: s.lost,
       seconds: Math.round((Date.now() - startedAt) / 1000),
     };
   };
