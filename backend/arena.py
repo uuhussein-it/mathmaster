@@ -1,4 +1,5 @@
-"""The class arena: one-minute fights between classmates, powered by quiz progress.
+"""The class arena: one-minute games between classmates (a fight, a car race,
+a math duel and a number hunt), powered by quiz progress.
 
 Academic progress sets each fighter's stats (level -> health, accuracy ->
 attack, best streak -> how fast the special meter fills) and unlocks special
@@ -21,6 +22,7 @@ from collections import deque
 from flask import Blueprint, abort, jsonify, request, session
 
 import gear
+import minigames
 import security
 import userdb
 
@@ -34,15 +36,14 @@ SPECIALS = [  # (id, name, unlock level, combo shown to players)
 ]
 SKINS = [(UNLOCK_LEVEL + 9, "gold"), (UNLOCK_LEVEL + 5, "silver"), (UNLOCK_LEVEL + 2, "bronze"), (0, "base")]
 FAIR_PLAY = 1.25          # the stronger fighter's stats are capped at 125% of the weaker's
-WIN_BONUS = 10
 ROUND_SECONDS = 60
-COUNTDOWN = 3
 CHALLENGE_SECONDS = 45
 ONLINE_SECONDS = 5 * 60
 
 _lock = threading.Lock()
 CHALLENGES = {}   # id -> {id, from, to, from_name, created, match}
-MATCHES = {}      # id -> Match
+MATCHES = {}      # id -> game (Fight, Race, Duel or Hunt)
+BOT_ID = -1       # the practice bot's student id
 
 _current_student = None
 REALTIME = False  # flask-sock installed and the fight socket registered
@@ -59,6 +60,7 @@ def init(app, current_student):
             stake INTEGER, created_at REAL);
         CREATE INDEX IF NOT EXISTS ql_fights_grp ON ql_fights (grp, created_at);
     """)
+    userdb.add_column("ql_fights", "game", "TEXT")
     app.register_blueprint(bp)
     try:
         from flask_sock import Sock
@@ -106,6 +108,35 @@ def _balanced(a, b):
         a[k] = min(a[k], lo * FAIR_PLAY)
         b[k] = min(b[k], lo * FAIR_PLAY)
     return a, b
+
+
+GAMES = {  # id -> (name, icon, one-line description)
+    "fight": ("Fight", "🥊", "Punch, kick and use your specials. Knock out your rival or have more health at the end."),
+    "race": ("Car Race", "🏎️", "Steer around cones and oil. Answer math questions for nitro. First across the line wins."),
+    "duel": ("Math Duel", "⚡", "Same question for both of you; the fastest right answer scores. First to 7 wins."),
+    "hunt": ("Number Hunt", "💎", "Grab the numbers that fit the rule (primes, multiples of 3, …). Wrong ones cost a point."),
+}
+
+
+def make_game(kind, a, b, practice=False):
+    """A new game between two student rows (b may be the practice bot)."""
+    stake = max(5, min(50, round(0.1 * min(_effective_xp(a), _effective_xp(b)))))
+    grade = int(a["grade"] or 9)
+    if kind == "fight":
+        return Fight(a, b, _group_id(a), stake, practice, grade)
+    cls = {"race": minigames.Race, "duel": minigames.Duel, "hunt": minigames.Hunt}[kind]
+    players = [minigames.Player(r["id"], r["name"], _profile(r).get("character"), _effective_xp(r), bot=r["id"] == BOT_ID)
+               for r in (a, b)]
+    return cls(players, _group_id(a), stake, practice, grade)
+
+
+def _bot_row(me):
+    """The practice bot: your own fighter stats under another hero."""
+    mine = _profile(me).get("character")
+    row = dict(me)
+    row.update(id=BOT_ID, name="Training Bot", arena_xp=0,
+               profile=json.dumps({**_profile(me), "character": next(c for c in ("warrior", "sage", "explorer") if c != mine)}))
+    return row
 
 
 def _effective_xp(row):
@@ -192,16 +223,18 @@ def lobby():
                    key=lambda b: (-b["wins"], -b["streak"], b["losses"], b["name"].lower()))[:20]
     history = [{"id": f["id"], "opponent": f["b_name"] if f["a_id"] == me["id"] else f["a_name"],
                 "result": "draw" if f["winner_id"] is None else "win" if f["winner_id"] == me["id"] else "loss",
-                "reason": f["reason"], "stake": f["stake"], "at": f["created_at"]}
+                "reason": f["reason"], "stake": f["stake"], "at": f["created_at"], "game": f["game"] or "fight"}
                for f in fights if me["id"] in (f["a_id"], f["b_id"])][:10]
     return jsonify({
         "me": {**_fighter_card(me, now), **rec[me["id"]], "arena_xp": me["arena_xp"] or 0, "xp": _effective_xp(me)},
         "unlock_level": UNLOCK_LEVEL,
         "specials": [{"id": s[0], "name": s[1], "level": s[2], "combo": s[3]} for s in SPECIALS],
         "fighters": fighters, "board": board, "history": history,
-        "incoming": [{"id": c["id"], "from": c["from_name"], "expires": int(c["created"] + CHALLENGE_SECONDS - now)}
-                     for c in incoming],
-        "outgoing": [{"id": c["id"], "to": c["to_name"], "match": c.get("match")} for c in outgoing],
+        "incoming": [{"id": c["id"], "from": c["from_name"], "game": c.get("game", "fight"),
+                      "expires": int(c["created"] + CHALLENGE_SECONDS - now)} for c in incoming],
+        "outgoing": [{"id": c["id"], "to": c["to_name"], "game": c.get("game", "fight"), "match": c.get("match")}
+                     for c in outgoing],
+        "games": [{"id": k, "name": n, "icon": i, "text": t} for k, (n, i, t) in GAMES.items()],
         "match": live.id if live else None,
         "realtime": REALTIME,
     })
@@ -211,10 +244,14 @@ def lobby():
 def challenge():
     me = _me()
     security.rate_limit("arena-challenge", 20, 60)
+    body = request.get_json(silent=True) or {}
     try:
-        opp_id = int((request.get_json(silent=True) or {}).get("opponent"))
+        opp_id = int(body.get("opponent"))
     except (TypeError, ValueError):
         abort(400, "Choose a classmate.")
+    kind = body.get("game") or "fight"
+    if kind not in GAMES:
+        abort(400, "Choose a game.")
     conn = userdb.connect()
     opp = conn.execute("SELECT * FROM ql_students WHERE id=?", (opp_id,)).fetchone()
     conn.close()
@@ -235,7 +272,7 @@ def challenge():
                 del CHALLENGES[c["id"]]  # one open challenge at a time
         cid = secrets.token_urlsafe(8)
         CHALLENGES[cid] = {"id": cid, "from": me["id"], "to": opp["id"], "from_name": me["name"],
-                           "to_name": opp["name"], "created": time.time()}
+                           "to_name": opp["name"], "created": time.time(), "game": kind}
     return jsonify({"ok": True, "id": cid})
 
 
@@ -259,12 +296,45 @@ def answer_challenge(cid):
     a = conn.execute("SELECT * FROM ql_students WHERE id=?", (c["from"],)).fetchone()
     b = conn.execute("SELECT * FROM ql_students WHERE id=?", (c["to"],)).fetchone()
     conn.close()
-    match = Match(a, b)
+    match = make_game(c.get("game", "fight"), a, b)
     with _lock:
         MATCHES[match.id] = match
         c["match"] = match.id
     match.start()
     return jsonify({"ok": True, "match": match.id})
+
+
+@bp.route("/api/arena/practice", methods=["POST"])
+def practice():
+    """A practice game against the bot: nothing at stake, nothing saved."""
+    me = _me()
+    security.rate_limit("arena-practice", 30, 60)
+    kind = (request.get_json(silent=True) or {}).get("game") or "fight"
+    if kind not in GAMES:
+        abort(400, "Choose a game.")
+    if not REALTIME:
+        abort(503, "Live games aren't available on this server yet.")
+    with _lock:
+        _expire()
+        if _busy(me["id"]):
+            abort(409, "You're already in a game.")
+        for c in list(CHALLENGES.values()):
+            if c["from"] == me["id"]:
+                del CHALLENGES[c["id"]]
+    match = make_game(kind, me, _bot_row(me), practice=True)
+    with _lock:
+        MATCHES[match.id] = match
+    match.start()
+    return jsonify({"ok": True, "match": match.id})
+
+
+@bp.route("/api/arena/match/<mid>", methods=["DELETE"])
+def leave_match(mid):
+    me = _me()
+    m = MATCHES.get(mid)
+    if m and me["id"] in m.ids:
+        m.quit(me["id"])
+    return jsonify({"ok": True})
 
 
 @bp.route("/api/arena/match/<mid>")
@@ -281,7 +351,7 @@ W = 960            # arena width (world units; the browser scales it)
 SPEED = 270
 JUMP = 640
 GRAVITY = 1900
-TICK = 1 / 30
+TICK = minigames.TICK
 MOVES = {          # duration, moment the hit lands, reach, damage multiplier, cooldown after
     "punch": (0.24, 0.09, 100, 1.0, 0.08),
     "kick": (0.40, 0.18, 130, 1.5, 0.12),
@@ -291,10 +361,9 @@ COMBO_WINDOW = 0.7
 SPECIAL_COST = {"fireball": 35, "shield": 30, "critical": 100}
 
 
-class Fighter:
-    def __init__(self, row, st, side):
-        p = _profile(row)
-        self.id, self.name, self.character = row["id"], row["name"], p.get("character") or "warrior"
+class Fighter(minigames.Player):
+    def __init__(self, row, st, side, bot=False):
+        super().__init__(row["id"], row["name"], _profile(row).get("character"), _effective_xp(row), bot=bot)
         self.st = st
         self.max_hp = self.hp = float(st["hp"])
         self.x = W * (0.28 if side == 0 else 0.72)
@@ -307,12 +376,7 @@ class Fighter:
         self.cool = 0.0
         self.stun = 0.0
         self.shield = 0.0
-        self.keys = {}
-        self.prev = {}
         self.dirs = deque(maxlen=6)  # (time, "d"|"f"|"b"|"u") on each new press
-        self.sockets = []
-        self.last_contact = time.time()
-        self.effective_xp = _effective_xp(row)
 
     def public(self):
         return {"id": self.id, "name": self.name, "character": self.character, "skin": self.st["skin"],
@@ -326,101 +390,19 @@ class Fighter:
         return bool(self.keys.get("block")) and self.y == 0 and self.action is None and self.stun <= 0
 
 
-class Match:
-    def __init__(self, a, b):
-        self.id = secrets.token_urlsafe(10)
-        self.grp = _group_id(a)
+class Fight(minigames.Game):
+    """The original one-minute fight: knock out your opponent or have more health at the end."""
+    kind = "fight"
+    keys = ("left", "right", "up", "down", "punch", "kick", "block")
+    seconds = ROUND_SECONDS
+
+    def __init__(self, a, b, grp, stake, practice=False, grade=9):
         sa, sb = _balanced(stats(a), stats(b))
-        self.f = [Fighter(a, sa, 0), Fighter(b, sb, 1)]
-        self.ids = {a["id"], b["id"]}
-        # The stake: 10% of the poorer fighter's XP, between 5 and 50.
-        self.stake = max(5, min(50, round(0.1 * min(f.effective_xp for f in self.f))))
-        self.created = time.time()
-        self.phase = "waiting"   # waiting -> countdown -> fight -> over
-        self.phase_start = self.created
+        super().__init__([Fighter(a, sa, 0), Fighter(b, sb, 1, bot=b["id"] == BOT_ID)], grp, stake, practice, grade)
+        self.f = self.p
         self.projectiles = []
-        self.events = []
-        self.result = None
-        self.ended = 0.0
-        self.lock = threading.Lock()
 
-    # -- sockets
-    def fighter(self, sid):
-        return next(f for f in self.f if f.id == sid)
-
-    def attach(self, sid, ws):
-        with self.lock:
-            f = self.fighter(sid)
-            f.sockets.append(ws)
-            f.last_contact = time.time()
-
-    def detach(self, sid, ws):
-        with self.lock:
-            f = self.fighter(sid)
-            if ws in f.sockets:
-                f.sockets.remove(ws)
-            f.last_contact = time.time()
-
-    def on_input(self, sid, msg):
-        keys = msg.get("keys") if isinstance(msg, dict) else None
-        if not isinstance(keys, dict):
-            return
-        with self.lock:
-            f = self.fighter(sid)
-            f.keys = {k: bool(keys.get(k)) for k in ("left", "right", "up", "down", "punch", "kick", "block")}
-            f.last_contact = time.time()
-
-    def start(self):
-        threading.Thread(target=self._run, name=f"arena-{self.id}", daemon=True).start()
-
-    # -- loop
-    def _run(self):
-        frame = 0
-        next_t = time.time()
-        while self.phase != "over":
-            now = time.time()
-            with self.lock:
-                self._step(now)
-                payload = None
-                if frame % 2 == 0 or self.phase == "over":
-                    payload = json.dumps(self.snapshot())
-                    self.events = []  # sent; events pile up between sends so none are missed
-                targets = [(f, ws) for f in self.f for ws in f.sockets]
-            if payload:
-                for f, ws in targets:
-                    try:
-                        ws.send(payload)
-                    except Exception:
-                        self.detach(f.id, ws)
-            frame += 1
-            next_t += TICK
-            time.sleep(max(0.0, next_t - time.time()))
-        self._save()
-        final = json.dumps(self.snapshot())
-        for f in self.f:
-            for ws in list(f.sockets):
-                try:
-                    ws.send(final)
-                except Exception:
-                    pass
-
-    def _step(self, now):
-        connected = [bool(f.sockets) for f in self.f]
-        if self.phase == "waiting":
-            if all(connected):
-                self._phase("countdown", now)
-            elif now - self.created > 25:
-                self._finish(now, next((f for f, c in zip(self.f, connected) if c), None),
-                             "no-show" if not any(connected) else "forfeit")
-            return
-        if self.phase == "countdown":
-            if now - self.phase_start >= COUNTDOWN:
-                self._phase("fight", now)
-            return
-        # fight
-        for f, c in zip(self.f, connected):
-            if not c and now - f.last_contact > 8:
-                return self._finish(now, self._other(f), "forfeit")
+    def tick(self, now):
         for f in self.f:
             self._control(f, now)
         for f in self.f:
@@ -430,21 +412,43 @@ class Match:
         a, b = self.f
         if a.hp <= 0 or b.hp <= 0:
             winner = None if a.hp <= 0 and b.hp <= 0 else (a if b.hp <= 0 else b)
-            return self._finish(now, winner, "ko")
-        if now - self.phase_start >= ROUND_SECONDS:
-            winner = None if abs(a.hp / a.max_hp - b.hp / b.max_hp) < 0.005 else (a if a.hp / a.max_hp > b.hp / b.max_hp else b)
-            self._finish(now, winner, "time")
+            self.finish(now, winner, "ko")
 
-    def _phase(self, name, now):
-        self.phase, self.phase_start = name, now
+    def score(self, f):
+        return f.hp
 
-    def _other(self, f):
-        return self.f[1] if f is self.f[0] else self.f[0]
+    def timeout(self, now):
+        a, b = self.f
+        ra, rb = a.hp / a.max_hp, b.hp / b.max_hp
+        self.finish(now, None if abs(ra - rb) < 0.005 else (a if ra > rb else b), "time")
+
+    def bot(self, f, now):
+        """A sparring partner: walks in, throws punches and kicks, sometimes blocks."""
+        f.think = now + self.rng.uniform(0.18, 0.32)
+        opp = self.other(f)
+        dx = opp.x - f.x
+        toward, away = ("right", "left") if dx > 0 else ("left", "right")
+        if f.prev.get("punch") or f.prev.get("kick"):
+            f.keys = {}  # let go, so the next press counts
+            return
+        roll = self.rng.random()
+        if abs(dx) > 115:
+            f.keys = {toward: True, "up": roll < 0.06}
+        elif opp.action and roll < 0.35:
+            f.keys = {"block": True}
+        elif roll < 0.45:
+            f.keys = {"punch": True}
+        elif roll < 0.7:
+            f.keys = {"kick": True}
+        elif roll < 0.85:
+            f.keys = {away: True}
+        else:
+            f.keys = {}
 
     def _control(self, f, now):
         k, prev = f.keys, f.prev
         f.prev = dict(k)
-        opp = self._other(f)
+        opp = self.other(f)
         f.facing = 1 if opp.x >= f.x else -1
         for key, d in (("down", "d"), ("up", "u"), ("left", "f" if f.facing < 0 else "b"),
                        ("right", "f" if f.facing > 0 else "b")):
@@ -487,7 +491,7 @@ class Match:
                 return
         f.vx = 0.0
         if not f.blocking():
-            f.vx = SPEED * ((1 if k.get("right") else 0) - (1 if k.get("left") else 0))
+            f.vx = SPEED * ((1 if k.get("right") else 0) - (1 if k.get("left") else 0)) * (0.85 if f.bot else 1)
         if k.get("up") and f.y == 0:
             f.vy = JUMP
 
@@ -516,7 +520,7 @@ class Match:
             if f.y == 0:
                 f.vy = 0.0
         f.x = min(W - 40, max(40, f.x))
-        opp = self._other(f)
+        opp = self.other(f)
         if abs(f.x - opp.x) < 60 and abs(f.y - opp.y) < 80:  # bodies don't overlap
             push = (60 - abs(f.x - opp.x)) / 2 * (1 if f.x < opp.x else -1)
             f.x = min(W - 40, max(40, f.x - push))
@@ -529,7 +533,7 @@ class Match:
             if f.action_t < at:
                 continue
             f.hit_done = True
-            opp = self._other(f)
+            opp = self.other(f)
             dx = (opp.x - f.x) * f.facing
             if 0 < dx <= reach and abs(opp.y - f.y) < 90:
                 self._hit(f, opp, f.st["attack"] * mult, f.action)
@@ -555,7 +559,7 @@ class Match:
         for p in self.projectiles:
             p["x"] += 520 * p["dir"] * TICK
             target = next(f for f in self.f if f.id != p["owner"])
-            owner = self._other(target)
+            owner = self.other(target)
             if abs(target.x - p["x"]) < 45 and target.y < 90:
                 self._hit(owner, target, p["dmg"], "fireball")
                 continue
@@ -563,46 +567,11 @@ class Match:
                 keep.append(p)
         self.projectiles = keep
 
-    def _finish(self, now, winner, reason):
-        self.phase, self.ended = "over", now
-        loser = self._other(winner) if winner else None
-        taken = min(self.stake, loser.effective_xp) if loser else 0
-        self.result = {"winner": winner.id if winner else None, "reason": reason,
-                       "xp": {f.id: (taken + WIN_BONUS if f is winner else -taken if f is loser else 0) for f in self.f}}
-        if reason == "no-show":
-            self.result["xp"] = {f.id: 0 for f in self.f}
-
-    def _save(self):
-        if not self.result or self.result["reason"] == "no-show":
-            return
-        a, b = self.f
-        conn = userdb.connect()
-        try:
-            conn.execute("INSERT INTO ql_fights (grp, a_id, b_id, a_name, b_name, winner_id, a_hp, b_hp, reason, stake, "
-                         "created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                         (self.grp, a.id, b.id, a.name, b.name, self.result["winner"], round(max(0, a.hp)),
-                          round(max(0, b.hp)), self.result["reason"], self.stake, self.ended))
-            for f in self.f:
-                if self.result["winner"] == f.id:
-                    conn.execute("UPDATE ql_students SET arena_wins = arena_wins + 1 WHERE id=?", (f.id,))
-                if self.result["xp"][f.id]:
-                    conn.execute("UPDATE ql_students SET arena_xp = arena_xp + ? WHERE id=?",
-                                 (self.result["xp"][f.id], f.id))
-            conn.commit()
-        finally:
-            conn.close()
-
-    def snapshot(self, full=False):
-        now = time.time()
-        left = {"waiting": ROUND_SECONDS, "countdown": ROUND_SECONDS,
-                "fight": max(0.0, ROUND_SECONDS - (now - self.phase_start)), "over": 0}[self.phase]
-        out = {"match": self.id, "phase": self.phase, "time_left": round(left, 1),
-               "countdown": max(0, math.ceil(COUNTDOWN - (now - self.phase_start))) if self.phase == "countdown" else None,
-               "fighters": [f.public() for f in self.f],
+    def state(self, now, full):
+        out = {"fighters": [f.public() for f in self.f],
                "projectiles": [{"x": round(p["x"], 1), "y": p["y"], "dir": p["dir"], "owner": p["owner"]}
                                for p in self.projectiles],
-               "events": self.events, "result": self.result, "stake": self.stake, "width": W,
-               "connected": {f.id: bool(f.sockets) for f in self.f}}
+               "width": W}
         if full:
             out["stats"] = {f.id: f.st for f in self.f}
         return out
