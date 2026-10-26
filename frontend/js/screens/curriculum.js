@@ -1,11 +1,13 @@
 /**
- * Path A: School Curriculum. Filter Grade → Track → Term, pick topics or single lessons, and a mode.
+ * Path A: School Curriculum. A student plays their own group's course (grade and
+ * track come from the level they chose): pick a term, topics or single lessons, and a mode.
  */
 import { h, mount, prefs } from '../ui.js';
 import { loadCurriculumIndex, loadCourse, prepareQuestions } from '../data.js';
 import { go } from '../router.js';
 import { timedSeconds } from '../characters.js';
 import { profile } from '../state.js';
+import { account } from '../account.js';
 import { chips, modeCard, lessonPicker, lessonKey, groupBoard } from './controls.js';
 
 const SECONDS_PER_QUIZ_QUESTION = 75;
@@ -14,6 +16,9 @@ const COUNTS = [5, 10, 15, 0]; // 0 = all
 export function renderCurriculum(app) {
   const saved = prefs.get('curriculum', {});
   const sel = { grade: 9, track: 'advanced', term: 1, mode: 'practice', count: 10, ...saved, lessons: null };
+  const me = account.student;
+  const locked = Boolean(me?.grade && me?.track); // their group decides the course
+  if (locked) Object.assign(sel, { grade: me.grade, track: me.track });
   const open = new Set(); // topics showing their lessons
   let index = null;
   const board = groupBoard(); // loads once; kept across redraws
@@ -47,7 +52,7 @@ export function renderCurriculum(app) {
     if (!trackOffered(sel.grade, sel.track)) {
       body = h('div.empty', {}, h('span', { 'aria-hidden': 'true' }, '🗺️'),
         h('h3', {}, `${trackName(sel.track)} isn't offered in Grade ${sel.grade}`),
-        h('p', {}, 'Pick another track above.'));
+        h('p', {}, locked ? 'Change your level from the hub if this isn’t your group.' : 'Pick another track above.'));
     } else if (!course) {
       body = h('div.empty', {}, h('span', { 'aria-hidden': 'true' }, '🔒'),
         h('h3', {}, `Term ${sel.term} unlocks soon`),
@@ -55,7 +60,7 @@ export function renderCurriculum(app) {
     } else {
       body = h('div.course', {},
         h('div.course-head', {},
-          h('div', {}, h('p.eyebrow', {}, `${course.code} · Grade ${course.grade} · Term ${course.term}`), h('h2', {}, course.title)),
+          h('div', {}, h('p.eyebrow', {}, me?.group?.name || `Grade ${course.grade}`), h('h2', {}, `Term ${course.term}`)),
           selectAllLessons(course)),
         h('h3.sub-title', {}, 'Mode'),
         h('div.mode-grid', {},
@@ -83,8 +88,8 @@ export function renderCurriculum(app) {
         h('div.crumbs', {}, h('button.link', { onclick: () => go('hub') }, '← Hub'), h('span', {}, 'School Curriculum')),
         h('h1.display', {}, 'School Curriculum'),
         h('div.panel.filters', {},
-          chips('Grade', index.grades.map((g) => ({ value: g, label: `Grade ${g}` })), sel.grade, (grade) => update({ grade })),
-          chips('Stream / Track', index.tracks.map((t) => ({
+          !locked && chips('Grade', index.grades.map((g) => ({ value: g, label: `Grade ${g}` })), sel.grade, (grade) => update({ grade })),
+          !locked && chips('Stream / Track', index.tracks.map((t) => ({
             value: t.id, label: t.name, badge: trackOffered(sel.grade, t.id) ? null : 'N/A',
           })), sel.track, (track) => update({ track })),
           chips('Academic term', index.terms.map((term) => ({

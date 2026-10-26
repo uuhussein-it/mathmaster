@@ -69,9 +69,10 @@ function pushProfile() {
     api('api/me', { method: 'PUT', body: { profile, name: profile.name } })
       .then((r) => {
         account.student = r.student;
-        // The server caps progress that looks tampered with; if it did, take its numbers.
+        // The server caps progress that looks tampered with, and keeps a level the admin set
+        // over an older copy from this device; either way, take its numbers.
         const saved = r.student.profile || {};
-        if (saved.totalXp < sent.totalXp || saved.score < sent.score) replaceProfile(saved);
+        if (saved.totalXp !== sent.totalXp || saved.score < sent.score) replaceProfile(saved);
       })
       .catch(() => {});
   }, 800);

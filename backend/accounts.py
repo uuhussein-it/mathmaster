@@ -302,6 +302,11 @@ def checked_profile(old, new, elapsed):
     elapsed = max(0.0, min(elapsed, 3600.0))
     prev = {f: max(0, int(old.get(f) or 0)) for f in ("totalXp", "score", "answered")}
     out["totalXp"] = min(out["totalXp"], prev["totalXp"] + 400 + int(XP_PER_SECOND * elapsed))
+    reset = out["totalXp"] == 0 and out["answered"] == 0  # "Reset progress" on the hub
+    if out["totalXp"] < prev["totalXp"] - 300 and not reset:
+        # Far below the saved total (skips only take a little): an old copy, e.g. a tab
+        # open from before the admin set the level. Keep the server's total.
+        out["totalXp"] = prev["totalXp"]
     out["score"] = min(out["score"], prev["score"] + 2000 + int(SCORE_PER_SECOND * elapsed))
     out["answered"] = min(out["answered"], prev["answered"] + 20 + int(elapsed))
     out["correct"] = min(out["correct"], out["answered"])
@@ -386,7 +391,8 @@ def admin_students():
     out = []
     for r in rows:
         s = _public(r)
-        s.update(email=r["email"], hidden=bool(r["hidden"]), created_at=r["created_at"], last_seen=r["last_seen"])
+        s.update(email=r["email"], hidden=bool(r["hidden"]), created_at=r["created_at"], last_seen=r["last_seen"],
+                 all_gear=bool(r["all_gear"]) if "all_gear" in r.keys() else False)
         out.append(s)
     return jsonify({"students": out})
 
@@ -394,10 +400,11 @@ def admin_students():
 @bp.route("/api/admin/students/<int:sid>", methods=["PUT", "DELETE"])
 def admin_student(sid):
     """PUT {hidden} hides/shows on the leaderboard, {password} resets it,
-    {grade, track} moves groups. DELETE removes the account."""
+    {grade, track} moves groups, {level} sets the level (admin only) and
+    {all_gear} unlocks every Armory item (admin only). DELETE removes the account."""
     _require_admin()
     data = _body()
-    if request.method == "DELETE" or data.get("password"):
+    if request.method == "DELETE" or data.get("password") or "level" in data or "all_gear" in data:
         security.require_owner()  # teachers can hide and move students, not delete or reset them
     conn = userdb.connect()
     if not conn.execute("SELECT 1 FROM ql_students WHERE id=?", (sid,)).fetchone():
@@ -414,6 +421,23 @@ def admin_student(sid):
                 abort(400, "Passwords need at least 8 characters.")
             conn.execute("UPDATE ql_students SET pw_hash=? WHERE id=?",
                          (generate_password_hash(str(data["password"])), sid))
+        if "level" in data:
+            try:
+                level = int(data["level"])
+            except (TypeError, ValueError):
+                level = 0
+            if not 1 <= level <= 100:
+                conn.close()
+                abort(400, "Choose a level from 1 to 100.")
+            row = conn.execute("SELECT profile FROM ql_students WHERE id=?", (sid,)).fetchone()
+            try:
+                profile = json.loads(row["profile"] or "{}")
+            except ValueError:
+                profile = {}
+            profile.update(totalXp=sum(xp_to_next(n) for n in range(1, level)), level=level, xp=0)
+            conn.execute("UPDATE ql_students SET profile=?, level=? WHERE id=?", (json.dumps(profile), level, sid))
+        if "all_gear" in data:
+            conn.execute("UPDATE ql_students SET all_gear=? WHERE id=?", (int(bool(data["all_gear"])), sid))
         grade = str(data.get("grade") or "")
         if grade.isdigit() and _group(int(grade), str(data.get("track") or "")):
             conn.execute("UPDATE ql_students SET grade=?, track=? WHERE id=?", (int(data["grade"]), data["track"], sid))
