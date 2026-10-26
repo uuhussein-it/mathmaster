@@ -354,6 +354,15 @@ export function renderAdmin(app) {
                 if (pw) set(s, { password: pw }, 'Password reset').catch((e) => toast('Not saved', e.message, { tone: 'danger', icon: '⚠️' }));
               },
             }, 'Reset password'),
+            h('button.btn.ghost.sm', {
+              onclick: () => {
+                const lv = prompt(`Set ${s.name}'s level (1–100). Their XP is set to the start of that level:`, String(s.level));
+                if (lv) set(s, { level: Number(lv) }, `${s.name} is now level ${lv}`).catch((e) => toast('Not saved', e.message, { tone: 'danger', icon: '⚠️' }));
+              },
+            }, 'Set level'),
+            h('button.btn.ghost.sm', {
+              onclick: () => set(s, { all_gear: !s.all_gear }, s.all_gear ? 'Armory back to normal unlocks' : 'Every Armory item unlocked'),
+            }, s.all_gear ? '🔒 Normal gear' : '🔓 Unlock all gear'),
             h('button.btn.ghost.sm.danger', {
               onclick: async () => {
                 if (!confirm(`Delete ${s.name}'s account and progress?`)) return;

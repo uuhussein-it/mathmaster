@@ -109,7 +109,7 @@ served (about 480 course MCQs plus QuestLearn's original SAT set).
 
 ## Student accounts, groups and the admin page
 
-- Students sign in at `/` with their school email and create a password on their first visit, then pick a hero and their level (grade + track). That puts them in a group such as "Grade 11 · Advanced", whose play area and leaderboard open first.
+- Students sign in at `/` with their school email and create a password on their first visit, then pick a hero and their level (grade + track). That puts them in a group such as "Grade 11 · Advanced", whose play area and leaderboard open first. The School Curriculum screen then shows only their group's course: they choose a term, then topics or lessons.
 - Teachers sign in at `/#/admin` with `TEACHER_USERNAME` / `ADMIN_PASSWORD`. The admin page can fix answers, remove questions, add questions of any type (multiple choice, short answer, table, matching, graph, multi-part), remove students from the leaderboard, reset passwords, read feedback and upload the school's student list.
 - **School student list:** upload the Excel file on the admin page (School list tab). After that, only emails on the list can create an account. It is not stored in the repository because it holds students' personal data.
 - Optional `SCHOOL_EMAIL_DOMAIN` (e.g. `actvet.gov.ae`): restricts sign-ups to that domain while no list is uploaded.
@@ -131,6 +131,7 @@ in Neon and re-applied to it on every start.
 ## Teachers and the admin
 
 - The account set by `TEACHER_USERNAME` / `ADMIN_PASSWORD` is the **admin**: it can do everything, including uploading the school list, deleting students, resetting passwords and adding teachers (admin page → Teachers tab).
+- On the Students tab the admin can also **Set level** (the student's XP moves to the start of that level) and **Unlock all gear** (every Armory item, whatever its requirement).
 - **Teachers** sign in on the same page with their email and the password the admin gave them. They can fix questions, read feedback and manage the leaderboard, but cannot see or change the school list, delete accounts or reset passwords.
 
 ## Class arena (games between classmates)

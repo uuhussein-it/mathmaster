@@ -112,7 +112,6 @@ export function renderHub(app) {
       h('div.hub-foot', {},
         h('button.btn.ghost', { onclick: () => openFeedback() }, '💬 Send feedback'),
         h('button.btn.ghost', { onclick: () => go('select') }, 'Change hero'),
-        h('a.btn.ghost', { href: 'classic' }, 'Classic MathMaster site'),
         h('button.btn.ghost.danger', {
           onclick: () => {
             if (confirm('Reset all progress? This clears your level, XP and history on this device.')) {

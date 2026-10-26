@@ -70,6 +70,7 @@ def init(app, current_student):
     _current_student = current_student
     userdb.add_column("ql_students", "gear", "TEXT")
     userdb.add_column("ql_students", "arena_wins", "INTEGER NOT NULL DEFAULT 0")
+    userdb.add_column("ql_students", "all_gear", "INTEGER NOT NULL DEFAULT 0")  # the admin unlocked everything
     app.register_blueprint(bp)
 
 
@@ -84,12 +85,13 @@ def progress(row):
     p = _profile(row)
     return {"level": max(1, int(p.get("level") or row["level"] or 1)),
             "wins": int(row["arena_wins"] or 0) if "arena_wins" in row.keys() else 0,
-            "streak": int(p.get("bestStreak") or 0)}
+            "streak": int(p.get("bestStreak") or 0),
+            "all": bool(row["all_gear"]) if "all_gear" in row.keys() else False}
 
 
 def is_unlocked(item, prog):
     kind, n = item["need"]
-    return prog[kind] >= n
+    return prog.get("all") or prog[kind] >= n
 
 
 def equipped(row):
