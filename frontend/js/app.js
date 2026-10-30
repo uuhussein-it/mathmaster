@@ -6,6 +6,7 @@ import { CHARACTERS } from './characters.js';
 import { profile, onProfileChange, xpToNext } from './state.js';
 import { register, startRouter, go } from './router.js';
 import { loadAccount } from './account.js';
+import { startAlerts } from './alerts.js';
 
 import { renderSelect } from './screens/select.js';
 import { renderHub } from './screens/hub.js';
@@ -64,4 +65,7 @@ register('fight', renderFight, { needsPayload: true });
 
 onProfileChange(renderHud);
 renderHud();
-loadAccount().then(startRouter);
+loadAccount().then(() => {
+  startRouter();
+  startAlerts();
+});

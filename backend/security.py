@@ -100,6 +100,32 @@ def rate_note(name, key=None, per_ip=True):
         _hits[_bucket(name, key, per_ip)].append(time.time())
 
 
+def ai_guard(name, limit, window):
+    """Gemini costs quota, so only signed-in students and staff may trigger it,
+    each within their own limit (else 401 / 429)."""
+    who = session.get("student_id") or (role() and f"staff:{role()}")
+    if not who:
+        abort(401, "Please sign in to use AI help.")
+    rate_limit(name, limit, window, key=who, per_ip=False)
+
+
+_ai_day = {"day": None, "calls": 0}
+
+
+def ai_budget_ok():
+    """A daily ceiling on Gemini calls for the whole site (GEMINI_DAILY_LIMIT, default 900),
+    so a runaway script can't use up the key's quota."""
+    today = time.strftime("%Y-%m-%d")
+    limit = int(os.environ.get("GEMINI_DAILY_LIMIT", "900"))
+    with _hits_lock:
+        if _ai_day["day"] != today:
+            _ai_day.update(day=today, calls=0)
+        if _ai_day["calls"] >= limit:
+            return False
+        _ai_day["calls"] += 1
+        return True
+
+
 # ----------------------------------------------------------------------- roles
 def role():
     if session.get("role") in ("teacher", "admin"):

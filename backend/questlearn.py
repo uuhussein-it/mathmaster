@@ -19,6 +19,7 @@ from flask import Blueprint, abort, g, jsonify, request
 
 import db
 import practice_sets
+import security
 import userdb
 
 bp = Blueprint("questlearn", __name__)
@@ -600,6 +601,7 @@ def _letter_index(answer):
 @bp.route("/api/ql/solve", methods=["POST"])
 def solve_route():
     """Hint + explanation (and the key for MCQ, used by the Sage's skill)."""
+    security.ai_guard("ql-solve", 200, 10 * 60)
     kind, qid = _parse_ref((request.get_json(silent=True) or {}).get("ref"))
     if kind == "set":
         q = _set_q(qid)
@@ -618,6 +620,7 @@ def solve_route():
 @bp.route("/api/ql/check", methods=["POST"])
 def check_route():
     """Grade one answer. MCQ: {ref, choice: index}. Free response: {ref, text}."""
+    security.ai_guard("ql-check", 400, 10 * 60)
     data = request.get_json(silent=True) or {}
     kind, qid = _parse_ref(data.get("ref"))
     if kind == "set":  # practice sets carry their own key
@@ -686,6 +689,7 @@ def _set_key(qid):
 @bp.route("/api/ql/keys", methods=["POST"])
 def keys_route():
     """Answer keys for a finished quiz/simulator: {refs: [...]} -> {keys: {ref: index|null}}."""
+    security.ai_guard("ql-keys", 40, 10 * 60)
     refs = [r for r in ((request.get_json(silent=True) or {}).get("refs") or [])][:120]
     parsed = [(r, _parse_ref(r)) for r in refs]
     with ThreadPoolExecutor(max_workers=6) as pool:
@@ -706,6 +710,7 @@ def _saved_similar(tag):
 def similar_route():
     """Generate new practice questions like the given one.
     Body: {ref} for a bank question, or {question: {q, options, answer}} for a text one."""
+    security.ai_guard("ql-similar", 30, 10 * 60)
     data = request.get_json(silent=True) or {}
     n = max(1, min(int(data.get("n") or 3), 5))
     q = data.get("question") or {}

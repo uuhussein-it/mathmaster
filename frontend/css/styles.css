@@ -916,3 +916,50 @@ body[data-screen="fight"] #hud { display: none; }
   .armory-hero { position: static; }
   .armory-list { grid-template-columns: 1fr; }
 }
+
+/* ------------------------------------------------- challenge alerts (any page) */
+.challenge-alerts { position: fixed; z-index: 60; top: 12px; left: 50%; transform: translateX(-50%); display: grid; gap: 10px; width: min(520px, calc(100vw - 24px)); pointer-events: none; }
+.challenge-alert {
+  pointer-events: auto; display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: linear-gradient(135deg, #2a1f5c, #141c3c); border: 2px solid var(--gold); border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 4px rgba(230, 192, 106, 0.18), var(--shadow); animation: alert-in 0.35s ease-out, alert-glow 1.4s ease-in-out infinite;
+}
+.challenge-alert-icon { font-size: 30px; animation: alert-shake 1.4s ease-in-out infinite; }
+.challenge-alert-text { flex: 1; display: grid; min-width: 0; }
+.challenge-alert-text b { font-family: var(--font-display); }
+.challenge-alert-text span { font-size: 13px; color: var(--muted); }
+.challenge-alert-actions { display: flex; gap: 6px; flex: none; }
+@keyframes alert-in { from { opacity: 0; transform: translateY(-20px); } }
+@keyframes alert-glow { 50% { box-shadow: 0 0 0 8px rgba(230, 192, 106, 0.08), var(--shadow); } }
+@keyframes alert-shake { 0%, 60%, 100% { transform: rotate(0); } 70% { transform: rotate(-14deg); } 85% { transform: rotate(14deg); } }
+@media (max-width: 480px) {
+  .challenge-alert { flex-wrap: wrap; }
+  .challenge-alert-actions { width: 100%; justify-content: flex-end; }
+}
+.arena-head-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+
+/* super attacks shake the game */
+.fight-canvas.shake { animation: game-shake 0.45s ease-out; }
+@keyframes game-shake {
+  20% { transform: translate(-6px, 3px); } 40% { transform: translate(5px, -4px); }
+  60% { transform: translate(-4px, 2px); } 80% { transform: translate(2px, -1px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fight-canvas.shake, .challenge-alert, .challenge-alert-icon { animation: none; }
+}
+
+/* armory: customize your look */
+.look-label { margin: 12px 0 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.look-swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+.look-swatch { width: 34px; height: 34px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.25); color: #fff; font-size: 14px; cursor: pointer; text-shadow: 0 1px 2px #000; }
+.look-swatch.on { border-color: #fff; box-shadow: 0 0 0 3px var(--gold); }
+.look-choices { display: flex; flex-wrap: wrap; gap: 8px; }
+.look-choice { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel-hi); color: var(--text); font: 600 14px var(--font-body); cursor: pointer; }
+.look-choice.on { border-color: var(--gold); background: rgba(230, 192, 106, 0.18); }
+.look-powers { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.look-powers li { display: grid; gap: 4px; padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: var(--panel-hi); text-align: center; }
+.look-powers li.on { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(230, 192, 106, 0.3); }
+.look-powers li.locked { opacity: 0.6; }
+.look-power-icon { font-size: 30px; }
+.look-power-actions { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
+.armory-car { display: block; width: 100%; max-width: 300px; height: auto; margin: 6px auto 0; border-radius: var(--radius-sm); background: linear-gradient(#1b2a6b, #f59e6b 64%, #1f6b3a 64%); }
