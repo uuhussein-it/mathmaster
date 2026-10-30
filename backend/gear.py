@@ -62,6 +62,18 @@ BY_ID = {g["id"]: g for g in CATALOG}
 DEFAULT = {"weapon": "wooden-sword", "armor": "cloth-tunic", "charm": "no-charm"}
 NEED_TEXT = {"level": "Reach level {n}", "wins": "Win {n} arena fights", "streak": "Get {n} answers right in a row"}
 
+# How a student's fighter and car look, and which super power they fire in the arena.
+COLORS = ["", "#ff6b5a", "#ff9f43", "#ffd34d", "#7ddc7a", "#4fd1e8", "#5b8cff", "#b48cff", "#ff6fb5", "#e8eef8", "#3a3a4a"]
+HATS = ["none", "headband", "cap", "crown", "horns", "wizard"]
+CAR_STYLES = ["sport", "kart", "truck"]
+POWERS = [  # id, name, icon, unlock level
+    ("thunder", "Thunder Storm", "⚡", 1),
+    ("laser", "Eye Laser", "👁️", 5),
+    ("fire", "Fire Tornado", "🌪️", 10),
+    ("ice", "Ice Blast", "❄️", 15),
+]
+LOOK_DEFAULT = {"body": "", "hat": "none", "power": "thunder", "car_color": "", "car_style": "sport"}
+
 _current_student = None
 
 
@@ -71,6 +83,7 @@ def init(app, current_student):
     userdb.add_column("ql_students", "gear", "TEXT")
     userdb.add_column("ql_students", "arena_wins", "INTEGER NOT NULL DEFAULT 0")
     userdb.add_column("ql_students", "all_gear", "INTEGER NOT NULL DEFAULT 0")  # the admin unlocked everything
+    userdb.add_column("ql_students", "look", "TEXT")
     app.register_blueprint(bp)
 
 
@@ -126,6 +139,32 @@ def looks(row):
             for slot, item in equipped(row).items()}
 
 
+def power_open(power, prog):
+    level = next((p[3] for p in POWERS if p[0] == power), None)
+    return level is not None and (prog.get("all") or prog["level"] >= level)
+
+
+def look(row):
+    """The student's saved look, with anything unknown or not yet unlocked replaced by the default."""
+    try:
+        saved = json.loads(row["look"] or "{}") if "look" in row.keys() else {}
+    except ValueError:
+        saved = {}
+    out = dict(LOOK_DEFAULT)
+    if isinstance(saved, dict):
+        for key, allowed in (("body", COLORS), ("hat", HATS), ("car_color", COLORS), ("car_style", CAR_STYLES)):
+            if saved.get(key) in allowed:
+                out[key] = saved[key]
+        if power_open(saved.get("power"), progress(row)):
+            out["power"] = saved["power"]
+    return out
+
+
+def _look_options(prog):
+    return {"colors": COLORS, "hats": HATS, "car_styles": CAR_STYLES,
+            "powers": [{"id": i, "name": n, "icon": c, "level": lv, "unlocked": power_open(i, prog)} for i, n, c, lv in POWERS]}
+
+
 def _public(item, prog, worn):
     kind, n = item["need"]
     stat, value = item["bonus"]
@@ -163,5 +202,28 @@ def gear_route():
         me = _current_student()
     prog = progress(me)
     worn = {slot: it["id"] for slot, it in equipped(me).items()}
-    return jsonify({"progress": prog, "equipped": worn, "bonus": bonuses(me),
+    return jsonify({"progress": prog, "equipped": worn, "bonus": bonuses(me), "look": look(me), "look_options": _look_options(prog),
                     "items": [_public(g, prog, worn[g["slot"]] == g["id"]) for g in CATALOG]})
+
+
+@bp.route("/api/gear/look", methods=["PUT"])
+def look_route():
+    """PUT {body, hat, power, car_color, car_style}: change how your fighter and car look."""
+    me = _me()
+    security.rate_limit("gear-look", 60, 60)
+    data = request.get_json(silent=True) or {}
+    new = look(me)
+    for key, allowed in (("body", COLORS), ("hat", HATS), ("car_color", COLORS), ("car_style", CAR_STYLES)):
+        if key in data:
+            if data[key] not in allowed:
+                abort(400, "Unknown choice.")
+            new[key] = data[key]
+    if "power" in data:
+        if not power_open(data["power"], progress(me)):
+            abort(403, "You haven't unlocked that power yet.")
+        new["power"] = data["power"]
+    conn = userdb.connect()
+    conn.execute("UPDATE ql_students SET look=? WHERE id=?", (json.dumps(new), me["id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"look": new})

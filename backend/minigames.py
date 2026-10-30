@@ -22,8 +22,9 @@ NO_SHOW_SECONDS = 25
 
 
 class Player:
-    def __init__(self, pid, name, character, effective_xp=0, bot=False):
+    def __init__(self, pid, name, character, effective_xp=0, bot=False, look=None):
         self.id, self.name, self.character = pid, name, character or "warrior"
+        self.look = look or {"power": "thunder"}
         self.effective_xp = effective_xp
         self.bot = bot
         self.keys = {}
@@ -33,7 +34,7 @@ class Player:
         self.think = 0.0  # bots: next decision time
 
     def card(self):
-        return {"id": self.id, "name": self.name, "character": self.character, "bot": self.bot}
+        return {"id": self.id, "name": self.name, "character": self.character, "bot": self.bot, "look": self.look}
 
 
 class Game:
@@ -302,6 +303,7 @@ class Race(Game):
     MAX = 380
     NITRO = 1.6
     BOT_SKILL = 0.7
+    SUPER_EVERY = 3   # every 3rd right answer fires your super power at the rival
 
     def __init__(self, *args, **kw):
         super().__init__(*args, **kw)
@@ -318,6 +320,7 @@ class Race(Game):
             p.spin = p.slow = p.nitro = 0.0
             p.hits = set()
             p.quiz, p.locked_until, p.answer_at = None, 0.0, 0.0
+            p.charge = 0
             p.done_at = None
 
     def begin(self, now):
@@ -334,6 +337,13 @@ class Race(Game):
         if i == p.quiz["answer"]:
             p.nitro = max(p.nitro, 2.2)
             self.events.append({"type": "nitro", "who": p.id})
+            p.charge += 1
+            if p.charge >= self.SUPER_EVERY:
+                p.charge = 0
+                rival = self.other(p)
+                rival.slow, rival.spin = max(rival.slow, 1.8), max(rival.spin, 0.6)
+                rival.v *= 0.6
+                self.events.append({"type": "super", "who": p.id, "target": rival.id, "power": p.look.get("power", "thunder")})
         else:
             p.locked_until = now + 2.0
             self.events.append({"type": "wrong", "who": p.id, "answer": p.quiz["options"][p.quiz["answer"]]})
@@ -389,7 +399,7 @@ class Race(Game):
     def state(self, now, full):
         out = {"length": self.LENGTH, "cars": [{
             "id": p.id, "d": round(p.d, 1), "x": round(p.x, 3), "v": round(p.v), "nitro": p.nitro > 0,
-            "spin": p.spin > 0, "slow": p.slow > 0, "locked": round(max(0.0, p.locked_until - now), 1),
+            "spin": p.spin > 0, "slow": p.slow > 0, "locked": round(max(0.0, p.locked_until - now), 1), "charge": p.charge,
             "quiz": public_question(p.quiz)} for p in self.p]}
         if full:
             out["track"] = self.track

@@ -16,6 +16,7 @@ import fight from '../games/fight.js';
 import race from '../games/race.js';
 import duel from '../games/duel.js';
 import hunt from '../games/hunt.js';
+import { drawPower } from '../games/powers.js';
 
 const GAMES = { fight, race, duel, hunt };
 const DELAY = 90; // ms behind the newest update, so there are two to blend between
@@ -27,6 +28,7 @@ export function renderFight(app, { match }) {
   const snaps = [];
   const particles = [];
   const texts = [];
+  const powers = [];   // super attacks being drawn
   let game = null;     // the renderer, once the first update says which game this is
   let track = null;    // static data sent once (the race track)
   let socket = null;
@@ -188,6 +190,12 @@ export function renderFight(app, { match }) {
       }
     },
     say(text, x, y, color, size = 24, life = 0.8) { texts.push({ text, x, y, color, size, life }); },
+    power(power, from, to) { powers.push({ power, from, to, start: performance.now() }); },
+    shake() {
+      canvas.classList.remove('shake');
+      void canvas.offsetWidth; // restart the animation
+      canvas.classList.add('shake');
+    },
   };
 
   function finish(s) {
@@ -257,6 +265,7 @@ export function renderFight(app, { match }) {
         status.textContent = s.phase === 'waiting' ? 'Waiting for your opponent…' : '';
       }
       game.draw(ctx, s, { now, dt, me });
+      remove(powers, (p) => !drawPower(ctx, p, now));
       countdown(s, now);
     } else {
       ctx.fillStyle = '#120d26';

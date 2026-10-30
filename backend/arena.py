@@ -125,9 +125,16 @@ def make_game(kind, a, b, practice=False):
     if kind == "fight":
         return Fight(a, b, _group_id(a), stake, practice, grade)
     cls = {"race": minigames.Race, "duel": minigames.Duel, "hunt": minigames.Hunt}[kind]
-    players = [minigames.Player(r["id"], r["name"], _profile(r).get("character"), _effective_xp(r), bot=r["id"] == BOT_ID)
-               for r in (a, b)]
+    players = [minigames.Player(r["id"], r["name"], _profile(r).get("character"), _effective_xp(r), bot=r["id"] == BOT_ID,
+                                look=_look(r)) for r in (a, b)]
     return cls(players, _group_id(a), stake, practice, grade)
+
+
+def _look(row):
+    look = gear.look(row)
+    if row["id"] == BOT_ID:  # the bot shows off a different power each game
+        look = {**look, "power": secrets.choice([p[0] for p in gear.POWERS]), "hat": "horns", "body": "", "car_color": "#3a3a4a"}
+    return look
 
 
 def _bot_row(me):
@@ -226,7 +233,8 @@ def lobby():
                 "reason": f["reason"], "stake": f["stake"], "at": f["created_at"], "game": f["game"] or "fight"}
                for f in fights if me["id"] in (f["a_id"], f["b_id"])][:10]
     return jsonify({
-        "me": {**_fighter_card(me, now), **rec[me["id"]], "arena_xp": me["arena_xp"] or 0, "xp": _effective_xp(me)},
+        "me": {**_fighter_card(me, now), **rec[me["id"]], "arena_xp": me["arena_xp"] or 0, "xp": _effective_xp(me),
+               "look": gear.look(me)},
         "unlock_level": UNLOCK_LEVEL,
         "specials": [{"id": s[0], "name": s[1], "level": s[2], "combo": s[3]} for s in SPECIALS],
         "fighters": fighters, "board": board, "history": history,
@@ -238,6 +246,26 @@ def lobby():
         "match": live.id if live else None,
         "realtime": REALTIME,
     })
+
+
+@bp.route("/api/arena/alerts")
+def alerts():
+    """What the page-wide challenge alert needs, polled every few seconds from
+    every screen: challenges waiting for you, and a game you're already in
+    (for example one your rival just accepted)."""
+    row = _current_student()
+    if not row:
+        return jsonify({"incoming": [], "match": None})
+    now = time.time()
+    with _lock:
+        _expire()
+        incoming = [{"id": c["id"], "from": c["from_name"], "game": c.get("game", "fight"),
+                     "name": GAMES.get(c.get("game", "fight"), GAMES["fight"])[0],
+                     "icon": GAMES.get(c.get("game", "fight"), GAMES["fight"])[1],
+                     "expires": int(c["created"] + CHALLENGE_SECONDS - now)}
+                    for c in CHALLENGES.values() if c["to"] == row["id"] and not c.get("match")]
+        live = next((m for m in MATCHES.values() if row["id"] in m.ids and m.phase != "over" and not m.practice), None)
+    return jsonify({"incoming": incoming, "match": live.id if live else None})
 
 
 @bp.route("/api/arena/challenge", methods=["POST"])
@@ -358,12 +386,14 @@ MOVES = {          # duration, moment the hit lands, reach, damage multiplier, c
     "critical": (0.55, 0.25, 140, 3.0, 0.3),
 }
 COMBO_WINDOW = 0.7
+POWER_FIRST, POWER_EVERY, POWER_SECONDS = 5.0, 8.0, 8.0   # power questions during a fight
+POWER_DAMAGE = 0.2   # a super attack takes 20% of the rival's full health; blocks and shields don't stop it
 SPECIAL_COST = {"fireball": 35, "shield": 30, "critical": 100}
 
 
 class Fighter(minigames.Player):
     def __init__(self, row, st, side, bot=False):
-        super().__init__(row["id"], row["name"], _profile(row).get("character"), _effective_xp(row), bot=bot)
+        super().__init__(row["id"], row["name"], _profile(row).get("character"), _effective_xp(row), bot=bot, look=_look(row))
         self.st = st
         self.max_hp = self.hp = float(st["hp"])
         self.x = W * (0.28 if side == 0 else 0.72)
@@ -376,6 +406,7 @@ class Fighter(minigames.Player):
         self.cool = 0.0
         self.stun = 0.0
         self.shield = 0.0
+        self.pq_at = 0.0
         self.dirs = deque(maxlen=6)  # (time, "d"|"f"|"b"|"u") on each new press
 
     def public(self):
@@ -401,8 +432,49 @@ class Fight(minigames.Game):
         super().__init__([Fighter(a, sa, 0), Fighter(b, sb, 1, bot=b["id"] == BOT_ID)], grp, stake, practice, grade)
         self.f = self.p
         self.projectiles = []
+        self.pq = None            # the power question both fighters race to answer
+        self.pq_start = 0.0
+        self.pq_tried = set()
+        self.next_pq = 0.0
+
+    def begin(self, now):
+        self.next_pq = now + POWER_FIRST
+
+    def _power_tick(self, now):
+        if not self.pq and now >= self.next_pq:
+            self.pq, self.pq_start, self.pq_tried = minigames.make_question(self.rng, self.grade), now, set()
+            for f in self.f:
+                f.pq_at = now + self.rng.uniform(2.5, 6.5)
+            self.events.append({"type": "power_q"})
+        elif self.pq and now - self.pq_start >= POWER_SECONDS:
+            self._power_done(now)
+
+    def _power_done(self, now):
+        self.pq = None
+        self.next_pq = now + POWER_EVERY
+
+    def answer(self, f, qid, i, now):
+        """The first right answer to a power question fires that fighter's super power."""
+        if not self.pq or self.pq["id"] != qid or f.id in self.pq_tried:
+            return
+        self.pq_tried.add(f.id)
+        if i == self.pq["answer"]:
+            opp = self.other(f)
+            power = f.look.get("power", "thunder")
+            dmg = round(opp.max_hp * POWER_DAMAGE, 1)
+            opp.hp -= dmg
+            opp.stun = 1.6 if power == "ice" else 1.0
+            opp.action = None
+            self.events.append({"type": "super", "who": f.id, "target": opp.id, "power": power, "dmg": dmg,
+                                "x": round(opp.x, 1), "fx": round(f.x, 1)})
+            self._power_done(now)
+        else:
+            self.events.append({"type": "power_wrong", "who": f.id, "answer": self.pq["options"][self.pq["answer"]]})
+            if len(self.pq_tried) == len(self.f):
+                self._power_done(now)
 
     def tick(self, now):
+        self._power_tick(now)
         for f in self.f:
             self._control(f, now)
         for f in self.f:
@@ -425,6 +497,9 @@ class Fight(minigames.Game):
     def bot(self, f, now):
         """A sparring partner: walks in, throws punches and kicks, sometimes blocks."""
         f.think = now + self.rng.uniform(0.18, 0.32)
+        if self.pq and f.id not in self.pq_tried and now >= f.pq_at:
+            q = self.pq
+            self.answer(f, q["id"], q["answer"] if self.rng.random() < 0.6 else (q["answer"] + 1) % 4, now)
         opp = self.other(f)
         dx = opp.x - f.x
         toward, away = ("right", "left") if dx > 0 else ("left", "right")
@@ -571,7 +646,8 @@ class Fight(minigames.Game):
         out = {"fighters": [f.public() for f in self.f],
                "projectiles": [{"x": round(p["x"], 1), "y": p["y"], "dir": p["dir"], "owner": p["owner"]}
                                for p in self.projectiles],
-               "width": W}
+               "width": W, "power_q": minigames.public_question(self.pq), "power_tried": sorted(self.pq_tried),
+               "power_left": round(max(0.0, POWER_SECONDS - (now - self.pq_start)), 1) if self.pq else 0}
         if full:
             out["stats"] = {f.id: f.st for f in self.f}
         return out

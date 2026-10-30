@@ -8,6 +8,8 @@ import { h, mount, toast, prefs } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
 import { go } from '../router.js';
 import { adminApi as api } from '../account.js';
+import { askNotifications, notificationsState } from '../alerts.js';
+import { POWERS } from '../games/powers.js';
 
 const POLL_MS = 2500;
 const SKIN_NAMES = { base: 'Recruit', bronze: 'Bronze', silver: 'Silver', gold: 'Gold' };
@@ -94,7 +96,9 @@ export function renderArena(app) {
       h('p.muted.small', {}, 'Health grows with your level, attack with your quiz accuracy, and the special meter with your best answer streak.'),
       h('div.arena-gear', {},
         Object.values(me.gear).filter((g) => g.color).map((g) => h('span.arena-gear-item', { title: g.name }, g.icon, ' ', g.name)),
-        h('button.btn.ghost.sm', { onclick: () => go('armory') }, '🛡️ Change gear')),
+        h('button.btn.ghost.sm', { onclick: () => go('armory') }, '🎨 Gear & looks')),
+      me.look && h('p.muted.small', {}, `Super power: ${POWERS[me.look.power]?.icon} ${POWERS[me.look.power]?.name}. `,
+        'In a fight, answer the ⚡ power question first to fire it; in a race, every 3rd right answer fires it.'),
       h('h3.sub-title', {}, 'Special moves'),
       h('ul.arena-specials', {}, specials));
   }
@@ -185,7 +189,15 @@ export function renderArena(app) {
       h('section.arena', {},
         h('div.arena-head', {},
           h('div', {}, h('p.eyebrow', {}, 'Class arena'), h('h1.display', {}, 'Battle your classmates')),
-          h('button.btn.ghost.sm', { onclick: () => go('hub') }, '← Back')),
+          h('div.arena-head-actions', {},
+            notificationsState() === 'default' && h('button.btn.ghost.sm', {
+              onclick: async () => {
+                const r = await askNotifications();
+                toast('Challenge alerts', r === 'granted' ? 'You’ll get a notification when someone challenges you.' : 'Alerts will still show on the page while QuestLearn is open.', { icon: '🔔' });
+                draw();
+              },
+            }, '🔔 Alert me'),
+            h('button.btn.ghost.sm', { onclick: () => go('hub') }, '← Back'))),
         !data.realtime && h('p.auth-error', {}, 'Live fights aren’t available on this server yet.'),
         error && h('p.auth-error', {}, error),
         challenges(),
@@ -195,6 +207,7 @@ export function renderArena(app) {
           h('div', {}, fighters(me), board())),
         h('p.muted.small.arena-rules', {},
           'Every game lasts up to 60 seconds. ',
+          'You’ll see a challenge on any page of QuestLearn, not just here. ',
           'The winner takes XP from the loser (10% of the lower total, 5 to 50) plus a 10 XP bonus. A draw changes nothing. Practice games against the bot don’t change XP.')));
   }
 

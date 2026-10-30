@@ -3,6 +3,7 @@
  * scores. A wrong answer locks you out of that question. First to 7 wins.
  */
 import { W, H, colorOf, roundRect, avatar, clock, label } from './common.js';
+import { POWERS, powerOf } from './powers.js';
 
 export default {
   keys: {},
@@ -31,8 +32,10 @@ export default {
     for (const ev of s.events || []) {
       if (ev.type === 'point') {
         const left = s.players[0].id === ev.who;
+        const power = powerOf(s, ev.who);
+        fx.power(power, { x: left ? 150 : W - 150, y: 112 }, { x: left ? W - 150 : 150, y: 120 });
         fx.burst(left ? 150 : W - 150, 120, colorOf(s, ev.who), 22);
-        fx.say('+1', left ? 150 : W - 150, 70, '#ffd34d', 34, 0.9);
+        fx.say(`+1 ${POWERS[power].icon}`, left ? 150 : W - 150, 70, '#ffd34d', 34, 0.9);
       } else if (ev.type === 'wrong' && ev.who === me) {
         navigator.vibrate?.(80);
       }

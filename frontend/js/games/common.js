@@ -12,8 +12,9 @@ const RIVAL_COLOR = '#b48cff';
 export function colorOf(s, id) {
   const [a, b] = s.players;
   const p = s.players.find((x) => x.id === id) || a;
-  const c = (CHARACTERS[p.character] || CHARACTERS.warrior).color;
-  return p === b && a && a.character === b.character ? RIVAL_COLOR : c;
+  const own = (x) => x.look?.body || (CHARACTERS[x.character] || CHARACTERS.warrior).color;
+  if (p === b && a && own(a) === own(b)) return own(a) === RIVAL_COLOR ? '#7ddc7a' : RIVAL_COLOR;
+  return own(p);
 }
 
 export const lerp = (p, q, k) => p + (q - p) * k;

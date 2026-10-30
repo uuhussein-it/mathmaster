@@ -31,6 +31,7 @@ export function drawFighter(ctx, f, { now, over = false, floor }) {
   };
   const gear = f.gear || {};
   const hero = CHARACTERS[f.character] || CHARACTERS.warrior;
+  const color = f.look?.body || hero.color;
   const ko = over && f.hp <= 0;
   const x = f.x;
   const base = floor - f.y;
@@ -66,7 +67,7 @@ export function drawFighter(ctx, f, { now, over = false, floor }) {
     ctx.closePath();
     ctx.fill();
   }
-  ctx.strokeStyle = shade(hero.color, -35);
+  ctx.strokeStyle = shade(color, -35);
   ctx.lineWidth = 15;
   // legs
   const kick = f.action === 'kick' || f.action === 'critical';
@@ -74,7 +75,7 @@ export function drawFighter(ctx, f, { now, over = false, floor }) {
   line(0, hip, kick ? 70 * ext(progress, f.action) + 8 : stride, kick ? hip - 10 * ext(progress, f.action) : 0);
   line(0, hip, -stride - 6, 0);
   // torso
-  ctx.fillStyle = hero.color;
+  ctx.fillStyle = color;
   roundRect(-22, shoulder, 44, hip - shoulder + 6, 14);
   ctx.fill();
   if (aura) {
@@ -85,10 +86,10 @@ export function drawFighter(ctx, f, { now, over = false, floor }) {
   }
   if (gear.armor?.color && !gear.armor.cape) drawArmor(ctx, gear.armor.color, shoulder, hip, roundRect);
   // belt
-  ctx.fillStyle = aura || shade(hero.color, -70);
+  ctx.fillStyle = aura || shade(color, -70);
   ctx.fillRect(-22, hip - 12, 44, 8);
   // arms, with fists
-  ctx.strokeStyle = shade(hero.color, -20);
+  ctx.strokeStyle = shade(color, -20);
   ctx.lineWidth = 12;
   let fists;
   if (f.block) {
@@ -136,11 +137,12 @@ export function drawFighter(ctx, f, { now, over = false, floor }) {
     ctx.fill();
   }
   ctx.restore();
-  ctx.strokeStyle = aura || hero.color;
+  ctx.strokeStyle = aura || color;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.arc(4, shoulder - 26, 27, 0, Math.PI * 2);
   ctx.stroke();
+  drawHat(ctx, f.look?.hat, 4, shoulder - 26, color, t);
   ctx.restore();
   if (f.shield) {
     ctx.save();
@@ -153,6 +155,77 @@ export function drawFighter(ctx, f, { now, over = false, floor }) {
     ctx.stroke();
     ctx.restore();
   }
+}
+
+/** A hat on the head centred at (x, y), radius 27, facing right. */
+function drawHat(ctx, hat, x, y, color, t) {
+  if (!hat || hat === 'none') return;
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  if (hat === 'headband') {
+    ctx.fillStyle = '#e23d3d';
+    ctx.fillRect(x - 28, y - 16, 56, 9);
+    const flap = Math.sin(t * 8) * 4;
+    ctx.beginPath();
+    ctx.moveTo(x - 26, y - 13);
+    ctx.lineTo(x - 50, y - 18 + flap);
+    ctx.lineTo(x - 46, y - 6 + flap);
+    ctx.closePath();
+    ctx.fill();
+  } else if (hat === 'cap') {
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y - 8, 28, Math.PI, 0);
+    ctx.fill();
+    ctx.fillStyle = shade(color.startsWith('#') ? color : '#888888', -50);
+    ctx.fillRect(x + 6, y - 12, 34, 6);
+  } else if (hat === 'crown') {
+    ctx.fillStyle = '#ffd34d';
+    ctx.strokeStyle = '#b8860b';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x - 22, y - 18);
+    ctx.lineTo(x - 24, y - 44);
+    ctx.lineTo(x - 11, y - 30);
+    ctx.lineTo(x, y - 48);
+    ctx.lineTo(x + 11, y - 30);
+    ctx.lineTo(x + 24, y - 44);
+    ctx.lineTo(x + 22, y - 18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ff4d6d';
+    ctx.beginPath();
+    ctx.arc(x, y - 26, 4, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (hat === 'horns') {
+    ctx.fillStyle = '#f1e4c8';
+    ctx.strokeStyle = '#a08a62';
+    ctx.lineWidth = 2;
+    for (const s of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(x + s * 12, y - 22);
+      ctx.quadraticCurveTo(x + s * 34, y - 30, x + s * 30, y - 56);
+      ctx.quadraticCurveTo(x + s * 26, y - 36, x + s * 22, y - 16);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  } else if (hat === 'wizard') {
+    ctx.fillStyle = '#6d4bd8';
+    ctx.beginPath();
+    ctx.moveTo(x - 32, y - 14);
+    ctx.lineTo(x + 32, y - 14);
+    ctx.lineTo(x - 6, y - 82);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#ffd34d';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('★', x - 2, y - 32);
+  }
+  ctx.restore();
 }
 
 /** Chest plate and shoulder pads in the armor's colour. */

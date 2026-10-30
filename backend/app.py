@@ -1348,7 +1348,7 @@ def _gemini(prompt, timeout=45, images=None):
     """
     import urllib.request as ureq, urllib.error as uerr, json as j, re as _re, time as _t
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not key:
+    if not key or not security.ai_budget_ok():
         return None
     primary = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
     models = [primary, "gemini-3.1-flash-lite", "gemini-3.1-flash-lite-preview",
@@ -1364,10 +1364,10 @@ def _gemini(prompt, timeout=45, images=None):
         if model in seen:
             continue
         seen.add(model)
-        url = ("https://generativelanguage.googleapis.com/v1beta/models/"
-               + model + ":generateContent?key=" + key)
+        # The key travels in a header, never in the URL, so it can't end up in logs or error text.
+        url = "https://generativelanguage.googleapis.com/v1beta/models/" + model + ":generateContent"
         for attempt in range(2):
-            req = ureq.Request(url, data=body, headers={"Content-Type": "application/json"})
+            req = ureq.Request(url, data=body, headers={"Content-Type": "application/json", "x-goog-api-key": key})
             try:
                 with ureq.urlopen(req, timeout=per_try) as resp:
                     res = j.loads(resp.read().decode("utf-8"))
@@ -1378,7 +1378,7 @@ def _gemini(prompt, timeout=45, images=None):
                     continue
                 break
             except Exception as e:
-                last = str(e)
+                last = str(e).replace(key, "<key>")
                 break
             parts = res.get("candidates", [{}])[0].get("content", {}).get("parts", []) or []
             txt = "".join(p.get("text", "") for p in parts if isinstance(p, dict))
@@ -1537,6 +1537,7 @@ def _widget_spec(kind, qid):
 def widget_spec_route(kind, qid):
     if kind not in ("course", "sat"):
         abort(404)
+    security.ai_guard("ai-widget", 120, 10 * 60)
     return jsonify(_widget_spec(kind, qid))
 
 
@@ -1576,6 +1577,7 @@ def ai_status():
 
 @app.route("/api/ai/check", methods=["POST"])
 def ai_check():
+    security.ai_guard("ai-check", 60, 10 * 60)
     data = request.get_json(force=True, silent=True) or {}
     q = data.get("question") or {}
     ans = data.get("student_answer") or ""
@@ -1612,6 +1614,7 @@ def ai_check():
 
 @app.route("/api/ai/explain", methods=["POST"])
 def ai_explain():
+    security.ai_guard("ai-explain", 30, 10 * 60)
     data = request.get_json(force=True, silent=True) or {}
     q = data.get("question") or {}
     ans = data.get("answer") or ""
@@ -1630,6 +1633,7 @@ def ai_explain():
 
 @app.route("/api/ai/hint", methods=["POST"])
 def ai_hint():
+    security.ai_guard("ai-hint", 30, 10 * 60)
     data = request.get_json(force=True, silent=True) or {}
     q = data.get("question") or {}
     if not _ai_ready():
@@ -1646,9 +1650,10 @@ def ai_hint():
 
 @app.route("/api/ai/generate-similar", methods=["POST"])
 def ai_generate_similar():
+    security.ai_guard("ai-similar", 15, 10 * 60)
     data = request.get_json(force=True, silent=True) or {}
     q = data.get("question") or {}
-    n = int(data.get("n") or 2)
+    n = max(1, min(int(data.get("n") or 2), 5))
     if not _ai_ready():
         return jsonify({"configured": False, "questions": []})
     prompt = (f"Generate {n} similar math questions with the same structure and skills but DIFFERENT numbers.\n" +
@@ -1666,6 +1671,7 @@ def ai_generate_similar():
 
 @app.route("/api/ai/grade-batch", methods=["POST"])
 def ai_grade_batch():
+    security.ai_guard("ai-batch", 10, 10 * 60)
     """Grade a whole quiz/exam in one call.
 
     Body: {items:[{question, student_answer, widget?, widget_answer?, source?}],

@@ -3,6 +3,7 @@
  * and oil, drive over boost pads, and answer math questions for nitro.
  */
 import { W, H, lerp, colorOf, roundRect, avatar, clock, label } from './common.js';
+import { POWERS, powerOf } from './powers.js';
 
 const HORIZON = 210;
 const CAM = 260;       // camera distance: bigger = flatter road
@@ -19,7 +20,7 @@ const project = (z) => {
 export default {
   keys: { ArrowLeft: 'left', a: 'left', ArrowRight: 'right', d: 'right' },
   pad: { left: [['left', '◀', 'big']], right: [['right', '▶', 'big']] },
-  help: 'Steer ← → (or A / D). Answer the question with 1–4 or a tap: a right answer fires nitro, a wrong one locks it for 2 s.',
+  help: 'Steer ← → (or A / D). Answer the question with 1–4 or a tap: a right answer fires nitro, a wrong one locks it for 2 s. Every 3rd right answer fires your super power at your rival.',
   start: 'GO!',
   quizPlace: 'top',
 
@@ -30,11 +31,28 @@ export default {
   quiz(s, me) {
     const c = s.cars.find((x) => x.id === me);
     if (!c?.quiz || s.phase !== 'fight') return null;
-    return { ...c.quiz, locked: c.locked > 0, lockText: 'Nitro locked…', title: c.nitro ? '🔥 NITRO!' : 'Answer for nitro' };
+    const p = POWERS[powerOf(s, me)];
+    return { ...c.quiz, locked: c.locked > 0, lockText: 'Nitro locked…',
+      title: c.nitro ? `🔥 NITRO! ${p.icon} ${c.charge}/3` : `Answer for nitro · ${p.icon} ${p.name} ${c.charge}/3` };
   },
 
   events(s, fx, me) {
+    const mine = s.cars.find((c) => c.id === me) || s.cars[0];
     for (const ev of s.events || []) {
+      if (ev.type === 'super') {
+        const p = POWERS[ev.power] || POWERS.thunder;
+        const target = s.cars.find((c) => c.id === ev.target);
+        const z = target.d - mine.d + ME_Z;
+        const at = z > -CAM * 0.5 && z < VIEW ? project(z) : project(VIEW * 0.6);
+        const spot = { x: W / 2 + target.x * at.half, y: at.y - 70 * at.k };
+        const from = ev.who === me ? { x: W / 2 + mine.x * project(ME_Z).half, y: project(ME_Z).y - 110 } : { x: W / 2, y: HORIZON - 40 };
+        fx.power(ev.power, from, spot);
+        const rival = s.players.find((pl) => pl.id !== me)?.name || 'Your rival';
+        fx.say(ev.who === me ? `${p.icon} ${p.name} hits ${rival}!` : `${p.icon} ${rival}'s ${p.name}!`, W / 2, 300, p.color, 34, 1.5);
+        fx.shake();
+        if (ev.target === me) navigator.vibrate?.([80, 40, 160]);
+        continue;
+      }
       if (ev.who !== me) continue;
       const say = { nitro: ['NITRO!', '#ffb02e'], wrong: [`Not quite: it was ${ev.answer}`, '#f87171'],
         cone: ['Bump!', '#ff9f43'], oil: ['Oil slick!', '#8ad8ff'], boost: ['Boost!', '#4fd1e8'] }[ev.type];
@@ -114,10 +132,11 @@ export default {
     }
     if (rival) {
       const z = rival.d - mine.d + ME_Z;
-      if (z > -CAM * 0.5 && z < VIEW) things.push({ z, draw: () => car(ctx, project(z), rival, colorOf(s, rival.id), t, s.players.find((p) => p.id === rival.id)?.name) });
+      const who = s.players.find((p) => p.id === rival.id);
+      if (z > -CAM * 0.5 && z < VIEW) things.push({ z, draw: () => drawCar(ctx, project(z), rival, carColor(s, rival.id), t, who?.name, who?.look) });
     }
     things.sort((a, b) => b.z - a.z).forEach((x) => x.draw());
-    car(ctx, project(ME_Z), mine, colorOf(s, mine.id), t, null);
+    drawCar(ctx, project(ME_Z), mine, carColor(s, mine.id), t, null, s.players.find((p) => p.id === mine.id)?.look);
 
     // HUD: progress bar with both cars, speed, clock
     const barX = 30;
@@ -134,6 +153,13 @@ export default {
     const lead = rival ? Math.round((mine.d - rival.d) / 10) : 0;
     label(ctx, rival ? (lead >= 0 ? `You lead by ${lead} m` : `${-lead} m behind`) : '', barX, 62, { size: 15, align: 'left' });
     label(ctx, `${Math.round(mine.v / 3.2)} km/h`, W - 30, 40, { size: 26, align: 'right', weight: 800, color: mine.nitro ? '#ffb02e' : '#fff' });
+    const pw = POWERS[powerOf(s, mine.id)];
+    label(ctx, pw.icon, W - 110, 72, { size: 18, align: 'right' });
+    for (let i = 0; i < 3; i += 1) { // super power meter: fills with each right answer
+      roundRect(ctx, W - 104 + i * 26, 60, 22, 12, 4);
+      ctx.fillStyle = i < (mine.charge || 0) ? pw.color : 'rgba(0,0,0,0.45)';
+      ctx.fill();
+    }
     clock(ctx, s, 50);
   },
 };
@@ -176,9 +202,16 @@ function obstacle(ctx, o, p, t) {
   }
 }
 
-function car(ctx, p, c, color, t, name) {
+/** A player's chosen car colour, or their hero colour. */
+function carColor(s, id) {
+  return s.players.find((p) => p.id === id)?.look?.car_color || colorOf(s, id);
+}
+
+/** A car seen from behind, in the player's style (sport, kart or truck). */
+export function drawCar(ctx, p, c, color, t, name, look) {
   const x = W / 2 + c.x * p.half;
   const s = p.k * 1.15;
+  const style = look?.car_style || 'sport';
   ctx.save();
   ctx.translate(x, p.y);
   if (c.spin) ctx.rotate(Math.sin(t * 30) * 0.25);
@@ -201,23 +234,68 @@ function car(ctx, p, c, color, t, name) {
   ctx.beginPath();
   ctx.ellipse(0, 0, 80, 14, 0, 0, Math.PI * 2);
   ctx.fill();
-  // body
-  ctx.fillStyle = '#111';
-  ctx.fillRect(-74, -30, 22, 30);
-  ctx.fillRect(52, -30, 22, 30);
-  roundRect(ctx, -66, -66, 132, 50, 14);
-  ctx.fillStyle = color;
-  ctx.fill();
-  roundRect(ctx, -44, -98, 88, 40, 12);
-  ctx.fill();
-  ctx.fillStyle = 'rgba(20,30,60,0.85)';
-  roundRect(ctx, -34, -92, 68, 26, 8);
-  ctx.fill();
-  ctx.fillStyle = '#ffdf6e';
-  ctx.fillRect(-58, -48, 20, 10);
-  ctx.fillRect(38, -48, 20, 10);
-  ctx.fillStyle = 'rgba(0,0,0,0.35)';
-  ctx.fillRect(-20, -40, 40, 12);
+  let top = -98;
+  if (style === 'kart') {
+    // open kart: big tyres, low body, the driver's helmet
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-80, -34, 26, 34);
+    ctx.fillRect(54, -34, 26, 34);
+    roundRect(ctx, -56, -40, 112, 26, 10);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.fillRect(-60, -50, 120, 8); // rear wing
+    ctx.beginPath();
+    ctx.arc(0, -66, 20, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.fillStyle = 'rgba(20,30,60,0.85)';
+    ctx.fillRect(-14, -72, 28, 8);
+    ctx.fillStyle = '#ffdf6e';
+    ctx.fillRect(-46, -32, 14, 8);
+    ctx.fillRect(32, -32, 14, 8);
+    top = -86;
+  } else if (style === 'truck') {
+    // monster truck: tall box on huge tyres
+    ctx.fillStyle = '#111';
+    roundRect(ctx, -84, -40, 30, 40, 8);
+    ctx.fill();
+    roundRect(ctx, 54, -40, 30, 40, 8);
+    ctx.fill();
+    roundRect(ctx, -70, -110, 140, 76, 10);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.fillStyle = 'rgba(20,30,60,0.85)';
+    roundRect(ctx, -52, -102, 104, 30, 6);
+    ctx.fill();
+    ctx.fillStyle = '#ffdf6e';
+    ctx.fillRect(-62, -58, 18, 12);
+    ctx.fillRect(44, -58, 18, 12);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(-30, -54, 60, 10);
+    top = -114;
+  } else {
+    ctx.fillStyle = '#111';
+    ctx.fillRect(-74, -30, 22, 30);
+    ctx.fillRect(52, -30, 22, 30);
+    roundRect(ctx, -66, -66, 132, 50, 14);
+    ctx.fillStyle = color;
+    ctx.fill();
+    roundRect(ctx, -44, -98, 88, 40, 12);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(20,30,60,0.85)';
+    roundRect(ctx, -34, -92, 68, 26, 8);
+    ctx.fill();
+    ctx.fillStyle = '#ffdf6e';
+    ctx.fillRect(-58, -48, 20, 10);
+    ctx.fillRect(38, -48, 20, 10);
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(-20, -40, 40, 12);
+  }
+  if (c.slow && c.spin) { // hit by a super power: sparks over the car
+    ctx.fillStyle = '#9be7ff';
+    for (let i = 0; i < 6; i += 1) ctx.fillRect(Math.sin(t * 20 + i) * 70, top - 10 - ((t * 200 + i * 30) % 40), 6, 6);
+  }
   ctx.restore();
-  if (name) label(ctx, name, x, p.y - 120 * s, { size: Math.max(12, 18 * s) });
+  if (name) label(ctx, name, x, p.y + (top - 22) * s, { size: Math.max(12, 18 * s) });
 }

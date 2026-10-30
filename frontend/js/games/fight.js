@@ -2,7 +2,8 @@
  * Fight: two heroes on a stage. Move, jump, punch, kick, block and specials.
  */
 import { drawFighter } from '../fighter-art.js';
-import { W, H, lerp } from './common.js';
+import { W, H, lerp, colorOf } from './common.js';
+import { POWERS, powerOf } from './powers.js';
 
 const FLOOR = 470;
 const SPECIAL_NAMES = { fireball: 'Fireball!', shield: 'Shield!', critical: 'Critical Strike!' };
@@ -16,15 +17,42 @@ export default {
     left: [['up', '▲', 'n'], ['left', '◀', 'w'], ['right', '▶', 'e'], ['down', '▼', 's']],
     right: [['block', 'Block', 'b'], ['kick', 'Kick', 'k'], ['punch', 'Punch', 'p']],
   },
-  help: 'Move ← → · Jump ↑ · Punch J · Kick K · Block L (hold). Specials: Fireball ↓ → J · Shield ↓ ← J · Critical ↓ ↓ K (when unlocked and the meter is full enough).',
+  help: 'Move ← → · Jump ↑ · Punch J · Kick K · Block L (hold). Specials: Fireball ↓ → J · Shield ↓ ← J · Critical ↓ ↓ K. When a ⚡ power question appears, the first right answer (1–4 or tap) fires your super power.',
+  quizPlace: 'top',
   start: 'FIGHT!',
 
   blend(a, b, k) {
     return { ...b, fighters: b.fighters.map((f, j) => ({ ...f, x: lerp(a.fighters[j].x, f.x, k), y: lerp(a.fighters[j].y, f.y, k) })) };
   },
 
+  quiz(s, me) {
+    if (!s.power_q || s.phase !== 'fight') return null;
+    const p = POWERS[powerOf(s, me)];
+    return { ...s.power_q, locked: s.power_tried.includes(me), lockText: 'Wrong! Your rival can still grab it…',
+      title: `${p.icon} Power question: answer first to fire your ${p.name}!` };
+  },
+
   events(s, fx, me) {
     for (const ev of s.events || []) {
+      if (ev.type === 'power_q') {
+        fx.say('⚡ POWER QUESTION! ⚡', W / 2, 300, '#ffd34d', 36, 1.2);
+        continue;
+      }
+      if (ev.type === 'power_wrong') {
+        if (ev.who === me) fx.say(`Not quite: it was ${ev.answer}`, W / 2, 250, '#f87171', 22, 1.2);
+        continue;
+      }
+      if (ev.type === 'super') {
+        const by = s.fighters.find((x) => x.id === ev.who);
+        const to = s.fighters.find((x) => x.id === ev.target);
+        const p = POWERS[ev.power] || POWERS.thunder;
+        fx.power(ev.power, { x: by.x + 6 * by.facing, y: FLOOR - by.y - 168 }, { x: to.x, y: FLOOR - to.y - 100 });
+        fx.say(`${p.icon} ${p.name.toUpperCase()}!`, W / 2, 230, p.color, 46, 1.5);
+        setTimeout(() => fx.say(`-${Math.round(ev.dmg)}`, to.x, FLOOR - 250, '#ff4d6d', 40, 1), 450);
+        fx.shake();
+        if (ev.target === me) navigator.vibrate?.([80, 40, 160]);
+        continue;
+      }
       if (ev.type === 'special') {
         const f = s.fighters.find((x) => x.id === ev.who);
         fx.say(SPECIAL_NAMES[ev.move], f.x, FLOOR - 230, '#ffd34d', 30, 1.1);
@@ -71,7 +99,8 @@ export default {
       ctx.fill();
     }
     // draw yourself in front
-    [...s.fighters].sort((a) => (a.id === me ? 1 : -1)).forEach((f) => drawFighter(ctx, f, { now, over: s.phase === 'over', floor: FLOOR }));
+    [...s.fighters].sort((a) => (a.id === me ? 1 : -1)).forEach((f) => drawFighter(ctx,
+      { ...f, look: { ...s.players.find((p) => p.id === f.id)?.look, body: colorOf(s, f.id) } }, { now, over: s.phase === 'over', floor: FLOOR }));
 
     const [a, b] = s.fighters;
     bars(ctx, a, 24, 1, me);
@@ -83,6 +112,12 @@ export default {
     ctx.font = '600 13px Inter, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.fillText(s.practice ? 'Practice · no XP' : `${s.stake} XP at stake`, W / 2, 84);
+    if (s.power_q && s.phase === 'fight') { // power question timer under the clock
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(W / 2 - 90, 92, 180, 6);
+      ctx.fillStyle = s.power_left < 3 ? '#f87171' : '#ffd34d';
+      ctx.fillRect(W / 2 - 90, 92, 180 * (s.power_left / 8), 6);
+    }
   },
 };
 
