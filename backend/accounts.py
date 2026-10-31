@@ -369,6 +369,8 @@ def feedback():
     category = str(data.get("category") or "other")[:30]
     if not message and not data.get("recheck"):
         abort(400, "Write a short message.")
+    if data.get("recheck"):
+        security.ai_guard("ai-recheck", 40, 10 * 60)
     verdict = _recheck(ref, answer, message) if data.get("recheck") and ref and answer else None
     conn = userdb.connect()
     fid = userdb.insert(

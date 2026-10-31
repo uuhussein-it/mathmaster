@@ -963,3 +963,12 @@ body[data-screen="fight"] #hud { display: none; }
 .look-power-icon { font-size: 30px; }
 .look-power-actions { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
 .armory-car { display: block; width: 100%; max-width: 300px; height: auto; margin: 6px auto 0; border-radius: var(--radius-sm); background: linear-gradient(#1b2a6b, #f59e6b 64%, #1f6b3a 64%); }
+
+/* "AI, check my answer" under a wrong answer */
+.ai-check-btn { margin: 8px 0 2px; }
+.ai-check { margin: 10px 0 4px; padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line-soft); background: rgba(255, 255, 255, 0.04); }
+.ai-check p { margin: 6px 0 0; }
+.ai-check.good { border-color: var(--good); background: rgba(95, 211, 138, 0.1); }
+.ai-check.bad { border-color: var(--bad); background: rgba(255, 107, 107, 0.08); }
+.ai-check.loading { color: var(--muted); animation: ai-pulse 1.2s ease-in-out infinite; }
+@keyframes ai-pulse { 50% { opacity: 0.5; } }

@@ -3,15 +3,32 @@
  */
 import { h, mount, burst, formatTime, answerLabel, questionBody, kpi } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
-import { profile, recordSession } from '../state.js';
+import { profile, recordSession, addXp } from '../state.js';
 import { evaluate, SKIP_XP } from '../scoring.js';
 import { go } from '../router.js';
 import { reportSession } from '../data.js';
 import { answerSummary } from '../widgets.js';
-import { openFeedback } from '../feedback.js';
+import { openFeedback, aiCheck } from '../feedback.js';
 
 const correctText = (q) => (q.type === 'widget' ? answerSummary(q.widget)
   : q.type === 'free' ? q.answerText : q.answer != null && answerLabel(q, q.answer));
+
+/** The "AI, check my answer" button under a wrong answer in the review. */
+function aiBox(q) {
+  const given = q.text || (q.chosen >= 0 ? answerLabel(q, q.chosen) : '');
+  if (!q.ref || !given || q.correct) return null;
+  const box = h('div.review-ai');
+  const st = {};
+  const redraw = () => box.replaceChildren(aiCheck(st, {
+    q, answer: given, redraw,
+    onAgree: () => {
+      addXp(10);
+      st.reward = '+10 XP.';
+    },
+  }));
+  redraw();
+  return box;
+}
 
 export function renderResults(app, r) {
   const hero = CHARACTERS[profile.character];
@@ -89,6 +106,7 @@ export function renderResults(app, r) {
               q.skipped && h('small.muted', {}, ` −${SKIP_XP} XP`)),
             !q.correct && correctText(q) && h('p', {}, h('span.muted', {}, 'Correct: '), correctText(q)),
             q.explanation && h('p.explanation', {}, q.explanation),
+            aiBox(q),
             q.ref && h('button.btn.ghost.sm.report-btn', {
               onclick: () => openFeedback({ q, answer: q.text || (q.chosen >= 0 ? answerLabel(q, q.chosen) : ''), wrong: !q.correct }),
             }, q.correct ? '⚑ Report a problem' : '⚑ I think I’m right')))))));

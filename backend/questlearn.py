@@ -803,7 +803,8 @@ def recheck(ref, answer, argument):
               f"Student's answer: {answer}\nStudent's note: {argument or '(none)'}\n{STYLE}\n"
               'Return ONLY JSON: {"correct": true|false, "answer": "the correct answer", '
               '"key_wrong": true|false (is the current answer key wrong?), '
-              '"explanation": "two or three sentences for the student"}')
+              '"explanation": "for the student, in 3 to 5 short sentences: how to solve it step by step and, '
+              'if their answer is wrong, where it went wrong"}')
     out = _gemini(prompt, timeout=60, images=images)
     if not isinstance(out, dict) or not isinstance(out.get("correct"), bool):
         return {"ai": True, "correct": None, "explanation": "AI couldn't check this one, so your teacher will review it."}

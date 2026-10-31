@@ -11,7 +11,7 @@ import { profile, topicMastery } from '../state.js';
 import { createScorer, SKIP_XP } from '../scoring.js';
 import { go } from '../router.js';
 import { checkAnswer, ensureSolved, fetchKeys, fetchSimilar } from '../data.js';
-import { openFeedback } from '../feedback.js';
+import { openFeedback, aiCheck } from '../feedback.js';
 import { renderWidget, emptyValue, gradeWidget, isAnswered, answerSummary, valueSummary, typesText } from '../widgets.js';
 import { mathPad } from '../mathpad.js';
 
@@ -160,13 +160,23 @@ export function renderPlay(app, config) {
 
   function feedback() {
     const a = answers[index];
+    const given = a.text || (a.chosen >= 0 ? answerLabel(q, a.chosen) : '');
     const correctLabel = q.type === 'widget' ? answerSummary(q.widget)
       : q.type === 'free' ? q.answerText : q.answer != null && answerLabel(q, q.answer);
     return h('div.feedback', { class: a.correct ? 'good' : 'bad', role: 'status' },
       h('div.feedback-head', {},
-        h('b', {}, a.correct ? 'Correct!' : 'Not quite'),
+        h('b', {}, a.aiAgreed ? 'Counted as right' : a.correct ? 'Correct!' : 'Not quite'),
         a.correct && h('span.earned', {}, `+${a.xp} XP · +${a.points} pts`)),
       !a.correct && correctLabel && h('p', {}, 'Correct answer: ', h('b', {}, correctLabel)),
+      q.ref && given && (a.ai || !a.correct) && aiCheck(a.ai ||= {}, {
+        q, answer: given, redraw: draw,
+        onAgree: () => {
+          const r = scorer.regrade();
+          Object.assign(a, { correct: true, aiAgreed: true, xp: r.xp, points: 100 });
+          a.ai.reward = `+${r.xp} XP: it now counts as right.`;
+          if (r.levels) toast(`Level ${profile.level}!`, 'Your hero grows stronger.', { icon: '⭐', tone: 'level' });
+        },
+      }),
       q.explanation
         ? h('p.explanation', {}, q.explanation)
         : config.ai && q.ref && h('p.explanation.muted', {}, 'Gemini is writing an explanation…'),
@@ -174,7 +184,7 @@ export function renderPlay(app, config) {
         (config.ai || q.more) && h('button.btn.ghost.similar-btn', { onclick: addSimilar, disabled: addedSimilar },
           addedSimilar ? '✨ Added to this run' : '✨ 3 more like this'),
         q.ref && h('button.btn.ghost.report-btn', {
-          onclick: () => openFeedback({ q, answer: a.text || (a.chosen >= 0 ? answerLabel(q, a.chosen) : ''), wrong: !a.correct }),
+          onclick: () => openFeedback({ q, answer: given, wrong: !a.correct }),
         }, a.correct ? '⚑ Report a problem' : '⚑ I think I’m right'),
         h('span.spacer'),
         h('button.btn.primary.next-btn', { onclick: next }, index + 1 < questions.length ? 'Next question →' : 'See results →')));
