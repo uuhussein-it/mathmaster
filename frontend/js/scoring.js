@@ -46,6 +46,16 @@ export function createScorer(mode) {
     return { xp, points, mult, levels };
   };
 
+  /** AI re-checked a wrong answer and found it right: award what a right answer earns (no streak). */
+  s.regrade = () => {
+    const xp = Math.round(BASE_XP[mode] * heroXpBoost(profile.character));
+    const levels = addXp(xp);
+    s.xp += xp;
+    s.score += 100;
+    s.levels += levels;
+    return { xp, levels };
+  };
+
   /** Bonus XP for finishing a run (rewards accuracy, not just volume). */
   s.finishBonus = (correct, total) => {
     const accuracy = total ? correct / total : 0;

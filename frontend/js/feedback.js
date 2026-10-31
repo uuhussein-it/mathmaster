@@ -15,6 +15,41 @@ const CATEGORIES = [
   ['other', 'Something else'],
 ];
 
+/**
+ * "🤖 AI, check my answer" under a wrong answer: AI solves the question,
+ * judges the student's answer and explains. `st` keeps the result across
+ * redraws; `onAgree` runs once if AI finds the answer right (to give credit).
+ * The verdict also reaches the teacher's feedback list.
+ */
+export function aiCheck(st, { q, answer, redraw, onAgree }) {
+  if (!st.status) {
+    return h('button.btn.ghost.ai-check-btn', {
+      type: 'button',
+      onclick: async () => {
+        if (st.status) return;
+        st.status = 'loading';
+        redraw();
+        try {
+          const r = await sendFeedback({ ref: q.ref, answer, category: 'ai-check', message: '', recheck: true });
+          st.verdict = r.verdict || { correct: null, explanation: 'Sent to your teacher to check.' };
+        } catch (e) {
+          st.verdict = { correct: null, explanation: e.message };
+        }
+        st.status = 'done';
+        if (st.verdict.correct === true) onAgree?.();
+        redraw();
+      },
+    }, '🤖 AI, check my answer');
+  }
+  if (st.status === 'loading') return h('p.ai-check.loading', { role: 'status' }, '🤖 AI is checking your answer…');
+  const v = st.verdict;
+  return h(`div.ai-check.${v.correct === true ? 'good' : v.correct === false ? 'bad' : 'neutral'}`, { role: 'status' },
+    h('b', {}, v.correct === true ? '🤖 AI says your answer is right!' : v.correct === false ? '🤖 AI checked it: still not right' : '🤖 AI couldn’t check this one'),
+    v.correct === false && v.answer && h('p', {}, 'Correct answer: ', h('b', {}, v.answer)),
+    v.explanation && h('p', {}, v.explanation),
+    v.correct === true && h('p.muted.small', {}, st.reward ? `${st.reward} Your teacher will check the answer key.` : 'Your teacher will check the answer key.'));
+}
+
 /** q: the question (optional); answer: the student's answer as text; wrong: it was marked wrong. */
 export function openFeedback({ q = null, answer = '', wrong = false } = {}) {
   const canRecheck = Boolean(q?.ref && answer && wrong);
