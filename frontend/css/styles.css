@@ -118,6 +118,7 @@ kbd {
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(14px);
 }
+.hud[hidden] { display: none; }
 .brand { display: flex; align-items: center; gap: 8px; background: none; border: 0; cursor: pointer; padding: 0; }
 .brand img { width: 30px; height: 30px; }
 .brand span { font-family: var(--font-display); font-weight: 800; font-size: 18px; letter-spacing: 0.04em; }

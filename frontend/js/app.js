@@ -5,7 +5,7 @@ import { h, mount } from './ui.js';
 import { CHARACTERS } from './characters.js';
 import { profile, onProfileChange, xpToNext } from './state.js';
 import { register, startRouter, go } from './router.js';
-import { loadAccount } from './account.js';
+import { loadAccount, account } from './account.js';
 import { startAlerts } from './alerts.js';
 
 import { renderSelect } from './screens/select.js';
@@ -25,9 +25,12 @@ import { renderFight } from './screens/fight.js';
 /** Top bar: hero portrait, level, XP progress, score and streak. */
 function renderHud() {
   const hud = document.getElementById('hud');
-  const hero = CHARACTERS[profile.character];
+  const hero = account.student && CHARACTERS[profile.character];
   hud.hidden = !hero;
-  if (!hero) return;
+  if (!hero) {
+    hud.replaceChildren(); // signed out: don't leave the last student's name and XP behind
+    return;
+  }
   document.documentElement.style.setProperty('--hero', hero.color);
 
   const need = xpToNext(profile.level);
@@ -64,8 +67,10 @@ register('armory', renderArmory);
 register('fight', renderFight, { needsPayload: true });
 
 onProfileChange(renderHud);
+window.addEventListener('hashchange', renderHud); // signing in or out changes the screen
 renderHud();
 loadAccount().then(() => {
+  renderHud();
   startRouter();
   startAlerts();
 });
