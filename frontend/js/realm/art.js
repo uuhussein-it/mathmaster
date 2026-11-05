@@ -378,3 +378,74 @@ export function bossSprite(n) {
   [19, 22, 25, 28].forEach((x) => p('#ffffff', x, 20, 2, 1));
   return outline(c);
 }
+
+// ------------------------------------------------------- world pieces
+/** The shop: a striped market tent with a counter. 24x24. */
+export function shopSprite() {
+  const c = canvas(24, 24);
+  const p = pen(c);
+  p('rgba(0,0,0,0.28)', 1, 21, 22, 3);
+  p('#8a5a32', 2, 10, 1, 12); p('#8a5a32', 21, 10, 1, 12);
+  for (let x = 0; x < 24; x += 1) p(Math.floor(x / 3) % 2 ? '#ffffff' : '#d64545', x, 6, 1, 4);
+  for (let i = 0; i < 6; i += 1) p(i % 2 ? '#b33636' : '#d64545', 2 + i, 6 - i, 20 - i * 2, 1);
+  p('#ffd34d', 11, 0, 2, 1);
+  p('#c9a36a', 3, 15, 18, 6); p('#a67c45', 3, 15, 18, 1);
+  p('#ffd34d', 5, 13, 3, 2); p('#7fe3f5', 10, 13, 2, 2); p('#e23d3d', 15, 13, 3, 2); // goods on the counter
+  p('#3ddc84', 19, 12, 2, 3);
+  return outline(c);
+}
+
+/** The guild portal: a swirling stone ring. 24x24, two frames. */
+export function portalFrames() {
+  return [0, 1].map((f) => {
+    const c = canvas(24, 28);
+    const p = pen(c);
+    p('rgba(0,0,0,0.3)', 2, 25, 20, 3);
+    for (let y = 0; y < 26; y += 1) {
+      for (let x = 0; x < 24; x += 1) {
+        const dx = (x - 11.5) / 11;
+        const dy = (y - 13) / 13;
+        const d = dx * dx + dy * dy;
+        if (d <= 1 && d > 0.62) p((x + y) % 4 ? '#8f88a8' : '#69728a', x, y);
+        else if (d <= 0.62) p(((Math.atan2(dy, dx) * 3 + d * 8 + f * 1.6) % 2 + 2) % 2 > 1 ? '#b48cff' : '#5b3fc4', x, y);
+      }
+    }
+    p('#ffffff', 11 + f, 12, 2, 2);
+    return outline(c);
+  });
+}
+
+/** A zone gate: stone posts with a wooden bar (closed) or open posts. 16x32. */
+export function gateSprite(open) {
+  const c = canvas(16, 32);
+  const p = pen(c);
+  p('rgba(0,0,0,0.28)', 1, 29, 14, 3);
+  p('#8f88a8', 1, 6, 4, 24); p('#c9c4dc', 1, 6, 4, 2);
+  p('#8f88a8', 11, 6, 4, 24); p('#c9c4dc', 11, 6, 4, 2);
+  if (!open) {
+    p('#8a5a32', 5, 12, 6, 3); p('#8a5a32', 5, 20, 6, 3);
+    p('#ffd34d', 7, 16, 2, 3); // lock
+  }
+  return outline(c);
+}
+
+/** Tilled soil for a building plot. */
+export function plotTile(seed) {
+  const c = canvas();
+  const p = pen(c);
+  const r = rand(seed * 31 + 5);
+  p('#8a6a3e', 0, 0, T, T);
+  p('#7a5a32', 0, 0, T, 1); p('#7a5a32', 0, 0, 1, T);
+  for (let i = 0; i < 8; i += 1) p(r() < 0.5 ? '#9c7a4a' : '#6e5230', Math.floor(r() * T), Math.floor(r() * T));
+  return c;
+}
+
+/** A signpost with a little board. */
+export function signSprite() {
+  const c = canvas();
+  const p = pen(c);
+  p('rgba(0,0,0,0.28)', 5, 14, 6, 2);
+  p('#8a5a32', 7, 6, 2, 9);
+  p('#c9a36a', 2, 2, 12, 5); p('#8a5a32', 3, 4, 10, 1);
+  return outline(c);
+}
