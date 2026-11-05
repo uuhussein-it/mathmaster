@@ -215,7 +215,7 @@ kbd {
 .kpi b { font: 700 22px/1.1 var(--font-display); color: var(--gold); }
 .kpi span { font-size: 12px; color: var(--muted); }
 .kpi small { font-size: 11px; color: var(--muted); opacity: 0.8; }
-.paths { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.paths { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
 .path-card {
   position: relative; text-align: left; cursor: pointer; overflow: hidden;
   padding: 28px; border-radius: 22px; border: 1px solid var(--line);
@@ -973,3 +973,66 @@ body[data-screen="fight"] #hud { display: none; }
 .ai-check.bad { border-color: var(--bad); background: rgba(255, 107, 107, 0.08); }
 .ai-check.loading { color: var(--muted); animation: ai-pulse 1.2s ease-in-out infinite; }
 @keyframes ai-pulse { 50% { opacity: 0.5; } }
+
+/* ------------------------------------------------- Knowledge Quest (pixel adventure) */
+.path-card.quest::before { background: radial-gradient(circle, rgba(127, 227, 245, 0.22), transparent 70%); }
+.quest-card { display: flex; align-items: center; gap: 16px; margin: 4px 0 18px; padding: 16px 18px; border-radius: var(--radius); border: 1px solid var(--gold);
+  background: linear-gradient(135deg, rgba(60, 40, 110, 0.65), rgba(16, 22, 48, 0.9)); }
+.quest-card-icon { font-size: 40px; }
+.quest-card > div { flex: 1; min-width: 0; }
+.quest-card p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.quest-card .quest-card-badge { color: var(--gold); }
+@media (max-width: 560px) { .quest-card { flex-wrap: wrap; } .quest-card .btn { width: 100%; } }
+
+.quest-head { display: flex; justify-content: space-between; align-items: end; gap: 12px; margin-bottom: 12px; }
+.quest-stage { position: relative; border-radius: 6px; overflow: hidden; border: 4px solid #2a2150; box-shadow: 0 0 0 2px #ffd34d55, var(--shadow); background: #0b0816; }
+.quest-canvas { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; image-rendering: pixelated; touch-action: none; }
+.quest-help { text-align: center; margin-top: 10px; }
+
+.quest-dialog { position: absolute; inset: 0; display: grid; place-items: center; padding: 10px; background: rgba(6, 4, 16, 0.55); overflow: auto; }
+.quest-dialog[hidden] { display: none; }
+.quest-dialog-box {
+  width: min(640px, 100%); max-height: 100%; overflow: auto; padding: 16px 18px;
+  background: #13104a; color: #fff; border: 4px solid #fff; border-radius: 4px;
+  box-shadow: 0 0 0 4px #13104a, 0 0 0 8px #ffd34d, 0 20px 40px rgba(0, 0, 0, 0.6);
+  font-family: var(--font-body);
+}
+.quest-dialog-title { margin: 0 0 8px; font: 11px/1.6 'Press Start 2P', ui-monospace, monospace; color: #ffd34d; }
+.quest-dialog-intro { margin: 0 0 10px; font-size: 14px; color: #d8d4f0; }
+.quest-q .q-text { font-size: clamp(17px, 2.4vw, 22px); margin: 0 0 10px; }
+.quest-q .q-figure { margin: 0 0 10px; }
+.quest-q .q-figure img { max-height: 34vh; width: auto; max-width: 100%; background: #fff; border-radius: 4px; }
+.quest-q figcaption { display: none; }
+.quest-opts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.quest-opt {
+  display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 8px 12px; text-align: left; cursor: pointer;
+  background: #221d6e; color: #fff; border: 3px solid #8f88d8; border-radius: 2px; font: 600 15px var(--font-body);
+}
+.quest-opt:hover:not(:disabled), .quest-opt:focus-visible { border-color: #ffd34d; background: #2d2690; outline: none; }
+.quest-opt kbd { font: 10px 'Press Start 2P', monospace; color: #ffd34d; }
+.quest-opt.right { border-color: var(--good); background: #1d5a3c; }
+.quest-opt.wrong { border-color: var(--bad); background: #5a1d2a; }
+.quest-opt.dim { opacity: 0.45; }
+.quest-dialog-note { margin: 10px 0 0; font-size: 14px; color: #d8d4f0; }
+.quest-dialog-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 14px; }
+.quest-end { text-align: center; }
+.quest-end-scroll { font-size: 56px; animation: quest-float 2s ease-in-out infinite; }
+.quest-end-stats { display: flex; justify-content: center; gap: 12px; margin: 14px 0; }
+.quest-end-stats div { display: grid; padding: 10px 14px; min-width: 90px; border: 3px solid #8f88d8; background: #221d6e; }
+.quest-end-stats b { font: 16px 'Press Start 2P', monospace; color: #ffd34d; }
+.quest-end-stats span { font-size: 12px; color: #d8d4f0; margin-top: 6px; }
+.quest-badge { font-weight: 700; color: #ffd34d; }
+.quest-end .quest-dialog-actions { justify-content: center; }
+@keyframes quest-float { 50% { transform: translateY(-8px); } }
+
+.quest-pad { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding: 0 6px; user-select: none; -webkit-user-select: none; }
+.quest-dpad { display: grid; grid-template: repeat(3, 54px) / repeat(3, 54px); }
+.quest-dpad button, .quest-a { touch-action: none; border: 3px solid #8f88d8; background: #221d6e; color: #fff; font-size: 20px; border-radius: 6px; }
+.quest-dpad button:active, .quest-a:active { background: #3b33a8; border-color: #ffd34d; }
+.qp-up { grid-area: 1 / 2; } .qp-left { grid-area: 2 / 1; } .qp-right { grid-area: 2 / 3; } .qp-down { grid-area: 3 / 2; }
+.quest-a { width: 84px; height: 84px; border-radius: 50%; font: 22px 'Press Start 2P', monospace; color: #ffd34d; border-color: #ffd34d; }
+@media (max-width: 560px) {
+  .quest-dialog { position: fixed; z-index: 40; }
+  .quest-opts { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .quest-end-scroll { animation: none; } }

@@ -8,10 +8,26 @@ import { profile, resetProfile } from '../state.js';
 import { go } from '../router.js';
 import { account, loadGroup, logout } from '../account.js';
 import { openFeedback } from '../feedback.js';
+import { loadCurriculumIndex } from '../data.js';
 import { newGear } from './armory.js';
 import { avatar, boardList } from './controls.js';
 
 const REFRESH_MS = 30_000;
+
+/** Open the Knowledge Quest for the student's group and their last-picked term. */
+async function startQuest() {
+  try {
+    const index = await loadCurriculumIndex();
+    const me = account.student;
+    const term = prefs.get('curriculum', {}).term || 1;
+    const mine = index.courses.filter((c) => c.grade === me?.grade && c.track === me?.track);
+    const course = mine.find((c) => c.term === term) || mine[0];
+    if (!course) throw new Error('Your group has no course yet.');
+    go('quest', { courseId: course.id });
+  } catch (e) {
+    toast('Knowledge Quest', e.message, { icon: '⚠️', tone: 'danger' });
+  }
+}
 
 export function renderHub(app) {
   const hero = CHARACTERS[profile.character];
@@ -84,6 +100,12 @@ export function renderHub(app) {
           text: 'Full section simulations and focused topic drills.',
           bullets: ['Timed SAT Simulator with scaled score', 'Math and Reading & Writing topics', 'Review every answer'],
           onclick: () => go('sat'),
+        }),
+        path({
+          id: 'quest', icon: '🗝️', eyebrow: 'Path C', title: 'Knowledge Quest',
+          text: 'A pixel adventure through the Lost Archives, one room per topic of your term.',
+          bullets: ['Walk the rooms in course order', 'Solve a riddle to open each door', 'Complete the Scroll for a badge'],
+          onclick: startQuest,
         })),
 
       lobby,

@@ -62,6 +62,13 @@ export function renderCurriculum(app) {
         h('div.course-head', {},
           h('div', {}, h('p.eyebrow', {}, me?.group?.name || `Grade ${course.grade}`), h('h2', {}, `Term ${course.term}`)),
           selectAllLessons(course)),
+        h('div.quest-card', {},
+          h('span.quest-card-icon', { 'aria-hidden': 'true' }, '🗝️'),
+          h('div', {},
+            h('b', {}, 'Knowledge Quest: The Lost Archives'),
+            h('p', {}, `Explore an ancient library, one room per topic of Term ${course.term}. Solve each room’s riddle to collect its item and open the next door.`),
+            profile.badges?.some((b) => b.id === `quest-${course.id}`) && h('p.quest-card-badge', {}, '🏅 You finished this quest. Play again to beat your score!')),
+          h('button.btn.primary', { onclick: () => go('quest', { courseId: course.id }) }, 'Enter the Archives')),
         h('h3.sub-title', {}, 'Mode'),
         h('div.mode-grid', {},
           modeCard({
