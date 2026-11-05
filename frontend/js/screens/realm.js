@@ -113,6 +113,7 @@ export function renderRealm(app) {
     const chest = missions.chestReady();
     const doneAll = eco.realm().daily?.chest;
     const sig = JSON.stringify([list, chest, doneAll]);
+    missionChip.classList.toggle('ready', chest || list.some((m) => m.complete && !m.claimed));
     if (sig === missionSig) return;
     missionSig = sig;
     missionBox.replaceChildren(
@@ -150,7 +151,8 @@ export function renderRealm(app) {
       h('button.chip', { onclick: go2('plots') }, '🌱 Plots'),
       h('button.chip', { onclick: go2('shop') }, '🛒 Shop'),
       h('button.chip', { onclick: go2('boss') }, '🐉 Boss'),
-      topic && h('button.chip', { onclick: go2(`topic:${topic.key}`) }, '⭐ Next topic')].filter(Boolean));
+      topic && h('button.chip', { onclick: go2(`topic:${topic.key}`) }, '⭐ Next topic'),
+      isFull && missionChip].filter(Boolean));
   }
 
   function refreshAll() {
@@ -427,8 +429,10 @@ export function renderRealm(app) {
 
   function openPlace(target) {
     open = target;
+    sheetMissions = false;
     drawPanel();
-    if (innerWidth < 900) {
+    drawSheet();
+    if (!isFull && innerWidth < 900) {
       const r = panel.getBoundingClientRect();
       if (r.top > innerHeight - 80) panel.scrollIntoView({ block: 'start', behavior: 'smooth' });
     }
@@ -545,7 +549,105 @@ export function renderRealm(app) {
         h('button.btn.ghost', { onclick: () => { dialog = null; drawDialog(); } }, done ? 'Close' : 'Back away'))));
   }
 
+  // ------------------------------------------------------------ full screen
+  // In full screen the map fills the whole screen and shows more of the world.
+  // The guide floats on top, the place buttons along the bottom, and a place's
+  // panel (or today's missions) opens as a sheet over the map. Phones without
+  // the browser's full-screen mode (iPhone) get the same view drawn over the page.
+  let view = null;
+  let isFull = false;
+  let sheetMissions = false;
+  const fsBtn = h('button.realm-fs-btn', { type: 'button', onclick: () => toggleFull() });
+  const wrap = h('div.realm-stage-wrap', {}, stage, overlay, fsBtn);
+  const main = h('div.realm-main', {}, wrap, jumps, panel);
+  const side = h('div.realm-side', {}, missionBox);
+  const layoutEl = h('div.realm-layout', {}, main, side);
+  const closeSheet = h('button.realm-sheet-close', {
+    type: 'button', 'aria-label': 'Close',
+    onclick: () => { open = { kind: 'help' }; sheetMissions = false; drawPanel(); drawSheet(); },
+  }, '✕');
+  const sheet = h('div.realm-sheet', { hidden: true });
+  const dock = h('div.realm-dock', {}, sheet, jumps);
+  const missionChip = h('button.chip.realm-mission-chip', {
+    type: 'button',
+    onclick: () => { sheetMissions = !sheetMissions || open.kind !== 'help'; open = { kind: 'help' }; drawPanel(); drawSheet(); },
+  }, '📜 Missions');
+  const fsRoot = h('div.realm-fs', {}, guide, layoutEl);
+  const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+
+  function drawFsBtn() {
+    fsBtn.textContent = isFull ? '✕ Exit' : '⛶ Full screen';
+    fsBtn.setAttribute('aria-label', isFull ? 'Exit full screen' : 'Play full screen');
+  }
+
+  function drawSheet() {
+    const showPanel = open.kind !== 'help' && !sheetMissions;
+    sheet.hidden = !isFull || !(showPanel || sheetMissions);
+    panel.hidden = isFull && !showPanel;
+    missionBox.hidden = isFull && !sheetMissions;
+    missionChip.classList.toggle('on', isFull && sheetMissions);
+  }
+
+  function fit() {
+    const sc = scene();
+    if (!sc || !view) return;
+    if (isFull) {
+      const box = fsRoot.getBoundingClientRect();
+      const w = Math.round(box.width);
+      const hgt = Math.round(box.height);
+      // Zoom in on big screens, but keep at least ~180 art pixels across and
+      // never show more than the world is tall.
+      const zoom = Math.max(2, Math.ceil(hgt / 352), Math.min(Math.ceil(hgt / 300), Math.floor(w / 180)));
+      sc.fitView(w, hgt, zoom);
+    } else {
+      sc.fitView(view.width * view.zoom, view.height * view.zoom, view.zoom);
+    }
+    game.scale.refresh();
+  }
+
+  function setFull(on) {
+    if (on === isFull) return;
+    isFull = on;
+    if (on) {
+      sheet.replaceChildren(closeSheet, panel, missionBox);
+      jumps.append(missionChip);
+      fsRoot.replaceChildren(wrap, guide, dock);
+    } else {
+      missionChip.remove();
+      main.replaceChildren(wrap, jumps, panel);
+      side.replaceChildren(missionBox);
+      fsRoot.replaceChildren(guide, layoutEl);
+    }
+    sheetMissions = false;
+    fsRoot.classList.toggle('full', on);
+    document.documentElement.classList.toggle('realm-locked', on);
+    drawFsBtn();
+    drawSheet();
+    requestAnimationFrame(fit);
+  }
+
+  async function toggleFull() {
+    if (isFull) {
+      if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen).call(document)?.catch?.(() => {});
+      setFull(false);
+      return;
+    }
+    setFull(true);
+    const ask = fsRoot.requestFullscreen || fsRoot.webkitRequestFullscreen;
+    try { await ask?.call(fsRoot, { navigationUI: 'hide' }); } catch { /* the view over the page still works */ }
+    requestAnimationFrame(fit);
+  }
+
+  // Leaving the browser's full screen (Esc, back gesture) leaves ours too.
+  const onFsChange = () => { if (!fsElement() && isFull) setFull(false); else requestAnimationFrame(fit); };
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  const onResize = () => { if (isFull) requestAnimationFrame(fit); };
+  window.addEventListener('resize', onResize);
+  drawFsBtn();
+
   const onKey = (e) => {
+    if (!dialog && e.key === 'Escape' && isFull) { setFull(false); return; }
     if (!dialog) return;
     if (e.key === 'Escape') { dialog = null; drawDialog(); }
     const i = '1234'.indexOf(e.key);
@@ -558,13 +660,7 @@ export function renderRealm(app) {
     h('section.realm', {},
       h('div.crumbs', {}, h('button.link', { onclick: () => go('hub') }, '← Hub'), h('span', {}, 'The Realm')),
       h('div.realm-top', {}, h('h1.display', {}, 'The Realm'), bar),
-      guide,
-      h('div.realm-layout', {},
-        h('div.realm-main', {},
-          h('div.realm-stage-wrap', {}, stage, overlay),
-          jumps,
-          panel),
-        h('div.realm-side', {}, missionBox))));
+      fsRoot));
   drawBar();
   drawMissions();
   drawPanel();
@@ -581,7 +677,7 @@ export function renderRealm(app) {
       const Phaser = await loadPhaser();
       if (!alive) return;
       stage.replaceChildren();
-      const view = viewFor(stage.clientWidth);
+      view = viewFor(stage.clientWidth);
       stage.style.aspectRatio = `${view.width} / ${view.height}`;
       const api2 = {
         zones, hero: heroLook(),
@@ -608,6 +704,11 @@ export function renderRealm(app) {
     clearInterval(tick);
     clearInterval(poll);
     window.removeEventListener('keydown', onKey);
+    window.removeEventListener('resize', onResize);
+    document.removeEventListener('fullscreenchange', onFsChange);
+    document.removeEventListener('webkitfullscreenchange', onFsChange);
+    if (fsElement()) (document.exitFullscreen || document.webkitExitFullscreen).call(document)?.catch?.(() => {});
+    document.documentElement.classList.remove('realm-locked');
     game?.destroy(true);
   };
 }
