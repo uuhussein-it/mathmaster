@@ -19,6 +19,7 @@ const blank = () => ({
   correct: 0,
   topics: {},     // { [topicKey]: { name, seen, correct } }
   history: [],    // most recent sessions first
+  badges: [],     // [{ id, name, icon, at }] e.g. finishing a Knowledge Quest
 });
 
 function load() {
@@ -113,6 +114,15 @@ export function recordSession(summary) {
 export function replaceProfile(saved) {
   Object.assign(profile, blank(), saved || {});
   save();
+}
+
+/** Give a badge once; returns true if it's new. */
+export function awardBadge({ id, name, icon }) {
+  profile.badges ||= [];
+  if (profile.badges.some((b) => b.id === id)) return false;
+  profile.badges.push({ id, name, icon, at: Date.now() });
+  save();
+  return true;
 }
 
 /** Clear all progress on this device. */
