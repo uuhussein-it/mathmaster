@@ -1743,6 +1743,9 @@ gear.init(app, current_student=accounts.current_student)
 import arena  # noqa: E402
 arena.init(app, current_student=accounts.current_student)
 
+import guild  # noqa: E402
+guild.init(app, current_student=accounts.current_student, group_info=accounts._group)
+
 import userdb  # noqa: E402
 app.teardown_appcontext(userdb.close_request_connections)
 

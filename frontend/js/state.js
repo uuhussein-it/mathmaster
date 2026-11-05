@@ -19,7 +19,9 @@ const blank = () => ({
   correct: 0,
   topics: {},     // { [topicKey]: { name, seen, correct } }
   history: [],    // most recent sessions first
-  badges: [],     // [{ id, name, icon, at }] e.g. finishing a Knowledge Quest
+  badges: [],     // [{ id, name, icon, at }] e.g. defeating a guild boss
+  insight: 0,     // ✨ earned by right answers, spent in the realm
+  realm: null,    // base, resources and cosmetics (see realm/economy.js)
 });
 
 function load() {
@@ -36,7 +38,7 @@ export const profile = load();
 // Writes are batched per microtask: settling a whole quiz at once does one
 // localStorage write and one HUD refresh instead of two per answer.
 let pending = false;
-function save() {
+export function save() {
   if (pending) return;
   pending = true;
   queueMicrotask(() => {
@@ -94,6 +96,7 @@ export function recordAnswer({ topicKey, topicName, correct, points }) {
     profile.streak += 1;
     profile.bestStreak = Math.max(profile.bestStreak, profile.streak);
     profile.score += points;
+    profile.insight = (profile.insight || 0) + 1; // realm currency: studying speeds up the base
   } else {
     profile.streak = 0;
   }

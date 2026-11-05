@@ -21,7 +21,7 @@ import { renderAdmin } from './screens/admin.js';
 import { renderArena } from './screens/arena.js';
 import { renderArmory } from './screens/armory.js';
 import { renderFight } from './screens/fight.js';
-import { renderQuest } from './screens/quest.js';
+import { renderRealm } from './screens/realm.js';
 
 /** Top bar: hero portrait, level, XP progress, score and streak. */
 function renderHud() {
@@ -66,7 +66,7 @@ register('results', renderResults, { needsPayload: true });
 register('arena', renderArena);
 register('armory', renderArmory);
 register('fight', renderFight, { needsPayload: true });
-register('quest', renderQuest, { needsPayload: true });
+register('realm', renderRealm);
 
 onProfileChange(renderHud);
 window.addEventListener('hashchange', renderHud); // signing in or out changes the screen

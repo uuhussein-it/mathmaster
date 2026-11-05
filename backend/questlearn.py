@@ -686,6 +686,27 @@ def _set_key(qid):
     return q["answer"] if q and q["type"] == "mcq" else None
 
 
+def known_answer(ref):
+    """The stored answer index of an MCQ, without asking Gemini (None if unknown
+    or not multiple choice). Used to grade guild boss hits on the server."""
+    kind, qid = _parse_ref(ref)
+    if kind == "set":
+        return _set_key(qid)
+    if kind == "custom":
+        r = custom_row(qid)
+        return int(r["answer"]) if r["type"] == "mcq" and str(r["answer"] or "").isdigit() else None
+    row = _row(kind, qid)
+    if not _is_mcq(kind, row):
+        return None
+    key = (re.findall(r"[A-F]", row["correct"] or "") or [None])[0]
+    if not key:
+        conn = db.get_conn()
+        hit = conn.execute("SELECT answer FROM ql_keys WHERE kind=? AND qid=?", (kind, qid)).fetchone()
+        conn.close()
+        key = hit and hit["answer"]
+    return _letter_index(key)
+
+
 @bp.route("/api/ql/keys", methods=["POST"])
 def keys_route():
     """Answer keys for a finished quiz/simulator: {refs: [...]} -> {keys: {ref: index|null}}."""
