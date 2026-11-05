@@ -8,26 +8,10 @@ import { profile, resetProfile } from '../state.js';
 import { go } from '../router.js';
 import { account, loadGroup, logout } from '../account.js';
 import { openFeedback } from '../feedback.js';
-import { loadCurriculumIndex } from '../data.js';
 import { newGear } from './armory.js';
 import { avatar, boardList } from './controls.js';
 
 const REFRESH_MS = 30_000;
-
-/** Open the Knowledge Quest for the student's group and their last-picked term. */
-async function startQuest() {
-  try {
-    const index = await loadCurriculumIndex();
-    const me = account.student;
-    const term = prefs.get('curriculum', {}).term || 1;
-    const mine = index.courses.filter((c) => c.grade === me?.grade && c.track === me?.track);
-    const course = mine.find((c) => c.term === term) || mine[0];
-    if (!course) throw new Error('Your group has no course yet.');
-    go('quest', { courseId: course.id });
-  } catch (e) {
-    toast('Knowledge Quest', e.message, { icon: '⚠️', tone: 'danger' });
-  }
-}
 
 export function renderHub(app) {
   const hero = CHARACTERS[profile.character];
@@ -58,6 +42,7 @@ export function renderHub(app) {
         h('button.btn.primary', { onclick: playCourse }, '⚔️ Play my course'),
         h('button.btn', { onclick: () => go('sat') }, '🎯 SAT practice'),
         h('button.btn', { onclick: () => go('arena') }, '🥊 Arena'),
+        h('button.btn', { onclick: () => go('realm') }, '🏰 Realm'),
         h('button.btn', { onclick: () => go('armory') }, '🛡️ Armory'),
         h('button.btn.ghost.sm', { onclick: () => go('level') }, 'Change level'))));
 
@@ -102,10 +87,10 @@ export function renderHub(app) {
           onclick: () => go('sat'),
         }),
         path({
-          id: 'quest', icon: '🗝️', eyebrow: 'Path C', title: 'Knowledge Quest',
-          text: 'A pixel adventure through the Lost Archives, one room per topic of your term.',
-          bullets: ['Walk the rooms in course order', 'Solve a riddle to open each door', 'Complete the Scroll for a badge'],
-          onclick: startQuest,
+          id: 'realm', icon: '🏰', eyebrow: 'Path C', title: 'The Realm',
+          text: 'Build your empire as you master your topics, and fight bosses with your class.',
+          bullets: ['World map: zones open as you master topics', 'Base: farms, mines and towers powered by right answers', 'Hero evolution, cosmetic store and guild bosses'],
+          onclick: () => go('realm'),
         })),
 
       lobby,
