@@ -23,8 +23,7 @@ export const RESOURCES = {
 };
 export const INSIGHT = { name: 'Insight', icon: '✨' };
 
-export const GRID = { w: 12, h: 8 };
-export const HALL = { x: 5, y: 3 }; // the town hall's fixed tile
+export const GRID = { w: 8, h: 6 }; // building plots in the town
 export const CAP_HOURS = 8;
 const RUSH_HOURS = 2;
 export const RUSH_COST = 2;
@@ -104,7 +103,34 @@ export function realm() {
   r.owned ||= [];
   r.wear ||= {};
   r.claimed ||= [];
+  r.stats ||= { collected: 0, built: 0, bossHits: 0 };
+  // Older saves used a bigger grid: move anything outside the plots onto a free one.
+  for (const list of [r.buildings, r.decor]) {
+    for (const b of list) {
+      if (b.x < GRID.w && b.y < GRID.h) continue;
+      const free = freePlot(r);
+      if (free) Object.assign(b, free);
+    }
+  }
+  r.buildings = r.buildings.filter((b) => b.x < GRID.w && b.y < GRID.h);
+  r.decor = r.decor.filter((b) => b.x < GRID.w && b.y < GRID.h);
   return r;
+}
+
+function freePlot(r) {
+  for (let y = 0; y < GRID.h; y += 1) {
+    for (let x = 0; x < GRID.w; x += 1) {
+      if (![...r.buildings, ...r.decor].some((b) => b.x === x && b.y === y)) return { x, y };
+    }
+  }
+  return null;
+}
+
+/** Count something for the daily missions. */
+export function bump(key, n = 1) {
+  const r = realm();
+  r.stats[key] = (r.stats[key] || 0) + n;
+  save();
 }
 
 export const insight = () => profile.insight || 0;
@@ -138,7 +164,7 @@ export function stepCost(type, level) {
   };
 }
 
-export const occupied = (x, y) => (x === HALL.x && y === HALL.y)
+export const occupied = (x, y) => x < 0 || y < 0 || x >= GRID.w || y >= GRID.h
   || realm().buildings.some((b) => b.x === x && b.y === y)
   || realm().decor.some((d) => d.x === x && d.y === y);
 
@@ -164,6 +190,7 @@ export function place(type, x, y, openZones, now = Date.now()) {
   pay(cost);
   const b = { uid: r.nextUid++, type, x, y, level: 1, readyAt: now + secs * 1000, collectedAt: now + secs * 1000, buildSecs: secs };
   r.buildings.push(b);
+  r.stats.built = (r.stats.built || 0) + 1;
   save();
   return b;
 }
@@ -183,6 +210,7 @@ export function upgrade(uid, now = Date.now()) {
   b.readyAt = now + secs * 1000;
   b.collectedAt = b.readyAt;
   b.buildSecs = secs;
+  realm().stats.built += 1;
   save();
 }
 
@@ -236,7 +264,10 @@ export function collect(uid, now = Date.now()) {
   const taken = isFull(b, now) ? now : b.collectedAt + (amount / rate) * HOUR;
   b.collectedAt = Math.min(now, taken);
   if (makes === 'insight') profile.insight = insight() + amount;
-  else realm().res[makes] += amount;
+  else {
+    realm().res[makes] += amount;
+    realm().stats.collected += amount;
+  }
   save();
   return [makes, amount];
 }

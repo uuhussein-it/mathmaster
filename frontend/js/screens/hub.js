@@ -88,8 +88,8 @@ export function renderHub(app) {
         }),
         path({
           id: 'realm', icon: '🏰', eyebrow: 'Path C', title: 'The Realm',
-          text: 'Build your empire as you master your topics, and fight bosses with your class.',
-          bullets: ['World map: zones open as you master topics', 'Base: farms, mines and towers powered by right answers', 'Hero evolution, cosmetic store and guild bosses'],
+          text: 'One pixel world: walk your town, build it up and travel the road of your topics.',
+          bullets: ['Daily missions with rewards', 'Build farms and mines, shop for your hero', 'Open new zones by mastering topics, beat bosses with your class'],
           onclick: () => go('realm'),
         })),
 
