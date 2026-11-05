@@ -69,6 +69,13 @@ export function worldScene(Phaser, api, view) {
   return class WorldScene extends Phaser.Scene {
     constructor() { super('world'); }
 
+    /** Show a w x h canvas at this zoom (full screen shows more of the world). */
+    fitView(w, h, zoom) {
+      this.scale.resize(w, h);
+      this.cameras.main.setSize(w, h);
+      this.cameras.main.setZoom(zoom);
+    }
+
     create() {
       const cam = this.cameras.main;
       cam.setZoom(view.zoom);
