@@ -48,9 +48,7 @@ def _headers(resp):
     resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     # The classic site uses inline scripts and KaTeX from a CDN, so it keeps no CSP.
     if resp.mimetype == "text/html" and not request.path.startswith("/classic"):
-        # Older Safari doesn't count ws:// to the same host as 'self'; the arena needs it.
-        resp.headers.setdefault("Content-Security-Policy", CSP.replace(
-            "connect-src 'self'", f"connect-src 'self' wss://{request.host} ws://{request.host}"))
+        resp.headers.setdefault("Content-Security-Policy", CSP)
     if request.path.startswith("/api/"):
         resp.headers.setdefault("Cache-Control", "no-store")
     if request.is_secure or request.headers.get("X-Forwarded-Proto") == "https":

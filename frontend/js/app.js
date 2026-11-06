@@ -6,7 +6,6 @@ import { CHARACTERS } from './characters.js';
 import { profile, onProfileChange, xpToNext } from './state.js';
 import { register, startRouter, go } from './router.js';
 import { loadAccount, account } from './account.js';
-import { startAlerts } from './alerts.js';
 
 import { renderSelect } from './screens/select.js';
 import { renderHub } from './screens/hub.js';
@@ -18,9 +17,6 @@ import { renderResults } from './screens/results.js';
 import { renderLogin } from './screens/login.js';
 import { renderLevel } from './screens/level.js';
 import { renderAdmin } from './screens/admin.js';
-import { renderArena } from './screens/arena.js';
-import { renderArmory } from './screens/armory.js';
-import { renderFight } from './screens/fight.js';
 import { renderRealm } from './screens/realm.js';
 import { renderCave } from './screens/cave.js';
 
@@ -64,9 +60,6 @@ register('sat', renderSat);
 register('play', renderPlay, { needsPayload: true });
 register('simulator', renderSimulator, { needsPayload: true });
 register('results', renderResults, { needsPayload: true });
-register('arena', renderArena);
-register('armory', renderArmory);
-register('fight', renderFight, { needsPayload: true });
 register('realm', renderRealm);
 register('cave', renderCave);
 
@@ -76,5 +69,4 @@ renderHud();
 loadAccount().then(() => {
   renderHud();
   startRouter();
-  startAlerts();
 });

@@ -1,14 +1,13 @@
 /**
- * Main hub: what to play first (course, SAT, arena), then the two learning
+ * Main hub: what to play first (course, SAT, the Realm), then the two learning
  * paths, then the group (who's here, leaderboard), hero banner and stats.
  */
-import { h, mount, kpi, prefs, toast } from '../ui.js';
+import { h, mount, kpi, prefs } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
 import { profile, resetProfile } from '../state.js';
 import { go } from '../router.js';
 import { account, loadGroup, logout } from '../account.js';
 import { openFeedback } from '../feedback.js';
-import { newGear } from './armory.js';
 import { avatar, boardList } from './controls.js';
 
 const REFRESH_MS = 30_000;
@@ -41,10 +40,8 @@ export function renderHub(app) {
       h('div.lobby-actions', {},
         h('button.btn.primary', { onclick: playCourse }, '⚔️ Play my course'),
         h('button.btn', { onclick: () => go('sat') }, '🎯 SAT practice'),
-        h('button.btn', { onclick: () => go('arena') }, '🥊 Arena'),
         h('button.btn', { onclick: () => go('realm') }, '🏰 Realm'),
         h('button.btn', { onclick: () => go('cave') }, '🪔 Cave'),
-        h('button.btn', { onclick: () => go('armory') }, '🛡️ Armory'),
         h('button.btn.ghost.sm', { onclick: () => go('level') }, 'Change level'))));
 
   function drawLobby(g) {
@@ -137,8 +134,6 @@ export function renderHub(app) {
         h('button.btn.ghost', { onclick: async () => { await logout(); go('login'); } }, 'Log out'))));
 
   refresh();
-  newGear().then((items) => items.slice(0, 2).forEach((i) => toast('New gear unlocked!', `${i.icon} ${i.name}. Equip it in the Armory.`, { icon: '🛡️', tone: 'level' })))
-    .catch(() => {});
   const timer = setInterval(refresh, REFRESH_MS);
   return () => clearInterval(timer);
 }
