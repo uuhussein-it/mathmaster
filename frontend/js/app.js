@@ -18,6 +18,7 @@ import { renderLogin } from './screens/login.js';
 import { renderLevel } from './screens/level.js';
 import { renderAdmin } from './screens/admin.js';
 import { renderRealm } from './screens/realm.js';
+import { renderCave } from './screens/cave.js';
 
 /** Top bar: hero portrait, level, XP progress, score and streak. */
 function renderHud() {
@@ -60,6 +61,7 @@ register('play', renderPlay, { needsPayload: true });
 register('simulator', renderSimulator, { needsPayload: true });
 register('results', renderResults, { needsPayload: true });
 register('realm', renderRealm);
+register('cave', renderCave);
 
 onProfileChange(renderHud);
 window.addEventListener('hashchange', renderHud); // signing in or out changes the screen

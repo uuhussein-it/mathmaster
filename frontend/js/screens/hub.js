@@ -41,6 +41,7 @@ export function renderHub(app) {
         h('button.btn.primary', { onclick: playCourse }, '⚔️ Play my course'),
         h('button.btn', { onclick: () => go('sat') }, '🎯 SAT practice'),
         h('button.btn', { onclick: () => go('realm') }, '🏰 Realm'),
+        h('button.btn', { onclick: () => go('cave') }, '🪔 Cave'),
         h('button.btn.ghost.sm', { onclick: () => go('level') }, 'Change level'))));
 
   function drawLobby(g) {
@@ -88,6 +89,12 @@ export function renderHub(app) {
           text: 'One pixel world: walk your town, build it up and travel the road of your topics.',
           bullets: ['Daily missions with rewards', 'Build farms and mines, shop for your hero', 'Open new zones by mastering topics, beat bosses with your class'],
           onclick: () => go('realm'),
+        }),
+        path({
+          id: 'cave', icon: '🪔', eyebrow: 'Path D', title: 'Cave of Equations',
+          text: 'A retro platformer: help Aladdin escape the cave by solving what blocks his way.',
+          bullets: ['Stage 1–3 follow Terms 1–3, then an SAT boss', 'Number Gates, sand-timer doors, coins and a merchant', 'Defeat the sorcerer Zarkan with Number Spells'],
+          onclick: () => go('cave'),
         })),
 
       lobby,
