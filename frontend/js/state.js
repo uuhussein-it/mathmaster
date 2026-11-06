@@ -22,6 +22,7 @@ const blank = () => ({
   badges: [],     // [{ id, name, icon, at }] e.g. defeating a guild boss
   insight: 0,     // ✨ earned by right answers, spent in the realm
   realm: null,    // base, resources and cosmetics (see realm/economy.js)
+  cave: null,     // Cave of Equations progress, coins and items (see screens/cave.js)
 });
 
 function load() {

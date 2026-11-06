@@ -29,7 +29,7 @@ export function tex(scene, key, make) {
  * height art pixels and shown `zoom` times larger, crisp (pixelArt), and the
  * canvas then scales to fit its box.
  */
-export function startGame(Phaser, parent, scene, { width, height, zoom, background = '#0b0816' }) {
+export function startGame(Phaser, parent, scene, { width, height, zoom, background = '#0b0816', physics }) {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
@@ -41,6 +41,7 @@ export function startGame(Phaser, parent, scene, { width, height, zoom, backgrou
     audio: { noAudio: true },
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_HORIZONTALLY },
     scene,
+    ...(physics ? { physics } : {}),
   });
 }
 

@@ -7,7 +7,7 @@
  */
 export const T = 16;
 
-function canvas(w = T, h = T) {
+export function canvas(w = T, h = T) {
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
@@ -17,7 +17,7 @@ function canvas(w = T, h = T) {
 const OUTLINE = '#1a1426';
 
 /** Give every sprite a 1px dark outline around its filled pixels. */
-function outline(c) {
+export function outline(c) {
   const g = c.getContext('2d');
   const { width: w, height: h } = c;
   const img = g.getImageData(0, 0, w, h);
@@ -35,7 +35,7 @@ function outline(c) {
 }
 
 /** Paint rows of palette letters ('.' is transparent). */
-function paint(rows, palette, w = T, h = rows.length) {
+export function paint(rows, palette, w = T, h = rows.length) {
   const c = canvas(w, h);
   const g = c.getContext('2d');
   rows.forEach((row, y) => {
@@ -48,7 +48,7 @@ function paint(rows, palette, w = T, h = rows.length) {
   return c;
 }
 
-function rand(seed) {
+export function rand(seed) {
   let s = seed >>> 0 || 1;
   return () => {
     s ^= s << 13; s ^= s >>> 17; s ^= s << 5;
@@ -63,7 +63,7 @@ export function shade(hex, amt) {
 }
 
 /** Draw helper: rectangles in art pixels. */
-function pen(c) {
+export function pen(c) {
   const g = c.getContext('2d');
   return (color, x, y, w = 1, h = 1) => {
     g.fillStyle = color;
