@@ -200,7 +200,7 @@ export function worldScene(Phaser, api, view) {
       this.time.addEvent({ delay: 220, loop: true, callback: () => { f = 1 - f; portal.setTexture(`portal-${f}`); } });
       this.place('portal', PORTAL.x, PORTAL.y + 14, portal, 'GUILD PORTAL', { kind: 'boss' }, { labelY: -36, color: '#c9b0ff' });
 
-      // The guild's boss stands in the arena beside the portal.
+      // The guild's boss stands in the clearing beside the portal.
       this.add.ellipse(BOSS.x, BOSS.y + 2, 70, 16, 0x5b3fc4, 0.25).setDepth(-5);
       const b = api.boss();
       this.bossN = b?.n || 1;
