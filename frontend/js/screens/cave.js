@@ -16,6 +16,7 @@ import { loadCurriculumIndex, loadCourse, loadSat } from '../data.js';
 import { loadPhaser, startGame } from '../realm/phaser.js';
 import { introScene, levelScene, VIEW } from '../cave/scene.js';
 import * as art from '../cave/art.js';
+import { sfx, isMuted, setMuted } from '../realm/sfx.js';
 
 const MAX_HEARTS = 3;
 const SHOP = [
@@ -34,6 +35,7 @@ function cave() {
   c.carpets ||= 0;
   c.rings ||= 0;
   c.skins ||= [];
+  c.stars ||= {};
   const mine = profile.character || 'sage';
   if (!c.skins.includes(mine)) c.skins.push(mine);
   if (!c.skin || !c.skins.includes(c.skin)) c.skin = mine;
@@ -61,9 +63,14 @@ async function questionPool(kind, stage) {
     const index = await loadCurriculumIndex();
     const me = account.student;
     const term = stage;
-    let courses = index.courses.filter((c) => c.grade === me?.grade && c.track === me?.track && c.term === term);
-    if (!courses.length) courses = index.courses.filter((c) => c.grade === me?.grade && c.term === term);
-    if (!courses.length) courses = index.courses.filter((c) => c.term === term).slice(0, 2);
+    // The student's own course for this term; when that term isn't in the bank yet,
+    // their latest term so far (never another grade's questions or the SAT).
+    const mine = (t) => index.courses.filter((c) => c.grade === me?.grade && c.track === me?.track && c.term === t);
+    const sameGrade = (t) => index.courses.filter((c) => c.grade === me?.grade && c.term === t);
+    let courses = [];
+    for (let t = term; t >= 1 && !courses.length; t -= 1) courses = mine(t);
+    for (let t = term; t >= 1 && !courses.length; t -= 1) courses = sameGrade(t);
+    if (!courses.length) courses = index.courses.filter((c) => c.term <= term).slice(0, 2);
     const loaded = await Promise.all(courses.map((c) => loadCourse(c.id)));
     list = loaded.flatMap((course) => course.topics.flatMap((t) => t.questions.filter(usable)
       .map((q) => ({ ...q, topicKey: `${course.id}:${t.id}:${q.lesson}`, topicName: t.name }))));
@@ -99,7 +106,9 @@ export function renderCave(app) {
   const overlay = h('div.cave-overlay', { hidden: true });
   const controls = h('div.cave-controls');
   const fsBtn = h('button.cave-fs-btn', { type: 'button', onclick: () => toggleFull() });
-  const wrap = h('div.cave-wrap', {}, h('div.cave-screen', {}, stageEl, hud, overlay, fsBtn), controls);
+  const soundBtn = h('button.cave-sound-btn', { type: 'button', onclick: () => { setMuted(!isMuted()); drawSoundBtn(); if (!isMuted()) sfx('coin'); } });
+  const drawSoundBtn = () => { soundBtn.textContent = isMuted() ? '🔇' : '🔊'; soundBtn.setAttribute('aria-label', isMuted() ? 'Sound off' : 'Sound on'); };
+  const wrap = h('div.cave-wrap', {}, h('div.cave-screen', {}, stageEl, hud, overlay, h('div.game-corner', {}, soundBtn, fsBtn)), controls);
   const picker = h('div.cave-picker');
   const heroes = h('div.panel.cave-heroes');
 
@@ -132,11 +141,12 @@ export function renderCave(app) {
     picker.replaceChildren(...[1, 2, 3].map((n) => {
       const open = n <= c.unlocked;
       const done = c.cleared.includes(n);
+      const stars = c.stars[n] || 0;
       return h('button.chip', {
         type: 'button', disabled: !open, 'aria-pressed': String(n === stage),
         title: art.STAGE_STYLE[n].name,
         onclick: () => play(n),
-      }, `${done ? '✅' : open ? '🔓' : '🔒'} Stage ${n}`);
+      }, `${done ? '✅' : open ? '🔓' : '🔒'} Stage ${n}`, done && h('span.cave-chip-stars', {}, '★'.repeat(stars) + '☆'.repeat(3 - stars)));
     }));
   }
 
@@ -144,6 +154,7 @@ export function renderCave(app) {
     const c = cave();
     const need = xpToNext(profile.level);
     const parts = [`Stage ${stage}`];
+    if (progress.coinsTotal) parts.push(`🪙 ${progress.coins}/${progress.coinsTotal}`);
     if (progress.gatesTotal) parts.push(`Gates ${progress.gates}/${progress.gatesTotal}`);
     if (progress.doorsTotal) parts.push(`Doors ${progress.doors}/${progress.doorsTotal}`);
     if (progress.shields != null) parts.push(`Shield ${'◆'.repeat(progress.shields)}${'◇'.repeat(5 - progress.shields)}`);
@@ -238,8 +249,11 @@ export function renderCave(app) {
       addXp(10);
       if (hearts < MAX_HEARTS) { hearts += 1; st.reward = '+1 heart'; } else { cave().coins += 5; save(); st.reward = '+5 coins'; }
       burst();
+      sfx('right');
     } else {
       hearts = Math.max(0, hearts - 1);
+      st.lostHeart = true;
+      sfx('wrong');
     }
     drawHud();
     drawQuestion();
@@ -249,6 +263,7 @@ export function renderCave(app) {
     const st = overlayState;
     if (st?.kind !== 'question' || st.chosen == null) return;
     show(null);
+    if (st.lostHeart) wrongAnswers += 1;
     if (hearts <= 0) { st.resolve(false); gameOver(); return; }
     hold(false);
     st.resolve(st.correct);
@@ -341,6 +356,8 @@ export function renderCave(app) {
 
   function gameOver() {
     hold(true);
+    sfx('lose');
+    runFlawless = false;
     overlayState = { kind: 'over' };
     overlay.hidden = false;
     overlay.replaceChildren(h('div.cave-dialog.center', { role: 'dialog' },
@@ -351,8 +368,19 @@ export function renderCave(app) {
         h('button.btn.ghost', { type: 'button', onclick: () => play(stage) }, 'Restart the stage'))));
   }
 
-  function cleared() {
+  /** Stars for a cleared stage: one for escaping, one for 70% of the coins, one for losing no hearts. */
+  function starsFor(stats) {
+    let n = 1;
+    if (stats.coinsTotal && stats.coins / stats.coinsTotal >= 0.7) n += 1;
+    if (runFlawless && !stats.hurts && !wrongAnswers) n += 1;
+    return n;
+  }
+
+  function cleared(stats = {}) {
     const c = cave();
+    const stars = starsFor(stats);
+    const bestBefore = c.stars[stage] || 0;
+    c.stars[stage] = Math.max(bestBefore, stars);
     const first = !c.cleared.includes(stage);
     const reward = first ? STAGE_REWARD[stage] : 10;
     c.coins += reward;
@@ -370,6 +398,13 @@ export function renderCave(app) {
     overlay.hidden = false;
     overlay.replaceChildren(h('div.cave-dialog.center', { role: 'dialog' },
       h('p.cave-dialog-title', {}, stage === 3 ? '🏆 You escaped the Cave of Equations!' : `✨ Stage ${stage} cleared!`),
+      h('p.cave-stars', { 'aria-label': `${stars} of 3 stars` }, [1, 2, 3].map((i) => h('span', { class: i <= stars ? 'on' : '', style: { animationDelay: `${i * 0.25}s` } }, '★'))),
+      h('ul.cave-stats', {},
+        h('li', { class: stats.coinsTotal && stats.coins / stats.coinsTotal >= 0.7 ? 'ok' : '' }, `🪙 Coins found: ${stats.coins ?? 0} / ${stats.coinsTotal ?? 0}`),
+        h('li', { class: runFlawless && !stats.hurts && !wrongAnswers ? 'ok' : '' }, `❤️ Hearts lost: ${(stats.hurts || 0) + wrongAnswers}`),
+        stats.stomps ? h('li', {}, `🥾 Enemies stomped: ${stats.stomps}`) : null),
+      stars > bestBefore && bestBefore > 0 && h('p.realm-good', {}, 'New best for this stage!'),
+      stars < 3 && h('p.muted.small', {}, stars === 1 ? 'Find more coins and keep your hearts for more stars.' : 'One more star: collect the coins and lose no hearts.'),
       h('p', {}, `${art.STAGE_STYLE[stage].name}: +🪙 ${reward} and +${first ? 50 : 10} XP.`),
       learnt && h('p.realm-good', {}, 'New power: Double Jump! Press jump again in the air.'),
       stage === 3 && h('p', {}, 'Zarkan is beaten and the treasure is yours: the knowledge you carried in.'),
@@ -384,6 +419,7 @@ export function renderCave(app) {
     get doubleJump() { return !!cave().doubleJump; },
     touch,
     ask,
+    stomp() { cave().coins += 3; coinsDirty = true; drawHud(); },
     hurt() {
       hearts = Math.max(0, hearts - 1);
       drawHud();
@@ -410,11 +446,15 @@ export function renderCave(app) {
     },
   };
   let coinsDirty = false;
+  let runFlawless = true;  // no game over this run (for the third star)
+  let wrongAnswers = 0;
   const coinSaver = setInterval(() => { if (coinsDirty) { coinsDirty = false; save(); } }, 3000);
 
   function play(n) {
     stage = n;
     hearts = MAX_HEARTS;
+    runFlawless = true;
+    wrongAnswers = 0;
     progress = {};
     show(null);
     drawPicker();
@@ -476,6 +516,7 @@ export function renderCave(app) {
   drawHeroes();
   drawControls();
   drawFsBtn();
+  drawSoundBtn();
 
   (async () => {
     try {

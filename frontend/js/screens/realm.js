@@ -19,6 +19,7 @@ import { heroFrames, buildingSprite, bossInfo, AURA } from '../realm/art.js';
 import { ZONES, NEED_PCT, loadNodes, layout, rememberZones, openZones, startNode } from '../realm/world.js';
 import * as eco from '../realm/economy.js';
 import * as missions from '../realm/missions.js';
+import { sfx, isMuted, setMuted } from '../realm/sfx.js';
 
 const ZONE_UNLOCKS = { plains: ['farm', 'mill'], forest: ['quarry', 'mine'], citadel: ['library', 'tower'] };
 const BOSS_TRAIT = {
@@ -127,7 +128,7 @@ export function renderRealm(app) {
         m.complete && !m.claimed && h('button.btn.primary.sm', {
           onclick: () => {
             const got = missions.claim(m.id);
-            if (got) { toast('Mission complete!', `🪙 ${got.gold} gold and ✨ ${got.insight} Insight.`, { icon: m.icon, tone: 'level' }); burst(); }
+            if (got) { toast('Mission complete!', `🪙 ${got.gold} gold and ✨ ${got.insight} Insight.`, { icon: m.icon, tone: 'level' }); burst(); sfx('win'); }
             refreshAll();
           },
         }, 'Claim')))),
@@ -360,7 +361,7 @@ export function renderRealm(app) {
         : def.makes && h('p', {}, `Makes ${rate % 1 ? rate.toFixed(1) : rate} ${icon} per hour. Holding ${n0(eco.pending(b, now))} of ${n0(rate * eco.CAP_HOURS)}${eco.isFull(b, now) ? ' (full: collect it!)' : ''}.`),
       h('div.realm-actions', {},
         busy && h('button.btn.primary', { onclick: () => act(() => eco.finishNow(b.uid)) }, `✨ Finish now (${eco.finishCost(b, now)})`),
-        !busy && def.makes && h('button.btn.primary', { disabled: eco.pending(b, now) < 1, onclick: () => act(() => eco.collect(b.uid)) }, `🧺 Collect ${n0(eco.pending(b, now))} ${icon}`),
+        !busy && def.makes && h('button.btn.primary', { disabled: eco.pending(b, now) < 1, onclick: () => act(() => { sfx('coin'); return eco.collect(b.uid); }) }, `🧺 Collect ${n0(eco.pending(b, now))} ${icon}`),
         !busy && def.makes && def.makes !== 'insight' && h('button.btn', {
           onclick: () => act(() => { const [k, v] = eco.rush(b.uid); toast('Rushed!', `+${v} ${resIcon(k)} right away.`, { icon: '✨', tone: 'level' }); }),
         }, `✨ Rush 2h (${eco.RUSH_COST})`),
@@ -511,6 +512,7 @@ export function renderRealm(app) {
       dialog.result = hit;
       recordAnswer({ topicKey: dialog.q.topicKey, topicName: dialog.q.topicName, correct: hit.correct, points: hit.correct ? 50 : 0 });
       if (hit.correct) addXp(8);
+      sfx(hit.correct ? (hit.damage ? 'blast' : 'right') : 'wrong');
       if (hit.damage) { eco.bump('bossHits'); scene()?.strike(hit); } else if (!hit.correct) scene()?.miss();
       applyGuild(out);
       refreshAll();
@@ -558,7 +560,10 @@ export function renderRealm(app) {
   let isFull = false;
   let sheetMissions = false;
   const fsBtn = h('button.realm-fs-btn', { type: 'button', onclick: () => toggleFull() });
-  const wrap = h('div.realm-stage-wrap', {}, stage, overlay, fsBtn);
+  const soundBtn = h('button.realm-sound-btn', { type: 'button', onclick: () => { setMuted(!isMuted()); drawSoundBtn(); if (!isMuted()) sfx('coin'); } });
+  const drawSoundBtn = () => { soundBtn.textContent = isMuted() ? '🔇' : '🔊'; soundBtn.setAttribute('aria-label', isMuted() ? 'Sound off' : 'Sound on'); };
+  drawSoundBtn();
+  const wrap = h('div.realm-stage-wrap', {}, stage, overlay, h('div.game-corner', {}, soundBtn, fsBtn));
   const main = h('div.realm-main', {}, wrap, jumps, panel);
   const side = h('div.realm-side', {}, missionBox);
   const layoutEl = h('div.realm-layout', {}, main, side);
@@ -567,7 +572,7 @@ export function renderRealm(app) {
     onclick: () => { open = { kind: 'help' }; sheetMissions = false; drawPanel(); drawSheet(); },
   }, '✕');
   const sheet = h('div.realm-sheet', { hidden: true });
-  const dock = h('div.realm-dock', {}, sheet, jumps);
+  const dock = h('div.realm-dock'); // filled in full screen (building it with `jumps` would steal them from the page)
   const missionChip = h('button.chip.realm-mission-chip', {
     type: 'button',
     onclick: () => { sheetMissions = !sheetMissions || open.kind !== 'help'; open = { kind: 'help' }; drawPanel(); drawSheet(); },
@@ -610,6 +615,7 @@ export function renderRealm(app) {
     isFull = on;
     if (on) {
       sheet.replaceChildren(closeSheet, panel, missionBox);
+      dock.replaceChildren(sheet, jumps);
       jumps.append(missionChip);
       fsRoot.replaceChildren(wrap, guide, dock);
     } else {
@@ -683,9 +689,10 @@ export function renderRealm(app) {
         zones, hero: heroLook(),
         boss: () => guild?.boss || null,
         open: (target) => openPlace(target),
+        busy: () => !!dialog,
       };
       game = startGame(Phaser, stage, worldScene(Phaser, api2, view), view);
-      game.events.once('ready', () => {});
+      stage.game = game; // handy for tests
       const wait = setInterval(() => {
         if (!scene()?.places) return;
         clearInterval(wait);
