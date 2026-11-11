@@ -13,6 +13,7 @@ import { renderCurriculum } from './screens/curriculum.js';
 import { renderSat } from './screens/sat.js';
 import { renderPlay } from './screens/play.js';
 import { renderSimulator } from './screens/simulator.js';
+import { renderExam } from './screens/exam.js';
 import { renderResults } from './screens/results.js';
 import { renderLogin } from './screens/login.js';
 import { renderLevel } from './screens/level.js';
@@ -60,6 +61,7 @@ register('sat', renderSat);
 register('play', renderPlay, { needsPayload: true });
 register('simulator', renderSimulator, { needsPayload: true });
 register('results', renderResults, { needsPayload: true });
+register('exam', renderExam, { needsPayload: true });
 register('realm', renderRealm);
 register('cave', renderCave);
 
