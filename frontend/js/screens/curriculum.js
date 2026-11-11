@@ -1,6 +1,7 @@
 /**
  * Path A: School Curriculum. A student plays their own group's course (grade and
- * track come from the level they chose): pick a term, topics or single lessons, and a mode.
+ * track come from the level they chose): pick a term, topics or single lessons, and a mode,
+ * or sit a full Final Exam practice paper for the term.
  */
 import { h, mount, prefs } from '../ui.js';
 import { loadCurriculumIndex, loadCourse, prepareQuestions } from '../data.js';
@@ -9,13 +10,14 @@ import { timedSeconds } from '../characters.js';
 import { profile } from '../state.js';
 import { account } from '../account.js';
 import { chips, modeCard, lessonPicker, lessonKey, groupBoard } from './controls.js';
+import { VERSIONS, EXAM_MINUTES } from './exam.js';
 
 const SECONDS_PER_QUIZ_QUESTION = 75;
 const COUNTS = [5, 10, 15, 0]; // 0 = all
 
 export function renderCurriculum(app) {
   const saved = prefs.get('curriculum', {});
-  const sel = { grade: 9, track: 'advanced', term: 1, mode: 'practice', count: 10, ...saved, lessons: null };
+  const sel = { grade: 9, track: 'advanced', term: 1, mode: 'practice', count: 10, version: 1, ...saved, lessons: null };
   const me = account.student;
   const locked = Boolean(me?.grade && me?.track); // their group decides the course
   if (locked) Object.assign(sel, { grade: me.grade, track: me.track });
@@ -35,7 +37,7 @@ export function renderCurriculum(app) {
   function update(patch) {
     Object.assign(sel, patch);
     if ('grade' in patch || 'track' in patch || 'term' in patch) { sel.lessons = null; open.clear(); }
-    prefs.set('curriculum', { grade: sel.grade, track: sel.track, term: sel.term, mode: sel.mode, count: sel.count });
+    prefs.set('curriculum', { grade: sel.grade, track: sel.track, term: sel.term, mode: sel.mode, count: sel.count, version: sel.version });
     draw();
   }
 
@@ -61,7 +63,7 @@ export function renderCurriculum(app) {
       body = h('div.course', {},
         h('div.course-head', {},
           h('div', {}, h('p.eyebrow', {}, me?.group?.name || `Grade ${course.grade}`), h('h2', {}, `Term ${course.term}`)),
-          selectAllLessons(course)),
+          sel.mode !== 'exam' && selectAllLessons(course)),
         h('h3.sub-title', {}, 'Mode'),
         h('div.mode-grid', {},
           modeCard({
@@ -71,7 +73,13 @@ export function renderCurriculum(app) {
           modeCard({
             icon: '⏱️', title: 'Quiz Mode', pressed: sel.mode === 'quiz', onclick: () => update({ mode: 'quiz' }),
             text: `Timed, back-to-back questions (${SECONDS_PER_QUIZ_QUESTION}s each). Score and evaluation at the end.`,
+          }),
+          modeCard({
+            icon: '🎓', title: 'Final Exam practice', pressed: sel.mode === 'exam', onclick: () => update({ mode: 'exam' }),
+            text: `A full End of Term ${course.term} exam like the real paper: 100 marks, ${EXAM_MINUTES / 60} hours, every subtopic.`,
           })),
+
+        sel.mode === 'exam' ? examPanel(course) : [
 
         h('div.start-row', {},
           chips('Questions', COUNTS.map((n) => ({ value: n, label: n ? String(n) : 'All' })), sel.count, (count) => update({ count })),
@@ -80,7 +88,7 @@ export function renderCurriculum(app) {
 
         h('h3.sub-title', {}, 'Topics'),
         h('p.muted.small.lesson-tip', {}, 'Tick a whole topic, or open its lessons to practise just one.'),
-        lessonPicker(course.topics, sel.lessons, open, draw));
+        lessonPicker(course.topics, sel.lessons, open, draw)]);
     }
 
     mount(app,
@@ -97,6 +105,23 @@ export function renderCurriculum(app) {
           })), sel.term, (term) => update({ term }))),
         body,
         board));
+  }
+
+  /** Final Exam practice: pick a version of the paper and start. */
+  function examPanel(course) {
+    const best = profile.exams?.[course.code];
+    return h('div.panel.exam-pick', {},
+      h('div.exam-pick-head', {},
+        h('span.exam-seal', { 'aria-hidden': 'true' }, '🎓'),
+        h('div', {},
+          h('p.eyebrow', {}, `${course.code} · Grade ${course.grade} · ${trackName(course.track)}`),
+          h('h3', {}, `End of Term ${course.term} Exam`),
+          h('p.muted', {}, `Section I: 19 multiple choice (38 marks). Section II: 13 written questions (62 marks). Built from your practice questions, covering every subtopic.`))),
+      chips('Paper version', VERSIONS.map((v) => ({ value: v, label: `Version ${v}` })), sel.version, (version) => update({ version })),
+      h('p.muted.small', {}, 'Each version is a fixed paper, so your whole class can sit the same one and compare.'),
+      h('div.start-row', {},
+        best ? h('span.exam-best', {}, `🏅 Best: ${best.best} / 100 · ${best.attempts} attempt${best.attempts === 1 ? '' : 's'}`) : h('span.muted.small', {}, 'No attempts yet.'),
+        h('button.btn.primary.lg', { onclick: () => go('exam', { courseId: course.id, version: sel.version }) }, `Open exam paper · V${sel.version}`)));
   }
 
   function allLessons(course) {
