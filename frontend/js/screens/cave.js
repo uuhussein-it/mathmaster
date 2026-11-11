@@ -114,7 +114,7 @@ export function renderCave(app) {
 
   mount(app,
     h('section.cave', {},
-      h('div.crumbs', {}, h('button.link', { onclick: () => go('hub') }, '← Hub'), h('span', {}, 'Cave of Equations')),
+      h('div.crumbs', {}, h('button.link', { onclick: () => go('games') }, '← Play'), h('span', {}, 'Cave of Equations')),
       h('div.cave-top', {},
         h('div', {},
           h('h1.display', {}, 'Cave of Equations'),

@@ -73,7 +73,7 @@ export function renderSat(app) {
 
     mount(app,
       h('section', {},
-        h('div.crumbs', {}, h('button.link', { onclick: () => go('hub') }, '← Hub'), h('span', {}, 'SAT Preparation')),
+        h('div.crumbs', {}, h('button.link', { onclick: () => go('learn') }, '← Learn'), h('span', {}, 'SAT Preparation')),
         h('h1.display', {}, 'SAT Preparation'),
         h('div.mode-grid', {},
           modeCard({

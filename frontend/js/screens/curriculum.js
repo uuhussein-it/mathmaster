@@ -93,7 +93,7 @@ export function renderCurriculum(app) {
 
     mount(app,
       h('section', {},
-        h('div.crumbs', {}, h('button.link', { onclick: () => go('hub') }, '← Hub'), h('span', {}, 'School Curriculum')),
+        h('div.crumbs', {}, h('button.link', { onclick: () => go('learn') }, '← Learn'), h('span', {}, 'School Curriculum')),
         h('h1.display', {}, 'School Curriculum'),
         h('div.panel.filters', {},
           !locked && chips('Grade', index.grades.map((g) => ({ value: g, label: `Grade ${g}` })), sel.grade, (grade) => update({ grade })),

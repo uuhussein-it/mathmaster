@@ -95,7 +95,7 @@ export function renderResults(app, r) {
           h('h3', {}, 'What next?'),
           h('button.btn.primary.lg', { onclick: () => r.config.restart() }, 'Play again'),
           h('button.btn.ghost', { onclick: () => go(r.config.origin) }, 'Change settings'),
-          h('button.btn.ghost', { onclick: () => go('hub') }, 'Back to hub'))),
+          h('button.btn.ghost', { onclick: () => go('hub') }, 'Back to Home'))),
 
       h('details.panel.review', { open: r.total <= 10 },
         h('summary', {}, `Review answers (${r.total})`),
