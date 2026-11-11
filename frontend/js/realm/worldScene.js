@@ -15,6 +15,7 @@ import {
   gateSprite, plotTile, signSprite, AURA, BANNER, CLASS_COLOR,
 } from './art.js';
 import { GRID, BUILDINGS, RESOURCES, INSIGHT, realm, isBuilding, pending, isFull } from './economy.js';
+import { sfx } from './sfx.js';
 
 const EMOJI = 'system-ui, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 const hex = (c) => parseInt(c.replace('#', ''), 16);
@@ -92,16 +93,21 @@ export function worldScene(Phaser, api, view) {
       this.drawPlots();
       this.drawHero();
       this.drawPointer();
+      this.drawLife();
       this.sync();
       this.time.addEvent({ delay: 1000, loop: true, callback: () => this.sync() });
 
       this.keys = this.input.keyboard.addKeys('UP,DOWN,LEFT,RIGHT,W,A,S,D');
-      this.input.keyboard.on('keydown-E', () => this.useNearest());
-      this.input.keyboard.on('keydown-SPACE', () => this.useNearest());
+      // While a question is open (or you're typing somewhere) the keys belong to the page, not the hero.
+      const blocked = () => api.busy?.() || ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+      this.blocked = blocked;
+      this.input.keyboard.on('keydown-E', () => { if (!blocked()) this.useNearest(); });
+      this.input.keyboard.on('keydown-SPACE', () => { if (!blocked() && document.activeElement?.tagName !== 'BUTTON') this.useNearest(); });
       this.input.on('pointerdown', (pointer, over) => {
         if (over.length) return; // a place handles its own tap
         const p = cam.getWorldPoint(pointer.x, pointer.y);
         this.walk(p.x, p.y);
+        this.markTarget();
       });
       this.events.emit('ready');
     }
@@ -157,7 +163,13 @@ export function worldScene(Phaser, api, view) {
       let seed = 11;
       const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
       const props = [];
+      // Spots that must stay clear: the road, the town, every shrine and every zone gate.
+      const keep = [...this.pos.values()].map((p) => ({ x: p.x, y: p.y + 4, r: 22 }));
+      this.zones.forEach((z, i) => {
+        if (i > 0) keep.push({ x: ZONE_X[z.id][0] * T - 4, y: (this.pos.get(z.nodes[0]?.key)?.y ?? 11 * T) + 2, r: 28 });
+      });
       const busy = (x, y) => this.roadPts.some((p) => Math.abs(p.x - x) < 16 && Math.abs(p.y - (y - 4)) < 16)
+        || keep.some((k) => Math.abs(k.x - x) < k.r && y > k.y - 14 && y < k.y + k.r + 14)
         || (x < 22 * T && y > 3 * T && y < 20 * T && x > 2 * T); // keep the town clear
       const ranges = { town: [0, 20], plains: [21, 33], forest: [34, 46], citadel: [47, 61] };
       for (const [zone, [a, b]] of Object.entries(ranges)) {
@@ -249,6 +261,7 @@ export function worldScene(Phaser, api, view) {
         }
       });
       // Topic shrines.
+      this.shrineTags = [];
       let num = 0;
       for (const z of this.zones) {
         for (const n of z.nodes) {
@@ -264,8 +277,10 @@ export function worldScene(Phaser, api, view) {
           if (state === 'open') this.tweens.add({ targets: disc, scale: 1.12, duration: 700, yoyo: true, repeat: -1 });
           this.place(`topic:${n.key}`, p.x, p.y + 10, node, null, { kind: 'topic', node: n, zone: z });
           if (open.has(z.id)) {
-            const short = n.name.length > 18 ? `${n.name.slice(0, 17)}…` : n.name;
-            label(this, p.x, p.y - 14, short, { size: 3.5, color: '#ffffff' }).setDepth(5000);
+            // One readable name at a time: the shrine you're standing near (see update()).
+            const short = n.name.length > 26 ? `${n.name.slice(0, 25)}…` : n.name;
+            const tag = label(this, p.x, p.y - 16, short, { size: 5, color: '#ffffff' }).setDepth(6500).setVisible(false);
+            this.shrineTags.push({ x: p.x, y: p.y, tag });
           }
         }
       }
@@ -306,6 +321,48 @@ export function worldScene(Phaser, api, view) {
       this.target = null;
     }
 
+    /** Butterflies over the meadows, fireflies in the forest, a walk marker and footstep dust. */
+    drawLife() {
+      this.critters = [];
+      let seed = 7;
+      const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+      const spawn = (x0, x1, n, kind) => {
+        for (let i = 0; i < n; i += 1) {
+          const x = (x0 + rnd() * (x1 - x0)) * T;
+          const y = 20 + rnd() * (WORLD.h - 40);
+          const color = kind === 'fly' ? 0xfff38a : [0xffffff, 0xffd34d, 0xff9ad5, 0x9ad8ff][i % 4];
+          const o = this.add.rectangle(x, y, kind === 'fly' ? 1.5 : 3, kind === 'fly' ? 1.5 : 2, color).setDepth(5200);
+          this.critters.push({ o, kind, bx: x, by: y, t: rnd() * 10, s: 0.6 + rnd() * 0.8 });
+        }
+      };
+      spawn(2, 33, 16, 'butterfly');
+      spawn(34, 46, 26, 'fly');
+      spawn(47, 61, 10, 'butterfly');
+      this.marker = this.add.ellipse(0, 0, 10, 5).setStrokeStyle(1, 0xffd34d).setDepth(1).setVisible(false);
+      this.prompt = label(this, 0, 0, 'E', { size: 5, color: '#ffd34d' }).setDepth(7500).setVisible(false);
+      this.stepT = 0;
+    }
+
+    markTarget() {
+      if (!this.target) return;
+      this.marker.setPosition(this.target.x, this.target.y).setScale(1.6).setAlpha(1).setVisible(true);
+      this.tweens.killTweensOf(this.marker);
+      this.tweens.add({ targets: this.marker, scale: 0.8, alpha: 0.4, duration: 500 });
+    }
+
+    lifeUpdate(dt) {
+      for (const c of this.critters) {
+        c.t += dt * c.s;
+        if (c.kind === 'fly') {
+          c.o.setPosition(c.bx + Math.sin(c.t * 0.7) * 18, c.by + Math.cos(c.t * 1.1) * 10);
+          c.o.setAlpha(0.35 + 0.65 * Math.max(0, Math.sin(c.t * 2.3)));
+        } else {
+          c.o.setPosition(c.bx + Math.sin(c.t * 0.5) * 30, c.by + Math.sin(c.t * 1.7) * 8);
+          c.o.setScale(Math.abs(Math.sin(c.t * 9)) * 0.8 + 0.4, 1); // flapping
+        }
+      }
+    }
+
     drawPointer() {
       this.arrow = label(this, 0, 0, '▼', { size: 9, color: '#ffd34d', font: EMOJI }).setDepth(7000).setVisible(false);
       this.tweens.add({ targets: this.arrow, y: '+=4', duration: 450, yoyo: true, repeat: -1 });
@@ -336,6 +393,7 @@ export function worldScene(Phaser, api, view) {
     visit(key) {
       const p = this.places.get(key);
       if (!p) return;
+      sfx('tap');
       api.open(p.target, key);
       this.selBox.setVisible(p.target.kind === 'plot');
       if (p.target.kind === 'plot') this.selBox.setPosition(plotCenter(p.target.x, p.target.y).x, plotCenter(p.target.x, p.target.y).y);
@@ -354,8 +412,9 @@ export function worldScene(Phaser, api, view) {
     update(_, dtMs) {
       const dt = dtMs / 1000;
       const k = this.keys;
-      let dx = (k.RIGHT.isDown || k.D.isDown) - (k.LEFT.isDown || k.A.isDown);
-      let dy = (k.DOWN.isDown || k.S.isDown) - (k.UP.isDown || k.W.isDown);
+      const keysOn = !this.blocked?.();
+      let dx = keysOn ? (k.RIGHT.isDown || k.D.isDown) - (k.LEFT.isDown || k.A.isDown) : 0;
+      let dy = keysOn ? (k.DOWN.isDown || k.S.isDown) - (k.UP.isDown || k.W.isDown) : 0;
       if (dx || dy) this.target = null;
       else if (this.target) {
         const vx = this.target.x - this.hero.x;
@@ -364,6 +423,7 @@ export function worldScene(Phaser, api, view) {
         if (d < 2) {
           const then = this.target.then;
           this.target = null;
+          this.marker.setVisible(false);
           then?.();
         } else {
           dx = vx / d;
@@ -373,10 +433,40 @@ export function worldScene(Phaser, api, view) {
       this.moving = !!(dx || dy);
       if (this.moving) {
         const len = Math.hypot(dx, dy) || 1;
+        const ox = this.hero.x;
+        const oy = this.hero.y;
         this.hero.x = Math.max(8, Math.min(this.limitX, this.hero.x + (dx / len) * SPEED * dt));
         this.hero.y = Math.max(26, Math.min(WORLD.h - 8, this.hero.y + (dy / len) * SPEED * dt));
         if (dx) this.hero.setFlipX(dx < 0);
+        // Pushing against the edge of the open map: stop instead of running on the spot.
+        if (Math.abs(this.hero.x - ox) + Math.abs(this.hero.y - oy) < 0.01) {
+          this.moving = false;
+          this.target = null;
+          this.marker.setVisible(false);
+        }
+        this.stepT += dt;
+        if (this.moving && this.stepT > 0.22) {
+          this.stepT = 0;
+          const d = this.add.rectangle(this.hero.x + (Math.random() - 0.5) * 4, this.hero.y + 1, 2, 2, 0xe8d9b0, 0.7).setDepth(this.hero.y);
+          this.tweens.add({ targets: d, y: d.y - 3, alpha: 0, duration: 400, onComplete: () => d.destroy() });
+        }
       }
+      if (!this.moving && !this.target) this.hero.setTexture(this.frames[0]);
+      this.lifeUpdate(dt);
+      // The nearest shrine shows its name; the nearest place shows an E.
+      let near = null;
+      for (const st of this.shrineTags) {
+        const d = Math.hypot(st.x - this.hero.x, st.y - this.hero.y);
+        if (d < 70 && (!near || d < near.d)) near = { st, d };
+      }
+      for (const st of this.shrineTags) st.tag.setVisible(st === near?.st);
+      let use = null;
+      for (const [, p] of this.places) {
+        const d = Math.hypot(p.x - this.hero.x, p.y - this.hero.y);
+        if (d < 26 && (!use || d < use.d)) use = { p, d };
+      }
+      this.prompt.setVisible(!!use && !this.moving);
+      if (use) this.prompt.setPosition(this.hero.x + 11, this.hero.y - 18);
       this.hero.setDepth(this.hero.y + 2);
       this.aura?.setPosition(this.hero.x, this.hero.y - 6).setDepth(this.hero.y + 1);
     }

@@ -941,7 +941,7 @@ html.realm-locked, html.realm-locked body { overflow: hidden; }
 .realm-fs.full .realm-stage-wrap { position: absolute; inset: 0; }
 .realm-fs.full .realm-stage { width: 100%; height: 100%; aspect-ratio: auto !important; border: 0; border-radius: 0; box-shadow: none; }
 .realm-fs.full .realm-fs-btn { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); }
-.realm-fs.full .realm-guide { position: absolute; z-index: 3; top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: calc(max(10px, env(safe-area-inset-right)) + 92px); max-width: 720px; margin: 0; padding: 6px 10px; gap: 8px; flex-wrap: nowrap; font-size: 14px; background: rgba(21, 16, 40, 0.88); backdrop-filter: blur(4px); }
+.realm-fs.full .realm-guide { position: absolute; z-index: 3; top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); right: calc(max(10px, env(safe-area-inset-right)) + 200px); max-width: 720px; margin: 0; padding: 6px 10px; gap: 8px; flex-wrap: nowrap; font-size: 14px; background: rgba(21, 16, 40, 0.88); backdrop-filter: blur(4px); }
 .realm-fs.full .realm-guide > span:nth-child(2) { min-width: 0; }
 .realm-fs.full .realm-guide-icon { font-size: 16px; }
 .realm-dock { position: absolute; z-index: 3; left: max(8px, env(safe-area-inset-left)); right: max(8px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); display: grid; gap: 8px; pointer-events: none; }
@@ -986,7 +986,7 @@ html.realm-locked, html.realm-locked body { overflow: hidden; }
 .cave-stage { aspect-ratio: 16 / 9; touch-action: none; }
 .cave-stage canvas { display: block; width: 100% !important; height: auto !important; image-rendering: pixelated; }
 .cave-loading { display: grid; place-items: center; height: 100%; margin: 0; color: var(--muted); font: 10px var(--pix); }
-.cave-hud { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 110px 6px 10px; background: linear-gradient(rgba(7, 5, 13, 0.85), rgba(7, 5, 13, 0)); font: 9px/1.4 var(--pix); color: #fff; pointer-events: none; }
+.cave-hud { position: absolute; top: 0; left: 0; right: 0; z-index: 3; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 6px 196px 6px 10px; background: linear-gradient(rgba(7, 5, 13, 0.85), rgba(7, 5, 13, 0)); font: 9px/1.4 var(--pix); color: #fff; pointer-events: none; }
 .cave-hearts { display: flex; gap: 3px; }
 .cave-xp { display: flex; align-items: center; gap: 6px; color: #8fe6ff; }
 .cave-xp-bar { width: 70px; height: 7px; border: 1px solid #8fe6ff; background: #0b1430; }
@@ -1014,7 +1014,7 @@ html.realm-locked, html.realm-locked body { overflow: hidden; }
 .cave-pad.down { background: #2d2690; border-color: #ffd34d; }
 @media (pointer: coarse) { .cave-controls { display: flex; } }
 .cave-rotate { display: none; margin: 8px 0 0; color: var(--muted); font-size: 14px; }
-@media (max-width: 700px) and (orientation: portrait) { .cave-rotate { display: block; } .cave-hud { font-size: 7px; gap: 8px; padding-right: 96px; } .cave-xp-bar { width: 40px; } }
+@media (max-width: 700px) and (orientation: portrait) { .cave-rotate { display: block; } .cave-hud { font-size: 7px; gap: 8px; padding-right: 186px; } .cave-xp-bar { width: 40px; } }
 .cave-info { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 14px; margin-top: 16px; }
 .cave-help ul { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 6px; }
 .cave-hero-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -1038,3 +1038,20 @@ html.realm-locked, html.realm-locked body { overflow: hidden; }
   .cave-pad.small { width: 42px; height: 42px; font-size: 7px; }
   .cave-pad.big { width: 56px; height: 56px; font-size: 9px; }
 }
+
+/* ---------- Cave polish: sound, stars ---------- */
+.cave-chip-stars { margin-left: 6px; color: #ffd34d; letter-spacing: 1px; font-size: 12px; }
+.cave-stars { display: flex; justify-content: center; gap: 10px; margin: 6px 0 4px; font-size: 40px; line-height: 1; }
+.cave-stars span { color: #3a3360; text-shadow: 0 2px 0 #0b0820; transform: scale(0.4); opacity: 0; animation: cave-star 0.45s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+.cave-stars span.on { color: #ffd34d; text-shadow: 0 0 14px rgba(255, 211, 77, 0.8), 0 2px 0 #8a5a12; }
+@keyframes cave-star { to { transform: scale(1); opacity: 1; } }
+.cave-stats { list-style: none; padding: 0; margin: 6px auto 10px; display: grid; gap: 4px; font-size: 14px; max-width: 320px; text-align: left; }
+.cave-stats li { padding: 4px 10px; border-radius: 4px; background: rgba(255, 255, 255, 0.05); }
+.cave-stats li.ok { background: rgba(125, 220, 122, 0.16); color: #c8f5c6; }
+@media (prefers-reduced-motion: reduce) { .cave-stars span { animation: none; transform: none; opacity: 1; } }
+
+/* Sound + full-screen buttons share the top-right corner of both games. */
+.game-corner { position: absolute; top: 8px; right: 8px; z-index: 4; display: flex; gap: 6px; align-items: stretch; }
+.game-corner .realm-fs-btn, .game-corner .cave-fs-btn { position: static; }
+.realm-fs.full .game-corner { top: max(10px, env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); }
+.realm-sound-btn, .cave-sound-btn { width: 36px; min-height: 30px; padding: 0; border: 2px solid #1a1426; border-radius: 4px; background: rgba(21, 18, 74, 0.85); font-size: 14px; cursor: pointer; box-shadow: 0 0 0 2px #e6c06a66; }

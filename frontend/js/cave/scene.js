@@ -12,6 +12,7 @@
  *   api.shop()          the merchant was asked to trade
  *   api.carpet()        -> true if a carpet was used up
  *   api.hud(info)       progress for the top bar
+ *   api.stomp()         an enemy was stomped (bonus coins)
  *   api.cleared()       the way out was reached
  *   api.introDone()     the intro finished or was skipped
  *   api.skin, api.doubleJump, api.touch {left, right, up, down, jump, act, carpet}
@@ -19,6 +20,7 @@
 import { tex, label } from '../realm/phaser.js';
 import * as art from './art.js';
 import { STAGES, ROWS } from './levels.js';
+import { sfx } from '../realm/sfx.js';
 
 export const VIEW = { width: 320, height: 180, zoom: 3 };
 // Things fixed to the screen (scroll factor 0) are zoomed about the canvas
@@ -32,6 +34,9 @@ const JUMP = 255;
 const DOOR_SECONDS = 30;
 const BOSS_SHIELDS = 5;
 const CARPET_MS = 6000;
+const COYOTE_MS = 100;    // you can still jump just after running off an edge
+const BUFFER_MS = 130;    // a jump pressed just before landing still counts
+const STOMP_BOUNCE = 210;
 
 function frames(scene, key, list) {
   list.forEach((c, i) => tex(scene, `${key}-${i}`, () => c));
@@ -157,6 +162,7 @@ export function introScene(Phaser, api) {
           targets: slab, y: 70, duration: 260, ease: 'Quad.easeIn',
           onComplete: () => {
             cam.shake(500, 0.02);
+            sfx('boom');
             label(this, VIEW.width / 2, 70, 'BOOM!', { size: 12, color: '#ffd34d' }).setDepth(2);
             this.time.delayedCall(900, () => this.voice());
           },
@@ -218,6 +224,7 @@ export function levelScene(Phaser, api) {
       Object.assign(this, {
         done: false, over: false, held: false, boss: null, bossStarted: false, bossGate: null,
         bossAt: null, rune: null, exitAt: null, exit: null, hurtUntil: 0, carpetUntil: 0, lastTouch: {},
+        coyoteUntil: 0, bufferUntil: 0, graceUntil: 0, wasOnFloor: false, coinsGot: 0, coinsTotal: 0, hurts: 0, stomps: 0,
       });
     }
 
@@ -264,6 +271,7 @@ export function levelScene(Phaser, api) {
       this.heroKey = heroAnims(this, api.skin);
 
       this.solids = this.physics.add.staticGroup();
+      this.ledges = this.physics.add.staticGroup(); // one-way: jump up through them, land on top
       this.lavas = this.physics.add.staticGroup();
       this.spikes = this.physics.add.staticGroup();
       this.coins = this.physics.add.staticGroup();
@@ -289,7 +297,7 @@ export function levelScene(Phaser, api) {
             const top = at(x, y - 1) !== '#';
             this.solids.create(cx, cy, `rock${stage}-${top ? 't' : ''}${(x * 7 + y * 3) % 3}`);
           } else if (ch === '=') {
-            this.solids.create(cx, y * T + 4, `ledge${stage}`);
+            this.ledges.create(cx, y * T + 4, `ledge${stage}`);
           } else if (ch === 'L') {
             if (at(x, y - 1) === 'L') { this.add.image(cx, cy, 'lava-deep'); continue; } // only the surface hurts
             this.lavas.create(cx, cy, 'lava-0').play('lava').setSize(16, 10).setOffset(0, 6);
@@ -299,6 +307,7 @@ export function levelScene(Phaser, api) {
             s.setSize(12, 8).setOffset(2, 8);
           } else if (ch === 'c') {
             this.coins.create(cx, cy, 'coin-0').play('coin').setSize(8, 8);
+            this.coinsTotal += 1;
           } else if (ch === 'h') {
             this.pickups.create(cx, cy, 'heart').setData('kind', 'heart');
           } else if (ch === 'b') {
@@ -361,19 +370,28 @@ export function levelScene(Phaser, api) {
       cam.startFollow(this.player, true, 0.15, 0.15);
 
       this.physics.add.collider(this.player, this.solids);
+      this.physics.add.collider(this.player, this.ledges, null, (pl, ledge) => pl.body.velocity.y >= 0 && pl.body.bottom <= ledge.body.top + 6);
       this.physics.add.collider(this.player, this.doorsGroup);
       this.physics.add.overlap(this.player, this.lavas, () => this.fall());
       this.physics.add.overlap(this.player, this.spikes, (_, s) => { if (s.getData('up')) this.hurt('spikes'); });
-      this.physics.add.overlap(this.player, this.enemies, () => this.hurt('enemy'));
+      this.physics.add.overlap(this.player, this.enemies, (pl, e) => {
+        // Land on an enemy from above to stomp it; touch it any other way and it hurts.
+        if (pl.body.velocity.y > 20 && pl.body.bottom <= e.body.top + 8) this.stomp(e);
+        else this.hurt('enemy');
+      });
       this.physics.add.overlap(this.player, this.orbs, (_, o) => { o.destroy(); this.hurt('magic'); });
       this.physics.add.overlap(this.player, this.coins, (_, c) => {
         c.destroy();
+        this.coinsGot += 1;
         api.coin();
+        sfx('coin');
+        this.sparkle(c.x, c.y, 0xffd34d, 6);
         this.pop(c.x, c.y, '+1', '#ffd34d');
       });
       this.physics.add.overlap(this.player, this.pickups, (_, p) => {
         p.destroy();
         api.heal();
+        sfx('right');
         this.pop(p.x, p.y, '+1 HEART', '#ff4d6d');
       });
       if (this.exitAt) this.makeExit();
@@ -415,7 +433,48 @@ export function levelScene(Phaser, api) {
 
     hold(on) {
       this.held = on;
-      if (on) this.physics.world.pause(); else this.physics.world.resume();
+      // While a dialog is open the page needs Enter/Space for its buttons, so stop capturing keys.
+      if (on) { this.physics.world.pause(); this.input.keyboard?.disableGlobalCapture(); return; }
+      this.physics.world.resume();
+      this.input.keyboard?.enableGlobalCapture();
+      // Keys pressed while a question or the shop was open (Enter to continue,
+      // Space, E) must not jump or re-open the gate the moment play resumes.
+      Object.values(this.keys || {}).forEach((k) => k.reset());
+      this.input.keyboard?.resetKeys?.();
+      this.lastTouch = { ...api.touch };
+      this.bufferUntil = 0;
+      // Phaser reads key events a moment later, so also ignore presses for a short grace time.
+      this.graceUntil = this.time.now + 300;
+      if (this.boss) this.boss.nextShot = Math.max(this.boss.nextShot, this.time.now + 1500);
+    }
+
+    sparkle(x, y, color, n = 8, dist = 12) {
+      for (let i = 0; i < n; i += 1) {
+        const s = this.add.rectangle(x, y, 2, 2, color).setDepth(11);
+        const a = (i / n) * Math.PI * 2 + Math.random() * 0.4;
+        this.tweens.add({ targets: s, x: x + Math.cos(a) * dist, y: y + Math.sin(a) * dist, alpha: 0, duration: 380 + Math.random() * 200, onComplete: () => s.destroy() });
+      }
+    }
+
+    dust(x, y, n = 4) {
+      for (let i = 0; i < n; i += 1) {
+        const d = this.add.rectangle(x + (Math.random() - 0.5) * 8, y, 2, 2, 0xd8c8a8, 0.8).setDepth(4);
+        this.tweens.add({ targets: d, x: d.x + (Math.random() - 0.5) * 16, y: y - 3 - Math.random() * 5, alpha: 0, duration: 320 + Math.random() * 160, onComplete: () => d.destroy() });
+      }
+    }
+
+    stomp(e) {
+      if (!e.active || this.over) return;
+      const p = this.player;
+      p.setVelocityY(-STOMP_BOUNCE);
+      this.jumps = 1; // a stomp gives the double jump back
+      this.stomps += 1;
+      sfx('stomp');
+      this.sparkle(e.x, e.y, 0xffffff, 10, 14);
+      this.pop(e.x, e.y - 6, 'STOMP! +3', '#7ddc7a');
+      api.stomp?.();
+      e.disableBody(true, false);
+      this.tweens.add({ targets: e, scaleY: 0.2, alpha: 0, y: e.y + 4, duration: 260, onComplete: () => e.destroy() });
     }
 
     report() {
@@ -426,12 +485,16 @@ export function levelScene(Phaser, api) {
         doorsTotal: this.doors.length,
         shields: this.boss ? this.boss.shields : null,
         carpet: this.carpetUntil > this.time.now ? Math.ceil((this.carpetUntil - this.time.now) / 1000) : 0,
+        coins: this.coinsGot,
+        coinsTotal: this.coinsTotal,
       });
     }
 
     hurt(why) {
       if (this.over || this.held || this.time.now < this.hurtUntil) return;
       this.hurtUntil = this.time.now + 1300;
+      this.hurts += 1;
+      sfx('hurt');
       this.cameras.main.shake(160, 0.006);
       const left = api.hurt(why);
       if (left <= 0) { this.over = true; return; }
@@ -476,6 +539,8 @@ export function levelScene(Phaser, api) {
           plank.setAlpha(0);
           this.tweens.add({ targets: plank, alpha: 1, duration: 200 });
         }));
+        sfx('bridge');
+        this.sparkle(g.x, g.y, 0x7ddc7a, 12, 18);
         this.pop(g.x, g.y - 16, 'BRIDGE!', '#7ddc7a');
       } else if (place.kind === 'door') {
         const d = place.door;
@@ -484,6 +549,7 @@ export function levelScene(Phaser, api) {
         if (!ok) { d.left = Math.max(5, d.left - 10); this.pop(d.x, d.y - 30, '-10s', '#ff4d4d'); return; }
         d.open = true;
         d.label.setText('');
+        sfx('open');
         this.tweens.add({ targets: d.sprite, y: d.y - 30, alpha: 0, duration: 500, onComplete: () => { d.sprite.disableBody(true, true); } });
       } else if (place.kind === 'spell') {
         const ok = await api.ask('spell');
@@ -532,6 +598,7 @@ export function levelScene(Phaser, api) {
       const b = this.boss;
       const p = this.player;
       const bolt = this.add.circle(p.x, p.y - 6, 5, 0xffd34d).setDepth(9);
+      sfx('blast');
       this.tweens.add({
         targets: bolt, x: b.sprite.x, y: b.sprite.y, duration: 380, ease: 'Quad.easeIn',
         onComplete: () => {
@@ -559,6 +626,7 @@ export function levelScene(Phaser, api) {
       b.dead = true;
       this.tweens.add({ targets: b.sprite, alpha: 0, angle: 20, y: b.sprite.y + 30, duration: 1600 });
       this.cameras.main.flash(500, 255, 230, 120);
+      sfx('win');
       this.pop(b.sprite.x, b.sprite.y - 40, 'ZARKAN IS DEFEATED!', '#ffd34d');
       for (let i = 0; i < 10; i += 1) {
         const c = this.coins.create(b.sprite.x - 60 + i * 12, 8 * T, 'coin-0').play('coin');
@@ -585,6 +653,7 @@ export function levelScene(Phaser, api) {
       if (this.time.now > b.nextShot) {
         b.nextShot = this.time.now + Math.max(1300, 2600 - (BOSS_SHIELDS - b.shields) * 250);
         const o = this.orbs.create(x, y + 10, 'orb');
+        sfx('orb');
         const a = Math.atan2(this.player.y - (y + 10), this.player.x - x);
         const speed = 75 + (BOSS_SHIELDS - b.shields) * 8;
         o.setVelocity(Math.cos(a) * speed, Math.sin(a) * speed);
@@ -597,7 +666,8 @@ export function levelScene(Phaser, api) {
       if (this.over || this.done) return;
       this.done = true;
       this.hold(true);
-      api.cleared();
+      sfx('win');
+      api.cleared({ coins: this.coinsGot, coinsTotal: this.coinsTotal, hurts: this.hurts, stomps: this.stomps });
     }
 
     // ------------------------------------------------------------- the loop
@@ -613,18 +683,24 @@ export function levelScene(Phaser, api) {
       const right = k.RIGHT.isDown || k.D.isDown || t.right;
       const upHeld = k.UP.isDown || k.W.isDown || t.up || k.SPACE.isDown || t.jump;
       const downHeld = k.DOWN.isDown || k.S.isDown || t.down;
-      const jumpPressed = Phaser.Input.Keyboard.JustDown(k.SPACE) || Phaser.Input.Keyboard.JustDown(k.UP) || Phaser.Input.Keyboard.JustDown(k.W) || edge('jump', t.jump);
-      const actPressed = Phaser.Input.Keyboard.JustDown(k.E) || Phaser.Input.Keyboard.JustDown(k.ENTER) || edge('act', t.act);
-      const carpetPressed = Phaser.Input.Keyboard.JustDown(k.C) || edge('carpet', t.carpet);
+      let jumpPressed = Phaser.Input.Keyboard.JustDown(k.SPACE) || Phaser.Input.Keyboard.JustDown(k.UP) || Phaser.Input.Keyboard.JustDown(k.W) || edge('jump', t.jump);
+      let actPressed = Phaser.Input.Keyboard.JustDown(k.E) || Phaser.Input.Keyboard.JustDown(k.ENTER) || edge('act', t.act);
+      let carpetPressed = Phaser.Input.Keyboard.JustDown(k.C) || edge('carpet', t.carpet);
+      if (this.time.now < (this.graceUntil || 0)) { jumpPressed = false; actPressed = false; carpetPressed = false; }
 
       const flying = this.carpetUntil > this.time.now;
       p.setVelocityX(left ? -SPEED : right ? SPEED : 0);
       if (left) p.setFlipX(true); else if (right) p.setFlipX(false);
       const onFloor = p.body.blocked.down;
+      const now = this.time.now;
       if (onFloor) {
         this.jumps = 0;
+        this.coyoteUntil = now + COYOTE_MS;
         this.safe = { x: p.x, y: p.y };
+        if (!this.wasOnFloor) this.dust(p.x, p.body.bottom, 5);
       }
+      this.wasOnFloor = onFloor;
+      if (jumpPressed) this.bufferUntil = now + BUFFER_MS;
       if (flying) {
         p.setVelocityY(upHeld ? -SPEED : downHeld ? SPEED : 0);
         this.carpet.setVisible(true).setPosition(p.x, p.y + 13);
@@ -634,12 +710,26 @@ export function levelScene(Phaser, api) {
           p.body.setAllowGravity(true);
           this.report();
         }
-        if (jumpPressed && (onFloor || (api.doubleJump && this.jumps < 2))) {
-          this.jumps = onFloor ? 1 : 2;
+        const grounded = onFloor || now < this.coyoteUntil;
+        if (this.bufferUntil > now && grounded && this.jumps === 0) {
+          this.jumps = 1;
+          this.bufferUntil = 0;
+          this.coyoteUntil = 0;
           p.setVelocityY(-JUMP);
+          sfx('jump');
+          this.dust(p.x, p.body.bottom, 3);
+        } else if (jumpPressed && !grounded && api.doubleJump && this.jumps < 2) {
+          this.jumps = 2;
+          this.bufferUntil = 0;
+          p.setVelocityY(-JUMP * 0.92);
+          sfx('jump');
+          this.sparkle(p.x, p.body.bottom, 0x8fe6ff, 6, 8);
         }
+        // Let go of jump early for a short hop.
+        if (!upHeld && p.body.velocity.y < -90) p.setVelocityY(p.body.velocity.y * 0.85);
       }
       if (carpetPressed && !flying && api.carpet()) {
+        sfx('carpet');
         this.carpetUntil = this.time.now + CARPET_MS;
         p.body.setAllowGravity(false);
         p.setVelocityY(-40);
@@ -671,6 +761,8 @@ export function levelScene(Phaser, api) {
           tc.lit = true;
           tc.sprite.play('torch-on');
           this.checkpoint = { x: tc.x, y: tc.y };
+          sfx('checkpoint');
+          this.sparkle(tc.x, tc.y - 8, 0xffa63d, 10, 14);
           this.pop(tc.x, tc.y - 14, 'CHECKPOINT', '#ffd34d');
         }
       });
