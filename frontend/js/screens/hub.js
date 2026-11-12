@@ -1,139 +1,165 @@
 /**
- * Main hub: what to play first (course, SAT, the Realm), then the two learning
- * paths, then the group (who's here, leaderboard), hero banner and stats.
+ * Home: a short greeting, the "Today" card (the next few things worth doing,
+ * worked out from the student's own progress), shortcuts to Learn and Play,
+ * and the top of the class leaderboard. Everything else lives on its own page
+ * (Learn, Play, Leaderboard, Me) in the main menu.
  */
-import { h, mount, kpi, prefs } from '../ui.js';
+import { h, mount, prefs } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
-import { profile, resetProfile } from '../state.js';
+import { profile } from '../state.js';
 import { go } from '../router.js';
-import { account, loadGroup, logout } from '../account.js';
-import { openFeedback } from '../feedback.js';
-import { avatar, boardList } from './controls.js';
+import { account, loadGroup } from '../account.js';
+import { loadCurriculumIndex } from '../data.js';
+import { avatar } from './controls.js';
+import * as missions from '../realm/missions.js';
 
 const REFRESH_MS = 30_000;
+
+/** Morning, afternoon or evening, in the student's own time. */
+function greeting() {
+  const hr = new Date().getHours();
+  return hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
+}
+
+/** The student's own Term 1 course, if the bank has one. */
+export async function myCourse() {
+  const me = account.student;
+  const index = await loadCurriculumIndex();
+  const mine = index.courses.filter((c) => c.grade === me?.grade && c.track === me?.track);
+  return mine.sort((a, b) => b.term - a.term)[0] || null;
+}
+
+/** Open School Curriculum on the student's course, optionally in a given mode. */
+export function openCurriculum(mode) {
+  const me = account.student;
+  prefs.set('curriculum', { ...prefs.get('curriculum', {}), grade: me.grade, track: me.track, ...(mode ? { mode } : {}) });
+  go('curriculum');
+}
+
+/** Weakest topic with enough answers to judge (below 75%). */
+function weakestTopic() {
+  return Object.entries(profile.topics || {})
+    .map(([key, t]) => ({ key, ...t, pct: t.seen ? Math.round((t.correct / t.seen) * 100) : 100 }))
+    .filter((t) => t.seen >= 3 && t.pct < 75)
+    .sort((a, b) => a.pct - b.pct)[0] || null;
+}
 
 export function renderHub(app) {
   const hero = CHARACTERS[profile.character];
   const me = account.student;
-  const lobby = h('section.lobby.panel.group-board', { 'aria-label': 'Your group' }, h('p.muted', {}, 'Loading your group…'));
+  const today = h('ul.today-list');
+  const board = h('div.home-board', {}, h('p.muted', {}, 'Loading your class…'));
 
-  function playCourse() {
-    prefs.set('curriculum', { ...prefs.get('curriculum', {}), grade: me.grade, track: me.track });
-    go('curriculum');
+  const row = ({ icon, title, text, cta, onclick, done = false }) => h('li.today-item', { class: done ? 'done' : '' },
+    h('span.today-icon', { 'aria-hidden': 'true' }, done ? '✅' : icon),
+    h('div.today-text', {}, h('b', {}, title), text && h('small', {}, text)),
+    cta && h('button.btn.sm', { class: done ? 'ghost' : 'primary', onclick }, cta));
+
+  async function drawToday() {
+    const items = [];
+
+    // 1. Daily missions in the Realm.
+    try {
+      const list = missions.daily();
+      const finished = list.filter((m) => m.complete).length;
+      const unclaimed = list.filter((m) => m.complete && !m.claimed).length;
+      const next = list.find((m) => !m.complete);
+      items.push(row({
+        icon: '📜',
+        title: unclaimed ? `${unclaimed} mission reward${unclaimed === 1 ? '' : 's'} to claim` : `Daily missions: ${finished} of ${list.length} done`,
+        text: unclaimed ? 'Collect them in the Realm.' : next ? `Next: ${next.text} (${next.progress}/${next.goal})` : 'All done for today. Come back tomorrow!',
+        cta: unclaimed ? 'Claim' : next ? 'Go' : null,
+        onclick: () => go('realm'),
+        done: !unclaimed && !next,
+      }));
+    } catch { /* the realm isn't set up yet: skip */ }
+
+    // 2. The weakest topic.
+    const weak = weakestTopic();
+    items.push(weak
+      ? row({
+        icon: '🎯', title: `Practise “${weak.name}”`, text: `Your weakest topic right now: ${weak.pct}% right.`,
+        cta: 'Practise', onclick: () => (weak.key.startsWith('sat:') ? go('sat') : openCurriculum('practice')),
+      })
+      : row({
+        icon: '📘', title: 'Practise your course', text: 'Answer a few questions to find your strong and weak topics.',
+        cta: 'Start', onclick: () => openCurriculum('practice'),
+      }));
+
+    // 3. The Final Exam for their course.
+    const course = await myCourse().catch(() => null);
+    if (course) {
+      const best = profile.exams?.[course.code];
+      items.push(row({
+        icon: '🎓',
+        title: best ? `Final Exam: beat your best of ${best.best}/100` : `Try the ${course.code} Final Exam practice`,
+        text: best ? `${best.attempts} attempt${best.attempts === 1 ? '' : 's'} so far. Three versions to try.` : 'A full End of Term paper: 100 marks, 2 hours.',
+        cta: 'Open', onclick: () => openCurriculum('exam'),
+      }));
+    }
+
+    // 4. The Cave.
+    const cave = profile.cave || {};
+    const cleared = cave.cleared || [];
+    const stars = cave.stars || {};
+    const nextStage = [1, 2, 3].find((n) => !cleared.includes(n));
+    const polish = [1, 2, 3].find((n) => cleared.includes(n) && (stars[n] || 0) < 3);
+    if (nextStage || polish) {
+      items.push(row({
+        icon: '🪔',
+        title: nextStage ? `Cave of Equations: Stage ${nextStage} is waiting` : `Get 3 stars on Cave Stage ${polish}`,
+        text: nextStage ? 'Help Aladdin escape by answering at the gates.' : `You have ${stars[polish] || 0} of 3 stars there.`,
+        cta: 'Play', onclick: () => go('cave'),
+      }));
+    }
+    today.replaceChildren(...items);
   }
 
-  async function refresh() {
+  async function drawBoard() {
     try {
-      drawLobby(await loadGroup(me.group.id));
+      const g = await loadGroup(me.group.id);
+      const top = g.leaderboard.slice(0, 3);
+      const mine = g.leaderboard.find((m) => m.id === me.id);
+      board.replaceChildren(
+        top.length ? h('ol.board.compact', {}, top.map((m) => h('li', { class: m.id === me.id ? 'me' : '' },
+          h('span.board-rank', {}, ['🥇', '🥈', '🥉'][m.rank - 1]),
+          avatar(m),
+          h('span.board-name', {}, m.id === me.id ? 'You' : m.name),
+          h('span.board-score', {}, m.score.toLocaleString())))) : h('p.muted', {}, 'Answer questions to put your class on the board.'),
+        h('p.muted.small', {}, mine && mine.rank > 3 ? `You're #${mine.rank} of ${g.leaderboard.length}. ` : '',
+          h('span.online-dot', { 'aria-hidden': 'true' }), ` ${g.online} online now`));
     } catch {
-      lobby.replaceChildren(h('p.muted', {}, 'Your group couldn’t load. Check your connection.'));
+      board.replaceChildren(h('p.muted', {}, 'Your class couldn’t load. Check your connection.'));
     }
   }
 
-  // Top: what to play. The group (who's online, leaderboard) comes after the paths.
-  const actions = h('section.lobby.panel', { 'aria-label': 'Play' },
-    h('div.lobby-head', {},
-      h('div', {},
-        h('p.eyebrow', {}, 'Your group'),
-        h('h2', {}, me.group?.name || 'Your group'),
-        h('p.muted', {}, 'Practice or quiz your course, or train for the SAT.')),
-      h('div.lobby-actions', {},
-        h('button.btn.primary', { onclick: playCourse }, '⚔️ Play my course'),
-        h('button.btn', { onclick: () => go('sat') }, '🎯 SAT practice'),
-        h('button.btn', { onclick: () => go('realm') }, '🏰 Realm'),
-        h('button.btn', { onclick: () => go('cave') }, '🪔 Cave'),
-        h('button.btn.ghost.sm', { onclick: () => go('level') }, 'Change level'))));
-
-  function drawLobby(g) {
-    const online = g.members.filter((m) => m.online);
-    lobby.replaceChildren(
-      h('div.lobby-head', {},
-        h('div', {},
-          h('h3', {}, '🏆 Leaderboard'),
-          h('p.muted', {}, `${g.members.length} ${g.members.length === 1 ? 'student' : 'students'} · `,
-            h('span.online-dot', { 'aria-hidden': 'true' }), ` ${online.length} online now`))),
-      h('div.lobby-members', { 'aria-label': 'Students online' },
-        online.slice(0, 24).map((m) => h('div.member', {}, avatar(m), h('span', {}, m.id === me.id ? 'You' : m.name))),
-        online.length === 0 && h('p.muted', {}, 'No one else is online right now.')),
-      boardList(g));
-  }
-
-  const path = ({ id, eyebrow, title, text, bullets, icon, onclick }) =>
-    h(`button.path-card.${id}`, { type: 'button', onclick },
-      h('span.path-icon', { 'aria-hidden': 'true' }, icon),
-      h('span.eyebrow', {}, eyebrow),
-      h('h2', {}, title),
-      h('p', {}, text),
-      h('ul', {}, bullets.map((b) => h('li', {}, b))),
-      h('span.path-cta', {}, 'Enter ', h('span', { 'aria-hidden': 'true' }, '→')));
+  const tile = (icon, title, text, route, cls) => h(`button.home-tile.${cls}`, { type: 'button', onclick: () => go(route) },
+    h('span.home-tile-icon', { 'aria-hidden': 'true' }, icon),
+    h('span', {}, h('b', {}, title), h('small', {}, text)),
+    h('span.home-tile-go', { 'aria-hidden': 'true' }, '→'));
 
   mount(app,
-    h('section.hub', {},
-      actions,
-      h('h2.section-title', {}, 'Choose your path'),
-      h('div.paths', {},
-        path({
-          id: 'school', icon: '📘', eyebrow: 'Path A', title: 'School Curriculum',
-          text: 'Grades 9–12 practice built from your course topics.',
-          bullets: ['ASP, Advanced and General tracks', 'Terms 1–3', 'Practice or timed Quiz mode'],
-          onclick: () => go('curriculum'),
-        }),
-        path({
-          id: 'sat', icon: '🎯', eyebrow: 'Path B', title: 'SAT Preparation',
-          text: 'Full section simulations and focused topic drills.',
-          bullets: ['Timed SAT Simulator with scaled score', 'Math and Reading & Writing topics', 'Review every answer'],
-          onclick: () => go('sat'),
-        }),
-        path({
-          id: 'realm', icon: '🏰', eyebrow: 'Path C', title: 'The Realm',
-          text: 'One pixel world: walk your town, build it up and travel the road of your topics.',
-          bullets: ['Daily missions with rewards', 'Build farms and mines, shop for your hero', 'Open new zones by mastering topics, beat bosses with your class'],
-          onclick: () => go('realm'),
-        }),
-        path({
-          id: 'cave', icon: '🪔', eyebrow: 'Path D', title: 'Cave of Equations',
-          text: 'A retro platformer: help Aladdin escape the cave by solving what blocks his way.',
-          bullets: ['Stage 1–3 follow Terms 1–3, then an SAT boss', 'Number Gates, sand-timer doors, coins and a merchant', 'Defeat the sorcerer Zarkan with Number Spells'],
-          onclick: () => go('cave'),
-        })),
+    h('section.home', {},
+      h('div.home-hello', {},
+        h('img.home-portrait', { src: hero.portrait, alt: '' }),
+        h('div', {},
+          h('p.eyebrow', {}, me.group?.name || ''),
+          h('h1.display', {}, `${greeting()}, ${profile.name}!`),
+          h('p.muted', {}, profile.streak >= 3 ? `🔥 ${profile.streak} right answers in a row. Keep it going!` : 'Here’s what to do today.'))),
 
-      lobby,
+      h('div.home-grid', {},
+        h('section.panel.today', { 'aria-label': 'Today' },
+          h('h2', {}, '☀️ Today'),
+          today),
+        h('div.home-side', {},
+          tile('📘', 'Learn', 'Your course, Final Exam practice and the SAT', 'learn', 'learn'),
+          tile('🎮', 'Play', 'The Realm and the Cave of Equations', 'games', 'play'),
+          h('section.panel.home-class', {},
+            h('div.home-class-head', {}, h('h3', {}, '🏆 Your class'), h('button.link', { onclick: () => go('leaderboard') }, 'Full leaderboard →')),
+            board)))));
 
-      h('div.hub-banner', {},
-        h('img.hub-banner-art', { src: hero.image, alt: '' }),
-        h('div.hub-banner-text', {},
-          h('p.eyebrow', {}, `${hero.name} · ${hero.title}`),
-          h('h1.display', {}, `Ready, ${profile.name}?`),
-          h('p', {}, `${hero.passive.name}: ${hero.passive.text}`),
-          h('div.kpis', {},
-            kpi('Level', profile.level),
-            kpi('Total XP', profile.totalXp.toLocaleString()),
-            kpi('Accuracy', profile.answered ? `${Math.round((profile.correct / profile.answered) * 100)}%` : '—'),
-            kpi('Best streak', profile.bestStreak)))),
-
-      profile.history.length > 0 && h('div.panel.history', {},
-        h('h3', {}, 'Recent quests'),
-        h('ul', {}, profile.history.slice(0, 5).map((s) =>
-          h('li', {},
-            h('span.history-mode', {}, s.modeLabel),
-            h('span.history-title', {}, s.title),
-            h('span.history-score', {}, `${s.correct}/${s.total}`),
-            h('span.history-xp', {}, `${s.xp >= 0 ? '+' : ''}${s.xp} XP`))))),
-
-      h('div.hub-foot', {},
-        h('button.btn.ghost', { onclick: () => openFeedback() }, '💬 Send feedback'),
-        h('button.btn.ghost', { onclick: () => go('select') }, 'Change hero'),
-        h('button.btn.ghost.danger', {
-          onclick: () => {
-            if (confirm('Reset all progress? This clears your level, XP and history on this device.')) {
-              resetProfile();
-              go('select');
-            }
-          },
-        }, 'Reset progress'),
-        h('button.btn.ghost', { onclick: async () => { await logout(); go('login'); } }, 'Log out'))));
-
-  refresh();
-  const timer = setInterval(refresh, REFRESH_MS);
+  drawToday();
+  drawBoard();
+  const timer = setInterval(drawBoard, REFRESH_MS);
   return () => clearInterval(timer);
 }

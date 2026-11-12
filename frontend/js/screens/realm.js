@@ -664,7 +664,7 @@ export function renderRealm(app) {
   // ------------------------------------------------------------ start
   mount(app,
     h('section.realm', {},
-      h('div.crumbs', {}, h('button.link', { onclick: () => go('hub') }, '← Hub'), h('span', {}, 'The Realm')),
+      h('div.crumbs', {}, h('button.link', { onclick: () => go('games') }, '← Play'), h('span', {}, 'The Realm')),
       h('div.realm-top', {}, h('h1.display', {}, 'The Realm'), bar),
       fsRoot));
   drawBar();

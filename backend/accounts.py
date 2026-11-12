@@ -78,6 +78,15 @@ def _group(grade, track):
             "name": f"Grade {grade} · {TRACK_NAMES[track]}"}
 
 
+def _game_stats(profile):
+    """Leaderboard extras from the saved profile: best Final Exam mark and Cave stars."""
+    exams = profile.get("exams") or {}
+    best = [e.get("best") for e in exams.values() if isinstance(e, dict) and isinstance(e.get("best"), (int, float))]
+    stars = (profile.get("cave") or {}).get("stars") or {}
+    total = sum(int(v) for v in stars.values() if isinstance(v, (int, float)))
+    return {"exam": max(best) if best else None, "stars": min(total, 9)}
+
+
 def _public(row, me=False):
     """Student row -> what the browser may see (never the password hash)."""
     profile = json.loads(row["profile"] or "{}")
@@ -85,7 +94,8 @@ def _public(row, me=False):
            "group": _group(row["grade"], row["track"]), "score": row["score"], "level": row["level"],
            "character": profile.get("character"), "arena_xp": row["arena_xp"] or 0,
            "xp": max(0, int(profile.get("totalXp") or 0) + (row["arena_xp"] or 0)),
-           "online": bool(row["last_seen"]) and time.time() - row["last_seen"] < ONLINE_SECONDS}
+           "online": bool(row["last_seen"]) and time.time() - row["last_seen"] < ONLINE_SECONDS,
+           **_game_stats(profile)}
     if me:
         out.update(email=row["email"], profile=profile)
     return out
@@ -351,8 +361,9 @@ def group(gid):
     board = [m for m, r in zip(members, rows) if not r["hidden"]][:20]
     for i, m in enumerate(board):
         m["rank"] = i + 1
+    players = [m for m, r in zip(members, rows) if not r["hidden"]]  # every visible classmate, for the other boards
     members.sort(key=lambda m: (not m["online"], m["name"].lower()))
-    return jsonify({**info, "members": members, "leaderboard": board,
+    return jsonify({**info, "members": members, "leaderboard": board, "players": players,
                     "online": sum(m["online"] for m in members)})
 
 
