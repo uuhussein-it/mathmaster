@@ -322,13 +322,36 @@ export function renderAdmin(app) {
   // ------------------------------------------------------------- students
   async function studentsTab(body) {
     state.students ||= (await adminApi('api/admin/students')).students;
-    const reload = async () => { state.students = null; draw(); };
+    state.resets ||= (await adminApi('api/admin/resets')).resets;
+    state.codes ||= {};
+    const reload = async () => { state.students = null; state.resets = null; draw(); };
+    const makeCode = async (s) => {
+      try {
+        const r = await adminApi(`api/admin/resets/${s.id}`, { method: 'POST' });
+        state.codes[s.id] = r.code;
+        reload();
+      } catch (e) { toast('No code made', e.message, { tone: 'danger', icon: '⚠️' }); }
+    };
+    const codeView = (s) => state.codes[s.id] && h('span.reset-code', { title: 'Give this code to the student' }, state.codes[s.id]);
+    const resetPanel = state.resets.length ? h('section.panel.reset-panel', {},
+      h('h3', {}, `🔑 Password help (${state.resets.length})`),
+      h('p.muted.small', {}, owner()
+        ? 'These students forgot their password. Make a code and give it to the student: they type it on the sign-in page with a new password. A code works once, for 24 hours.'
+        : 'These students forgot their password. Only the admin can make reset codes.'),
+      h('ul.reset-list', {}, state.resets.map((s) => h('li', {},
+        h('span.reset-who', {}, h('b', {}, s.name), ' ', h('small.muted', {}, `${s.email} · ${s.group ? s.group.name : 'No group'} · asked ${when(s.requested_at)}`)),
+        codeView(s) || (s.code_active && h('span.q-tag', {}, 'Code given')),
+        owner() && h('button.btn.primary.sm', { onclick: () => makeCode(s) }, state.codes[s.id] || s.code_active ? 'New code' : 'Make code'),
+        owner() && h('button.btn.ghost.sm', {
+          onclick: async () => { await adminApi(`api/admin/resets/${s.id}`, { method: 'DELETE' }); delete state.codes[s.id]; reload(); },
+        }, 'Dismiss'))))) : null;
     const groups = [...new Set(state.students.filter((s) => s.group).map((s) => s.group.name))].sort();
     const rows = state.students.filter((s) => (!state.group || s.group?.name === state.group)
       && (!state.search || `${s.name} ${s.email}`.toLowerCase().includes(state.search.toLowerCase())));
     const set = async (s, data, msg) => { await adminApi(`api/admin/students/${s.id}`, { method: 'PUT', body: data }); toast(msg, '', { icon: '✅', tone: 'success' }); reload(); };
 
     body.replaceChildren(
+      resetPanel || '',
       h('div.admin-filters', {},
         h('label.field', {}, h('span', {}, 'Group'), h('select', { onchange: (e) => { state.group = e.target.value; draw(); } },
           h('option', { value: '' }, `All groups (${state.students.length})`),
@@ -348,6 +371,8 @@ export function renderAdmin(app) {
             onclick: () => set(s, { hidden: !s.hidden }, s.hidden ? 'Back on the leaderboard' : 'Removed from the leaderboard'),
           }, s.hidden ? '↩ Show' : '🚫 Remove')),
           owner() && h('td.admin-row-actions', {},
+            codeView(s),
+            h('button.btn.ghost.sm', { onclick: () => makeCode(s) }, 'Reset code'),
             h('button.btn.ghost.sm', {
               onclick: () => {
                 const pw = prompt(`New password for ${s.name} (at least 8 characters):`);
