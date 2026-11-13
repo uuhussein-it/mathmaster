@@ -616,6 +616,16 @@ kbd {
 .auth-note { margin: 0; font-size: 14px; }
 .auth-error { margin: 0; color: var(--bad); font-weight: 600; }
 .auth-error:empty { display: none; }
+.auth-forgot { align-self: center; text-decoration: underline; text-underline-offset: 3px; }
+.auth-steps { margin: 0; padding-left: 22px; display: grid; gap: 6px; color: var(--muted); }
+.auth-ok { margin: 0; color: var(--good); font-weight: 600; }
+.reset-panel { margin-bottom: 16px; border-color: var(--gold, #f2c14e); }
+.reset-panel h3 { margin: 0 0 8px; }
+.reset-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.reset-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.reset-list .reset-who { flex: 1 1 220px; }
+.reset-code { font: 700 26px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: 4px; padding: 6px 12px;
+  border-radius: 10px; background: var(--panel-2, rgba(255,255,255,.08)); user-select: all; }
 .auth-teacher { display: block; text-align: center; margin-top: 18px; color: var(--muted); font-size: 14px; }
 .level-grades { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .level-grade, .level-track {

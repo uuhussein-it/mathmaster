@@ -11,6 +11,7 @@ reset passwords, remove accounts and read feedback.
 import json
 import os
 import re
+import secrets
 import time
 
 from flask import Blueprint, abort, jsonify, request, session
@@ -23,6 +24,8 @@ bp = Blueprint("accounts", __name__)
 TRACK_NAMES = {"asp": "ASP", "advanced": "Advanced", "general": "General"}
 GRADES = (9, 10, 11, 12)
 ONLINE_SECONDS = 5 * 60
+RESET_CODE_SECONDS = 24 * 60 * 60  # a reset code works for a day
+RESET_CODE_TRIES = 5               # then the teacher has to make a new one
 EMAIL = re.compile(r"^[^@\s]+@([^@\s]+\.[^@\s]+)$")
 # Comma-separated list such as "school.edu.qa,students.school.edu.qa". Empty means
 # any email address is accepted.
@@ -62,6 +65,10 @@ def init(app, is_admin, recheck):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT NOT NULL UNIQUE COLLATE NOCASE,
             name TEXT NOT NULL, pw_hash TEXT NOT NULL, created_at REAL);
+        CREATE TABLE IF NOT EXISTS ql_resets (
+            student_id INTEGER PRIMARY KEY,
+            requested_at REAL, code_hash TEXT, code_at REAL,
+            tries INTEGER NOT NULL DEFAULT 0);
     """)
     # XP won or lost in the arena (kept apart from quiz XP, which the browser
     # reports) and when the profile was last saved (for the tamper checks).
@@ -242,6 +249,101 @@ def login():
         abort(401, "Wrong email or password.")
     _sign_in(row["id"])
     return jsonify({"student": _public(row, me=True)})
+
+
+# ------------------------------------------------------------ forgot password
+# There's no email service, so a forgotten password goes through the teacher:
+# the student asks from the sign-in page, the admin sees the request on the
+# Students tab and makes a 6-digit code, and the student types that code with
+# a new password. Codes are stored hashed, last a day and allow 5 tries.
+@bp.route("/api/auth/forgot", methods=["POST"])
+def forgot():
+    email = str(_body().get("email") or "").strip().lower()
+    security.rate_limit("forgot", 300, 60 * 60)
+    security.rate_limit("forgot-email", 5, 60 * 60, key=email, per_ip=False)
+    conn = userdb.connect()
+    row = conn.execute("SELECT id FROM ql_students WHERE email=?", (email,)).fetchone()
+    if not row:
+        conn.close()
+        abort(404, "There's no account with this email yet.")
+    old = conn.execute("SELECT * FROM ql_resets WHERE student_id=?", (row["id"],)).fetchone()
+    if old:
+        conn.execute("UPDATE ql_resets SET requested_at=? WHERE student_id=?", (time.time(), row["id"]))
+    else:
+        conn.execute("INSERT INTO ql_resets (student_id, requested_at, tries) VALUES (?,?,0)", (row["id"], time.time()))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/auth/reset", methods=["POST"])
+def reset_password():
+    data = _body()
+    email = str(data.get("email") or "").strip().lower()
+    code = re.sub(r"\D", "", str(data.get("code") or ""))
+    password = str(data.get("password") or "")
+    security.rate_limit("reset", 300, 15 * 60)
+    security.rate_limit("reset-email", 10, 15 * 60, key=email, per_ip=False)
+    if len(password) < 8:
+        abort(400, "Choose a password of at least 8 characters.")
+    conn = userdb.connect()
+    row = conn.execute("SELECT * FROM ql_students WHERE email=?", (email,)).fetchone()
+    reset = row and conn.execute("SELECT * FROM ql_resets WHERE student_id=?", (row["id"],)).fetchone()
+    if not reset or not reset["code_hash"] or time.time() - (reset["code_at"] or 0) > RESET_CODE_SECONDS \
+            or reset["tries"] >= RESET_CODE_TRIES:
+        conn.close()
+        abort(400, "This code has expired or hasn't been made yet. Ask your teacher for a new one.")
+    if not check_password_hash(reset["code_hash"], code):
+        conn.execute("UPDATE ql_resets SET tries=tries+1 WHERE student_id=?", (row["id"],))
+        conn.commit()
+        conn.close()
+        left = RESET_CODE_TRIES - reset["tries"] - 1
+        abort(400, f"That code isn't right. {left} tr{'y' if left == 1 else 'ies'} left." if left
+              else "That code isn't right, and it can't be used again. Ask your teacher for a new one.")
+    conn.execute("UPDATE ql_students SET pw_hash=? WHERE id=?", (generate_password_hash(password), row["id"]))
+    conn.execute("DELETE FROM ql_resets WHERE student_id=?", (row["id"],))
+    conn.commit()
+    row = conn.execute("SELECT * FROM ql_students WHERE id=?", (row["id"],)).fetchone()
+    conn.close()
+    _sign_in(row["id"])
+    return jsonify({"student": _public(row, me=True)})
+
+
+@bp.route("/api/admin/resets")
+def admin_resets():
+    """Students who asked for a password reset, newest first."""
+    _require_admin()
+    conn = userdb.connect()
+    rows = conn.execute("SELECT r.*, s.name, s.email, s.grade, s.track FROM ql_resets r "
+                        "JOIN ql_students s ON s.id = r.student_id ORDER BY r.requested_at DESC").fetchall()
+    conn.close()
+    now = time.time()
+    return jsonify({"resets": [{
+        "id": r["student_id"], "name": r["name"], "email": r["email"], "group": _group(r["grade"], r["track"]),
+        "requested_at": r["requested_at"],
+        "code_active": bool(r["code_hash"]) and now - (r["code_at"] or 0) <= RESET_CODE_SECONDS
+        and r["tries"] < RESET_CODE_TRIES,
+    } for r in rows if r["requested_at"]]})
+
+
+@bp.route("/api/admin/resets/<int:sid>", methods=["POST", "DELETE"])
+def admin_reset(sid):
+    """POST makes a new 6-digit code for the student (shown once); DELETE dismisses the request."""
+    _require_admin()
+    security.require_owner()  # same rule as resetting a password
+    conn = userdb.connect()
+    if not conn.execute("SELECT 1 FROM ql_students WHERE id=?", (sid,)).fetchone():
+        conn.close()
+        abort(404)
+    conn.execute("DELETE FROM ql_resets WHERE student_id=?", (sid,))
+    code = None
+    if request.method == "POST":
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        conn.execute("INSERT INTO ql_resets (student_id, requested_at, code_hash, code_at, tries) VALUES (?,?,?,?,0)",
+                     (sid, time.time(), generate_password_hash(code), time.time()))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "code": code, "hours": RESET_CODE_SECONDS // 3600})
 
 
 @bp.route("/api/auth/logout", methods=["POST"])
@@ -425,6 +527,7 @@ def admin_student(sid):
         abort(404)
     if request.method == "DELETE":
         conn.execute("DELETE FROM ql_students WHERE id=?", (sid,))
+        conn.execute("DELETE FROM ql_resets WHERE student_id=?", (sid,))
     else:
         if "hidden" in data:
             conn.execute("UPDATE ql_students SET hidden=? WHERE id=?", (int(bool(data["hidden"])), sid))
@@ -434,6 +537,7 @@ def admin_student(sid):
                 abort(400, "Passwords need at least 8 characters.")
             conn.execute("UPDATE ql_students SET pw_hash=? WHERE id=?",
                          (generate_password_hash(str(data["password"])), sid))
+            conn.execute("DELETE FROM ql_resets WHERE student_id=?", (sid,))
         if "level" in data:
             try:
                 level = int(data["level"])
