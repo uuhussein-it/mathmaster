@@ -177,7 +177,7 @@ export function renderSimulator(app, config) {
         const ok = s.picks[i] === q.answer;
         if (ok) correct += 1;
         const skipped = s.picks[i] == null && !s.timedOut;
-        scorer.settle({ correct: ok, skipped, doubleXp: s.doubleXp.has(i), topicKey: q.topicKey, topicName: q.topicName });
+        scorer.settle({ correct: ok, skipped, doubleXp: s.doubleXp.has(i), topicKey: q.topicKey, topicName: q.topicName, ref: q.ref });
         items.push({ ...q, chosen: s.picks[i] ?? -1, correct: ok, skipped });
       });
       return { name: s.name, correct, total: s.questions.length, scaled: satScaled(correct, s.questions.length) };

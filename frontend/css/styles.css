@@ -1184,3 +1184,58 @@ html.realm-locked, html.realm-locked body { overflow: hidden; }
   .today-text small { font-size: 12px; }
   .home-portrait { width: 52px; height: 52px; }
 }
+
+/* ---------------------------------------------------------------- daily goal, streaks, mistakes, stickers */
+.stat-pill.days.hot { border-color: #ffb347; box-shadow: 0 0 18px -6px #ff9d2e; }
+.goal-head { display: flex; align-items: center; gap: 16px; padding: 4px 0 16px; margin-bottom: 14px; border-bottom: 1px solid var(--line, rgba(255,255,255,.08)); }
+.goal-head h3 { margin: 2px 0 8px; font-size: 17px; }
+.goal-text { min-width: 0; display: grid; gap: 4px; }
+.goal-text .eyebrow { margin: 0; }
+.goal-ring-wrap { position: relative; width: 92px; height: 92px; flex: none; }
+.goal-ring { width: 100%; height: 100%; }
+.goal-track { fill: none; stroke: rgba(255,255,255,.1); stroke-width: 9; }
+.goal-fill { fill: none; stroke: var(--gold); stroke-width: 9; stroke-linecap: round; transition: stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1); }
+.goal-ring.done .goal-fill { stroke: #ff9d2e; filter: drop-shadow(0 0 6px rgba(255,157,46,.6)); }
+.goal-ring-label { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; line-height: 1; }
+.goal-ring-label b { font: 700 26px/1 var(--font-display); }
+.goal-ring-label small { color: var(--muted); font-size: 12px; }
+.day-dots { display: flex; gap: 6px; }
+.day-dot { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  color: var(--muted); background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
+.day-dot.some { background: rgba(230,192,106,.18); color: var(--text); }
+.day-dot.hit { background: linear-gradient(160deg, #ffcf6b, #ff8a2e); color: #2a1600; border-color: transparent; }
+.path-card.review::before { background: radial-gradient(circle, rgba(255, 138, 46, 0.22), transparent 70%); }
+.cal { display: grid; gap: 6px; margin-bottom: 12px; max-width: 320px; }
+.cal-head, .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.cal-head span { text-align: center; font-size: 11px; color: var(--muted); font-weight: 700; }
+.cal-cell { aspect-ratio: 1; border-radius: 6px; background: rgba(255,255,255,.06); display: block; }
+.cal-cell.some { background: rgba(230,192,106,.3); }
+.cal-cell.hit { background: linear-gradient(160deg, #ffcf6b, #ff8a2e); }
+.cal-cell.key { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; }
+.sticker-wall { display: grid; gap: 8px; max-height: 320px; overflow: auto; }
+.sticker { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 12px; background: rgba(255,255,255,.04); }
+.sticker p { margin: 0 0 2px; }
+.sticker-icon { font-size: 30px; line-height: 1; }
+.kudos-pop { display: grid; gap: 12px; }
+.kudos-item { display: flex; align-items: center; gap: 14px; }
+.kudos-icon { font-size: 56px; line-height: 1; animation: pop-in .5s cubic-bezier(.2,1.6,.4,1) both; }
+.kudos-msg { margin: 0 0 4px; font-size: 17px; font-weight: 600; }
+@keyframes pop-in { from { transform: scale(.3) rotate(-20deg); opacity: 0; } to { transform: none; opacity: 1; } }
+.sticker-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sticker-chip { display: grid; justify-items: center; gap: 2px; padding: 10px 4px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,.05); border: 2px solid transparent; color: var(--text); }
+.sticker-chip span { font-size: 28px; line-height: 1; }
+.sticker-chip small { font-size: 11px; color: var(--muted); }
+.sticker-chip[aria-checked="true"] { border-color: var(--gold); background: rgba(230,192,106,.14); }
+.admin-bulk { order: 3; align-self: flex-end; }
+@media (max-width: 720px) {
+  .goal-head { gap: 12px; }
+  .goal-ring-wrap { width: 76px; height: 76px; }
+  .goal-ring-label b { font-size: 22px; }
+  .goal-head h3 { font-size: 15px; }
+  .day-dot { width: 22px; height: 22px; font-size: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .kudos-icon { animation: none; } .goal-fill { transition: none; } }
+/* Phones: the day streak matters more in the top bar; "in a row" still shows while answering. */
+@media (max-width: 520px) { .hud-stats .stat-pill.streak { display: none; } }
+.paths.four { grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); }

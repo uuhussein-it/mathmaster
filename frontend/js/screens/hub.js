@@ -4,14 +4,15 @@
  * and the top of the class leaderboard. Everything else lives on its own page
  * (Learn, Play, Leaderboard, Me) in the main menu.
  */
-import { h, mount, prefs } from '../ui.js';
+import { h, mount, prefs, modal, burst } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
-import { profile } from '../state.js';
+import { profile, dailyGoal, dayKey } from '../state.js';
 import { go } from '../router.js';
-import { account, loadGroup } from '../account.js';
+import { account, loadGroup, loadKudos, markKudosSeen } from '../account.js';
 import { loadCurriculumIndex } from '../data.js';
 import { avatar } from './controls.js';
 import * as missions from '../realm/missions.js';
+import { startReview, mistakeCount } from '../review.js';
 
 const REFRESH_MS = 30_000;
 
@@ -44,11 +45,65 @@ function weakestTopic() {
     .sort((a, b) => a.pct - b.pct)[0] || null;
 }
 
+/** A progress ring: today's answers towards the daily goal. */
+export function goalRing(done, goal, size = 92) {
+  const r = size / 2 - 8;
+  const c = 2 * Math.PI * r;
+  const frac = Math.min(1, done / goal);
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+  svg.setAttribute('class', `goal-ring${frac >= 1 ? ' done' : ''}`);
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = `<circle class="goal-track" cx="${size / 2}" cy="${size / 2}" r="${r}"/>`
+    + `<circle class="goal-fill" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - frac)}" transform="rotate(-90 ${size / 2} ${size / 2})"/>`;
+  return h('div.goal-ring-wrap', {}, svg, h('div.goal-ring-label', {}, h('b', {}, Math.min(done, goal)), h('small', {}, `/ ${goal}`)));
+}
+
+/** The last 7 days as dots: filled when that day's goal was met. */
+export function weekDots(log, goal) {
+  const out = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const n = log[dayKey(d)] || 0;
+    out.push(h('span.day-dot', { class: n >= goal ? 'hit' : n > 0 ? 'some' : '', title: `${d.toLocaleDateString(undefined, { weekday: 'long' })}: ${n} answers` },
+      d.toLocaleDateString(undefined, { weekday: 'narrow' })));
+  }
+  return h('div.day-dots', {}, out);
+}
+
+/** Show stickers the student hasn't seen yet, then mark them seen. */
+async function showNewKudos() {
+  let list;
+  try { list = (await loadKudos()).filter((k) => !k.seen); } catch { return; }
+  if (!list.length) return;
+  burst();
+  modal(list.length === 1 ? 'You got a sticker!' : `You got ${list.length} stickers!`,
+    h('div.kudos-pop', {}, list.slice(0, 5).map((k) => h('div.kudos-item', {},
+      h('span.kudos-icon', { 'aria-hidden': 'true' }, k.icon),
+      h('div', {}, k.message && h('p.kudos-msg', {}, `“${k.message}”`), h('small.muted', {}, `From ${k.from || 'your teacher'}`))))),
+    h('p.muted.small', {}, 'Your stickers stay on your Me page.'));
+  markKudosSeen();
+}
+
 export function renderHub(app) {
   const hero = CHARACTERS[profile.character];
   const me = account.student;
   const today = h('ul.today-list');
   const board = h('div.home-board', {}, h('p.muted', {}, 'Loading your class…'));
+
+  function goalHead() {
+    const g = dailyGoal();
+    const left = Math.max(0, g.goal - g.done);
+    return h('div.goal-head', {},
+      goalRing(g.done, g.goal),
+      h('div.goal-text', {},
+        h('p.eyebrow', {}, 'Daily goal'),
+        h('h3', {}, g.hitToday ? `Done for today! 🔥 ${g.streak}-day streak` : g.streak ? `${left} more to keep your ${g.streak}-day streak` : `Answer ${left} question${left === 1 ? '' : 's'} to start a streak`),
+        weekDots(g.log, g.goal),
+        h('small.muted', {}, g.freezes ? `🧊 ${g.freezes} streak freeze${g.freezes === 1 ? '' : 's'} ready` : 'Keep a 7-day streak to earn a streak freeze 🧊', g.best > 1 ? ` · Best: ${g.best} days` : '')));
+  }
 
   const row = ({ icon, title, text, cta, onclick, done = false }) => h('li.today-item', { class: done ? 'done' : '' },
     h('span.today-icon', { 'aria-hidden': 'true' }, done ? '✅' : icon),
@@ -85,6 +140,16 @@ export function renderHub(app) {
         icon: '📘', title: 'Practise your course', text: 'Answer a few questions to find your strong and weak topics.',
         cta: 'Start', onclick: () => openCurriculum('practice'),
       }));
+
+    // 2b. Mistakes to fix.
+    const mistakes = mistakeCount();
+    if (mistakes) {
+      items.push(row({
+        icon: '🔁', title: `Fix ${Math.min(mistakes, 10)} mistake${mistakes === 1 ? '' : 's'}`,
+        text: `Questions you got wrong come back until you get them right. ${profile.fixed ? `${profile.fixed} fixed so far.` : ''}`,
+        cta: 'Fix', onclick: () => startReview(),
+      }));
+    }
 
     // 3. The Final Exam for their course.
     const course = await myCourse().catch(() => null);
@@ -149,6 +214,7 @@ export function renderHub(app) {
 
       h('div.home-grid', {},
         h('section.panel.today', { 'aria-label': 'Today' },
+          goalHead(),
           h('h2', {}, '☀️ Today'),
           today),
         h('div.home-side', {},
@@ -160,6 +226,7 @@ export function renderHub(app) {
 
   drawToday();
   drawBoard();
+  showNewKudos();
   const timer = setInterval(drawBoard, REFRESH_MS);
   return () => clearInterval(timer);
 }

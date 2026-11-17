@@ -38,7 +38,7 @@ export function createScorer(mode) {
         xp = -lost;
       }
     }
-    recordAnswer({ topicKey: item.topicKey, topicName: item.topicName, correct: item.correct, points });
+    recordAnswer({ topicKey: item.topicKey, topicName: item.topicName, correct: item.correct, points, ref: item.ref });
     const levels = xp > 0 ? addXp(xp) : 0;
     s.xp += xp;
     s.score += points;

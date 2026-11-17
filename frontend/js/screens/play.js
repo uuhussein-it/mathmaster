@@ -7,7 +7,7 @@
  */
 import { h, mount, toast, floatText, burst, LETTERS, answerLabel, questionBody, timerEl, startCountdown } from '../ui.js';
 import { CHARACTERS, SKILL_CHARGES, streakMultiplier, applySkill } from '../characters.js';
-import { profile, topicMastery } from '../state.js';
+import { profile, topicMastery, forgiveMistake } from '../state.js';
 import { createScorer, SKIP_XP } from '../scoring.js';
 import { go } from '../router.js';
 import { checkAnswer, ensureSolved, fetchKeys, fetchSimilar } from '../data.js';
@@ -137,7 +137,7 @@ export function renderPlay(app, config) {
     widgetResult = gradeWidget(q.widget, widgetValue);
     const record = {
       chosen: -1, text: valueSummary(q.widget, widgetValue), correct: widgetResult.correct,
-      usedHint, doubleXp, topicKey: q.topicKey, topicName: q.topicName,
+      usedHint, doubleXp, topicKey: q.topicKey, topicName: q.topicName, ref: q.ref,
     };
     answers[index] = record;
     if (!practice) { next(); return; }
@@ -172,6 +172,7 @@ export function renderPlay(app, config) {
         q, answer: given, redraw: draw,
         onAgree: () => {
           const r = scorer.regrade();
+          forgiveMistake(q.ref);
           Object.assign(a, { correct: true, aiAgreed: true, xp: r.xp, points: 100 });
           a.ai.reward = `+${r.xp} XP: it now counts as right.`;
           if (r.levels) toast(`Level ${profile.level}!`, 'Your hero grows stronger.', { icon: '⭐', tone: 'level' });
@@ -194,7 +195,7 @@ export function renderPlay(app, config) {
   function choose(i, el, skipped = false) {
     if (locked || finished) return;
     locked = true;
-    const record = { chosen: i, correct: i === q.answer, usedHint, doubleXp, skipped, topicKey: q.topicKey, topicName: q.topicName };
+    const record = { chosen: i, correct: i === q.answer, usedHint, doubleXp, skipped, topicKey: q.topicKey, topicName: q.topicName, ref: q.ref };
     answers[index] = record;
 
     if (!practice) {
@@ -216,7 +217,7 @@ export function renderPlay(app, config) {
   function submitFree(text) {
     if (locked || finished || !text.trim()) return;
     locked = true;
-    const record = { chosen: -1, text: text.trim(), correct: false, usedHint, doubleXp, topicKey: q.topicKey, topicName: q.topicName };
+    const record = { chosen: -1, text: text.trim(), correct: false, usedHint, doubleXp, topicKey: q.topicKey, topicName: q.topicName, ref: q.ref };
     answers[index] = record;
     serverCheck(record, { text: record.text }, (r) => {
       q.answerText = r.answer_text;
@@ -352,7 +353,7 @@ export function renderPlay(app, config) {
     if (!practice) await resolveKeys(app, questions);
     // Unanswered questions (time ran out) count as wrong; Quiz answers are scored now.
     const items = questions.map((qq, i) => {
-      const a = (answers[i] ||= { chosen: -1, correct: false, topicKey: qq.topicKey, topicName: qq.topicName });
+      const a = (answers[i] ||= { chosen: -1, correct: false, topicKey: qq.topicKey, topicName: qq.topicName, ref: qq.ref });
       if (!practice) {
         // Widgets (tables, graphs…) were graded when submitted; choices are scored now.
         if (qq.type !== 'widget') a.correct = a.chosen >= 0 && a.chosen === qq.answer;

@@ -8,6 +8,7 @@ follows them between devices, and the score feeds the group leaderboard.
 Admins (the existing teacher login) can hide students from the leaderboard,
 reset passwords, remove accounts and read feedback.
 """
+import datetime
 import json
 import os
 import re
@@ -23,6 +24,8 @@ bp = Blueprint("accounts", __name__)
 TRACK_NAMES = {"asp": "ASP", "advanced": "Advanced", "general": "General"}
 GRADES = (9, 10, 11, 12)
 ONLINE_SECONDS = 5 * 60
+WEEK_TZ_HOURS = float(os.environ.get("WEEK_TZ_HOURS", "4"))  # weekly league weeks start Monday 00:00 (UAE time)
+STICKERS = {"star": "⭐", "fire": "🔥", "brain": "🧠", "rocket": "🚀", "trophy": "🏆", "clap": "👏", "gem": "💎", "crown": "👑"}
 EMAIL = re.compile(r"^[^@\s]+@([^@\s]+\.[^@\s]+)$")
 # Comma-separated list such as "school.edu.qa,students.school.edu.qa". Empty means
 # any email address is accepted.
@@ -62,6 +65,10 @@ def init(app, is_admin, recheck):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             email TEXT NOT NULL UNIQUE COLLATE NOCASE,
             name TEXT NOT NULL, pw_hash TEXT NOT NULL, created_at REAL);
+        CREATE TABLE IF NOT EXISTS ql_kudos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id INTEGER NOT NULL, sticker TEXT NOT NULL, message TEXT,
+            from_name TEXT, created_at REAL, seen INTEGER NOT NULL DEFAULT 0);
     """)
     # XP won or lost in the arena (kept apart from quiz XP, which the browser
     # reports) and when the profile was last saved (for the tamper checks).
@@ -78,13 +85,43 @@ def _group(grade, track):
             "name": f"Grade {grade} · {TRACK_NAMES[track]}"}
 
 
+def current_week(now=None):
+    """ISO week id such as '2026-W47', in school time."""
+    d = datetime.datetime.fromtimestamp((now or time.time()) + WEEK_TZ_HOURS * 3600, datetime.timezone.utc)
+    year, week, _ = d.isocalendar()
+    return f"{year}-W{week:02d}"
+
+
+def _school_day(now=None):
+    return datetime.datetime.fromtimestamp((now or time.time()) + WEEK_TZ_HOURS * 3600, datetime.timezone.utc).date()
+
+
+def _week_xp(profile):
+    week = profile.get("week") if isinstance(profile.get("week"), dict) else {}
+    return int(week.get("xp") or 0) if week.get("id") == current_week() else 0
+
+
+def _day_streak(profile):
+    """The day streak, or 0 once it has lapsed (a freeze covers one missed day)."""
+    days = profile.get("days") if isinstance(profile.get("days"), dict) else {}
+    try:
+        last = datetime.date.fromisoformat(str(days.get("last")))
+    except ValueError:
+        return 0
+    gap = (_school_day() - last).days
+    ok = gap <= 1 or (gap == 2 and int(days.get("freezes") or 0) > 0)
+    return max(0, int(days.get("streak") or 0)) if ok else 0
+
+
 def _game_stats(profile):
-    """Leaderboard extras from the saved profile: best Final Exam mark and Cave stars."""
+    """Leaderboard extras from the saved profile: best Final Exam mark, Cave stars,
+    this week's XP and the day streak."""
     exams = profile.get("exams") or {}
     best = [e.get("best") for e in exams.values() if isinstance(e, dict) and isinstance(e.get("best"), (int, float))]
     stars = (profile.get("cave") or {}).get("stars") or {}
     total = sum(int(v) for v in stars.values() if isinstance(v, (int, float)))
-    return {"exam": max(best) if best else None, "stars": min(total, 9)}
+    return {"exam": max(best) if best else None, "stars": min(total, 9),
+            "week_xp": _week_xp(profile), "days": _day_streak(profile)}
 
 
 def _public(row, me=False):
@@ -323,6 +360,23 @@ def checked_profile(old, new, elapsed):
     out["bestStreak"] = min(out["bestStreak"], out["correct"])
     out["streak"] = min(out["streak"], out["bestStreak"])
     out["level"], out["xp"] = level_for(out["totalXp"])
+    # This week's XP is counted here from the gain in total XP, so it can't be edited in the browser.
+    wk = current_week()
+    old_week = old.get("week") if isinstance(old.get("week"), dict) else {}
+    base = int(old_week.get("xp") or 0) if old_week.get("id") == wk else 0
+    out["week"] = {"id": wk, "xp": 0 if reset else base + max(0, out["totalXp"] - prev["totalXp"])}
+    # A day streak can't be longer than the days since the last save allow.
+    days = new.get("days") if isinstance(new.get("days"), dict) else None
+    if days:
+        old_days = old.get("days") if isinstance(old.get("days"), dict) else {}
+        try:
+            cap = int(old_days.get("streak") or 0) + 1 + int(elapsed // 86400)
+            days = {**days, "streak": max(0, min(int(days.get("streak") or 0), cap)),
+                    "freezes": max(0, min(int(days.get("freezes") or 0), 2))}
+            days["best"] = max(int(old_days.get("best") or 0), min(int(days.get("best") or 0), days["streak"]))
+        except (TypeError, ValueError):
+            days = old_days
+        out["days"] = days
     return out
 
 
@@ -394,6 +448,62 @@ def feedback():
     return jsonify({"ok": True, "id": fid, "verdict": verdict})
 
 
+# --------------------------------------------------------------- shout-outs
+# Teachers send a sticker with a short note; the student sees it pop up on Home
+# and keeps it on their Me page.
+@bp.route("/api/kudos")
+def my_kudos():
+    row = _require_student()
+    conn = userdb.connect()
+    rows = conn.execute("SELECT * FROM ql_kudos WHERE student_id=? ORDER BY created_at DESC LIMIT 30", (row["id"],)).fetchall()
+    conn.close()
+    return jsonify({"kudos": [{"id": r["id"], "sticker": r["sticker"], "icon": STICKERS.get(r["sticker"], "⭐"),
+                               "message": r["message"], "from": r["from_name"], "at": r["created_at"],
+                               "seen": bool(r["seen"])} for r in rows]})
+
+
+@bp.route("/api/kudos/seen", methods=["POST"])
+def kudos_seen():
+    row = _require_student()
+    conn = userdb.connect()
+    conn.execute("UPDATE ql_kudos SET seen=1 WHERE student_id=?", (row["id"],))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@bp.route("/api/admin/kudos", methods=["POST"])
+def admin_kudos():
+    """{student_ids: [...], sticker, message, from}: teachers can send these too."""
+    _require_admin()
+    data = _body()
+    sticker = str(data.get("sticker") or "")
+    if sticker not in STICKERS:
+        abort(400, "Pick a sticker.")
+    message = re.sub(r"\s+", " ", str(data.get("message") or "")).strip()[:140]
+    try:
+        ids = sorted({int(i) for i in data.get("student_ids") or []})[:200]
+    except (TypeError, ValueError):
+        abort(400, "Pick students.")
+    if not ids:
+        abort(400, "Pick students.")
+    security.rate_limit("kudos", 60, 60 * 60)
+    # Signed as typed, else the teacher account's name ("Your teacher" for the admin login).
+    sender = re.sub(r"\s+", " ", str(data.get("from") or "")).strip()[:30] \
+        or (session.get("teacher") if security.role() == "teacher" else None)
+    conn = userdb.connect()
+    known = {r["id"] for r in conn.execute(
+        f"SELECT id FROM ql_students WHERE id IN ({','.join('?' * len(ids))})", ids).fetchall()}
+    now = time.time()
+    for sid in ids:
+        if sid in known:
+            conn.execute("INSERT INTO ql_kudos (student_id, sticker, message, from_name, created_at) VALUES (?,?,?,?,?)",
+                         (sid, sticker, message, sender or "Your teacher", now))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "sent": len(known)})
+
+
 # ----------------------------------------------------------------------- admin
 @bp.route("/api/admin/students")
 def admin_students():
@@ -425,6 +535,7 @@ def admin_student(sid):
         abort(404)
     if request.method == "DELETE":
         conn.execute("DELETE FROM ql_students WHERE id=?", (sid,))
+        conn.execute("DELETE FROM ql_kudos WHERE student_id=?", (sid,))
     else:
         if "hidden" in data:
             conn.execute("UPDATE ql_students SET hidden=? WHERE id=?", (int(bool(data["hidden"])), sid))

@@ -1,9 +1,9 @@
 /**
  * Entry point: renders the persistent HUD and registers every screen.
  */
-import { h, mount } from './ui.js';
+import { h, mount, toast, burst } from './ui.js';
 import { CHARACTERS } from './characters.js';
-import { profile, onProfileChange, xpToNext } from './state.js';
+import { profile, onProfileChange, xpToNext, dailyGoal } from './state.js';
 import { register, startRouter, go } from './router.js';
 import { loadAccount, account } from './account.js';
 
@@ -56,6 +56,7 @@ function renderHud() {
   document.documentElement.style.setProperty('--hero', hero.color);
 
   const need = xpToNext(profile.level);
+  const goal = dailyGoal();
   const pct = Math.min(100, (profile.xp / need) * 100);
   mount(hud,
     h('button.brand', { onclick: () => go('hub'), 'aria-label': 'QuestLearn home' },
@@ -70,9 +71,21 @@ function renderHud() {
         h('div.xp-label', {}, `${profile.xp} / ${need} XP`))),
     h('div.hud-stats', {},
       h('div.stat-pill.score', { title: 'Total score' }, h('span', { 'aria-hidden': 'true' }, '🏆'), h('b', {}, profile.score.toLocaleString()), h('small', {}, 'Score')),
-      h('div.stat-pill.streak', { class: profile.streak >= 3 ? 'hot' : '', title: 'Current answer streak' },
-        h('span', { 'aria-hidden': 'true' }, '🔥'), h('b', {}, profile.streak), h('small', {}, 'Streak'))));
+      h('div.stat-pill.days', { class: goal.hitToday ? 'hot' : '', title: goal.hitToday ? `Day streak: today's goal is done` : `Day streak: answer ${goal.goal - goal.done} more today to keep it` },
+        h('span', { 'aria-hidden': 'true' }, goal.hitToday ? '🔥' : '🕯️'), h('b', {}, goal.streak), h('small', {}, goal.streak === 1 ? 'Day' : 'Days')),
+      h('div.stat-pill.streak', { class: profile.streak >= 3 ? 'hot' : '', title: 'Right answers in a row' },
+        h('span', { 'aria-hidden': 'true' }, '⚡'), h('b', {}, profile.streak), h('small', {}, 'In a row'))));
 }
+
+// Daily goal reached: celebrate, and say when a streak freeze was earned or used.
+window.addEventListener('ql:goal', (e) => {
+  const { streak, usedFreeze, earnedFreeze } = e.detail;
+  burst();
+  toast(`Daily goal done! 🔥 ${streak} day${streak === 1 ? '' : 's'}`,
+    usedFreeze ? 'A streak freeze 🧊 saved your streak for the day you missed.'
+      : earnedFreeze ? 'A full week! You earned a streak freeze 🧊: it covers one missed day.'
+        : 'Come back tomorrow to keep your streak going.', { icon: '🎯', tone: 'level' });
+});
 
 register('login', renderLogin);
 register('level', renderLevel);

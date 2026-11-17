@@ -5,13 +5,14 @@
  */
 import { h, mount, kpi } from '../ui.js';
 import { CHARACTERS } from '../characters.js';
-import { profile, resetProfile } from '../state.js';
+import { profile, resetProfile, dailyGoal, dayKey, DAILY_GOAL } from '../state.js';
 import { go } from '../router.js';
-import { account, loadGroup, logout } from '../account.js';
+import { account, loadGroup, logout, loadKudos } from '../account.js';
 import { openFeedback } from '../feedback.js';
 import { avatar } from './controls.js';
 import { myCourse, openCurriculum } from './hub.js';
 import * as missions from '../realm/missions.js';
+import { startReview, mistakeCount } from '../review.js';
 
 const pageHead = (title, text) => h('div.page-head', {}, h('h1.display', {}, title), text && h('p.muted', {}, text));
 
@@ -44,8 +45,8 @@ export function renderLearn(app) {
 
   mount(app,
     h('section.page', {},
-      pageHead('Learn', 'Practise your course, sit a Final Exam, or train for the SAT.'),
-      h('div.paths', {},
+      pageHead('Learn', 'Practise your course, sit a Final Exam, fix your mistakes, or train for the SAT.'),
+      h('div.paths.four', {},
         card({
           id: 'school', icon: '📘', title: 'My course',
           text: `Practice and quizzes from ${me.group?.name || 'your course'}, by topic and lesson.`,
@@ -53,6 +54,14 @@ export function renderLearn(app) {
           cta: 'Start practising', onclick: () => openCurriculum('practice'),
         }),
         examCard,
+        card({
+          id: 'review', icon: '🔁', title: 'Fix my mistakes',
+          text: mistakeCount() ? 'Questions you got wrong come back here until you get them right.' : 'Nothing to fix right now. Questions you get wrong will wait for you here.',
+          bullets: ['Up to 10 questions per run, newest first', 'Hints and explanations as in Practice', `${profile.fixed || 0} mistake${profile.fixed === 1 ? '' : 's'} fixed so far`],
+          badge: mistakeCount() ? `${mistakeCount()} to fix` : null,
+          cta: mistakeCount() ? 'Fix them' : 'Practise instead',
+          onclick: () => (mistakeCount() ? startReview() : openCurriculum('practice')),
+        }),
         card({
           id: 'sat', icon: '🎯', title: 'SAT Preparation',
           text: 'Full section simulations and focused topic drills.',
@@ -95,15 +104,24 @@ export function renderGames(app) {
 
 // ------------------------------------------------------------------ Leaderboard
 const BOARDS = [
+  { id: 'week', label: '📅 This week', value: (m) => m.week_xp, show: (m) => `${m.week_xp.toLocaleString()} XP`, note: 'XP earned since Monday. Everyone starts again each week.' },
+  { id: 'days', label: '🔥 Day streak', value: (m) => m.days, show: (m) => `${m.days} day${m.days === 1 ? '' : 's'}`, note: `Days in a row with ${DAILY_GOAL}+ answers.` },
   { id: 'score', label: '🏆 Score', value: (m) => m.score, show: (m) => m.score.toLocaleString(), note: 'Points from every right answer.' },
   { id: 'xp', label: '⭐ XP', value: (m) => m.xp, show: (m) => `${m.xp.toLocaleString()} XP`, note: 'Experience from practice, quizzes, exams and games.' },
   { id: 'exam', label: '🎓 Final Exam', value: (m) => m.exam, show: (m) => `${m.exam} / 100`, note: 'Best Final Exam practice mark.' },
   { id: 'stars', label: '🪔 Cave stars', value: (m) => m.stars, show: (m) => `${'★'.repeat(m.stars)} ${m.stars}/9`, note: 'Stars earned in the Cave of Equations.' },
 ];
 
+/** "Resets in 3 days" (weeks start on Monday). */
+function resetText() {
+  const d = new Date();
+  const left = (8 - (d.getDay() || 7)) % 7 || 7;
+  return left === 1 ? 'Resets tonight at midnight.' : `Resets in ${left} days.`;
+}
+
 export function renderLeaderboard(app) {
   const me = account.student;
-  let tab = 'score';
+  let tab = 'week';
   let group = null;
   const body = h('div', {}, h('p.muted', {}, 'Loading your class…'));
 
@@ -119,7 +137,7 @@ export function renderLeaderboard(app) {
         type: 'button', role: 'tab', 'aria-selected': String(x.id === tab), 'aria-checked': String(x.id === tab),
         onclick: () => { tab = x.id; draw(); },
       }, x.label))),
-      h('p.muted.small', {}, b.note),
+      h('p.muted.small', {}, b.note, tab === 'week' ? ` ${resetText()}` : ''),
       ranked.length
         ? h('ol.board.full', {}, ranked.slice(0, 50).map((m, i) => h('li', { class: m.id === me.id ? 'me' : '' },
           h('span.board-rank', {}, i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1),
@@ -161,6 +179,33 @@ export function renderMe(app) {
     .map((t) => ({ ...t, pct: Math.round((t.correct / t.seen) * 100) }));
   const strong = [...topics].sort((a, b) => b.pct - a.pct).filter((t) => t.pct >= 75).slice(0, 3);
   const weak = [...topics].sort((a, b) => a.pct - b.pct).filter((t) => t.pct < 75).slice(0, 3);
+  const goal = dailyGoal();
+  const stickers = h('div.sticker-wall', {}, h('p.muted.small', {}, 'Loading…'));
+  loadKudos().then((list) => stickers.replaceChildren(...(list.length
+    ? list.map((k) => h('div.sticker', { title: k.message || '' },
+      h('span.sticker-icon', { 'aria-hidden': 'true' }, k.icon),
+      h('div', {}, k.message && h('p', {}, k.message), h('small.muted', {}, `${k.from || 'Your teacher'} · ${new Date(k.at * 1000).toLocaleDateString()}`))))
+    : [h('p.muted.small', {}, 'No stickers yet. Your teacher can send you one for great work.')])))
+    .catch(() => stickers.replaceChildren(h('p.muted.small', {}, 'Stickers couldn’t load.')));
+
+  /** The last 5 weeks, Monday to Sunday: how many answers each day, goal days lit. */
+  function streakCalendar() {
+    const end = new Date();
+    const start = new Date(end);
+    start.setDate(end.getDate() - ((end.getDay() || 7) - 1) - 28);
+    const cells = [];
+    for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      const n = goal.log[dayKey(d)] || 0;
+      cells.push(h('span.cal-cell', {
+        class: n >= goal.goal ? 'hit' : n > 0 ? 'some' : '',
+        title: `${d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' })}: ${n} answer${n === 1 ? '' : 's'}`,
+      }));
+    }
+    return h('div.cal', {},
+      h('div.cal-head', {}, ['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((x) => h('span', {}, x))),
+      h('div.cal-grid', {}, cells),
+      h('p.muted.small', {}, h('span.cal-cell.hit.key'), ` Goal met (${goal.goal}+ answers)  `, h('span.cal-cell.some.key'), ' Some practice'));
+  }
 
   mount(app,
     h('section.page.me', {},
@@ -196,6 +241,19 @@ export function renderMe(app) {
           h('div.me-badges', {}, (profile.badges || []).length
             ? profile.badges.map((b) => h('span.me-badge', { title: b.name }, h('span', { 'aria-hidden': 'true' }, b.icon), b.name))
             : h('p.muted.small', {}, 'Badges appear here: beat a guild boss, ace a Final Exam, or defeat Zarkan.')))),
+
+      h('div.me-grid', {},
+        h('section.panel', {},
+          h('h3', {}, '🔥 My streak'),
+          streakCalendar(),
+          h('ul.me-facts', {},
+            h('li', {}, h('span', {}, 'Day streak'), h('b', {}, `${goal.streak} day${goal.streak === 1 ? '' : 's'}`)),
+            h('li', {}, h('span', {}, 'Best streak'), h('b', {}, `${goal.best} day${goal.best === 1 ? '' : 's'}`)),
+            h('li', {}, h('span', {}, '🧊 Streak freezes'), h('b', {}, `${goal.freezes} of 2`)),
+            h('li', {}, h('span', {}, '🔁 Mistakes fixed'), h('b', {}, `${profile.fixed || 0} (${mistakeCount()} to go)`)))),
+        h('section.panel', {},
+          h('h3', {}, '💌 Stickers from my teacher'),
+          stickers)),
 
       profile.history.length > 0 && h('div.panel.history', {},
         h('h3', {}, 'Recent activity'),
