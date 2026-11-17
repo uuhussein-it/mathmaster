@@ -44,6 +44,13 @@ export async function login(email, password) {
   adopt((await api('api/auth/login', { method: 'POST', body: { email, password } })).student);
 }
 
+/** Forgot password: ask the teacher for a reset code, then use it. */
+export const requestReset = (email) => api('api/auth/forgot', { method: 'POST', body: { email } });
+
+export async function resetPassword(email, code, password) {
+  adopt((await api('api/auth/reset', { method: 'POST', body: { email, code, password } })).student);
+}
+
 export async function signup(email, password, name) {
   replaceProfile({}); // a new account starts fresh, not with someone else's device progress
   adopt((await api('api/auth/signup', { method: 'POST', body: { email, password, name } })).student);
