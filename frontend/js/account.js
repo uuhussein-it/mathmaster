@@ -88,6 +88,10 @@ onProfileChange(() => account.student && pushProfile());
 
 export const loadGroup = (id) => api(`api/groups/${id}`);
 
+/** Stickers and notes teachers sent this student. */
+export const loadKudos = () => api('api/kudos').then((r) => r.kudos);
+export const markKudosSeen = () => api('api/kudos/seen', { method: 'POST' }).catch(() => {});
+
 /** Feedback about a question (ref) or the site; `recheck` asks AI to grade the answer again. */
 export const sendFeedback = (body) => api('api/ql/feedback', { method: 'POST', body });
 

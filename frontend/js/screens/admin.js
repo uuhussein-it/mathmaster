@@ -16,6 +16,40 @@ const TYPES = [
   ['matching', 'Matching'], ['graph', 'Plot on a graph'], ['parts', 'Multi-part'],
 ];
 const TRACK_NAMES = { asp: 'ASP', advanced: 'Advanced', general: 'General' };
+const STICKERS = [['star', '⭐', 'Star'], ['fire', '🔥', 'On fire'], ['brain', '🧠', 'Big brain'], ['rocket', '🚀', 'Rocket'],
+  ['trophy', '🏆', 'Champion'], ['clap', '👏', 'Well done'], ['gem', '💎', 'Gem'], ['crown', '👑', 'Crown']];
+
+/** Pick a sticker and a short note, then send it to one or more students. */
+function sendSticker(students, done) {
+  let pick = 'star';
+  let from = '';
+  try { from = localStorage.getItem('ql.kudosFrom') || ''; } catch { /* storage off */ }
+  const chips = h('div.sticker-pick', { role: 'radiogroup', 'aria-label': 'Sticker' });
+  const drawChips = () => chips.replaceChildren(...STICKERS.map(([id, icon, label]) => h('button.sticker-chip', {
+    type: 'button', role: 'radio', 'aria-checked': String(id === pick), title: label,
+    onclick: () => { pick = id; drawChips(); },
+  }, h('span', { 'aria-hidden': 'true' }, icon), h('small', {}, label))));
+  drawChips();
+  const close = modal(students.length === 1 ? `Send ${students[0].name} a sticker` : `Send a sticker to ${students.length} students`,
+    h('form.auth-form', {
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const { message, sender } = e.target.elements;
+        try { localStorage.setItem('ql.kudosFrom', sender.value.trim()); } catch { /* storage off */ }
+        try {
+          const r = await adminApi('api/admin/kudos', { method: 'POST', body: { student_ids: students.map((x) => x.id), sticker: pick, message: message.value, from: sender.value } });
+          toast('Sticker sent', `${r.sent} student${r.sent === 1 ? '' : 's'} will see it on their Home page.`, { icon: '💌', tone: 'success' });
+          close();
+          done?.();
+        } catch (err) { toast('Not sent', err.message, { tone: 'danger', icon: '⚠️' }); }
+      },
+    },
+    chips,
+    h('label.field', {}, h('span', {}, 'Note (optional)'), h('input', { name: 'message', maxlength: 140, placeholder: 'Great work on linear equations!' })),
+    h('label.field', {}, h('span', {}, 'From'), h('input', { name: 'sender', maxlength: 30, placeholder: 'Your teacher', value: from })),
+    h('button.btn.primary', { type: 'submit' }, '💌 Send')));
+}
+
 const when = (t) => (t ? new Date(t * 1000).toLocaleString() : '—');
 
 export function renderAdmin(app) {
@@ -353,6 +387,8 @@ export function renderAdmin(app) {
     body.replaceChildren(
       resetPanel || '',
       h('div.admin-filters', {},
+        rows.length > 0 && h('button.btn.ghost.sm.admin-bulk', { type: 'button', onclick: () => sendSticker(rows) },
+          `💌 Sticker to ${state.group || state.search ? `these ${rows.length}` : `all ${rows.length}`}`),
         h('label.field', {}, h('span', {}, 'Group'), h('select', { onchange: (e) => { state.group = e.target.value; draw(); } },
           h('option', { value: '' }, `All groups (${state.students.length})`),
           groups.map((g) => h('option', { value: g, selected: g === state.group }, g)))),
@@ -369,7 +405,7 @@ export function renderAdmin(app) {
           h('td', {}, s.online ? h('span.q-tag.online', {}, 'Online') : when(s.last_seen)),
           h('td', {}, h('button.btn.ghost.sm', {
             onclick: () => set(s, { hidden: !s.hidden }, s.hidden ? 'Back on the leaderboard' : 'Removed from the leaderboard'),
-          }, s.hidden ? '↩ Show' : '🚫 Remove')),
+          }, s.hidden ? '↩ Show' : '🚫 Remove'), ' ', h('button.btn.ghost.sm', { onclick: () => sendSticker([s]) }, '💌 Sticker')),
           owner() && h('td.admin-row-actions', {},
             codeView(s),
             h('button.btn.ghost.sm', { onclick: () => makeCode(s) }, 'Reset code'),
